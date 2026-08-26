@@ -22,6 +22,7 @@
     "verify": "npm run typecheck && npm run lint && npm run test",
     "db:types": "supabase gen types typescript --linked --schema public > src/lib/db/database.types.ts",
     "db:push": "supabase db push",
+    "db:bundle": "node scripts/bundle-migrations.mjs",
     "db:reset": "supabase db reset",
     "create-admin": "tsx scripts/create-admin.ts"
   },
