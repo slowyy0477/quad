@@ -201,6 +201,131 @@ describe('policy execute privileges', () => {
   })
 })
 
+describe('function execute privileges', () => {
+  /**
+   * The other direction from the block above, and the reason 0015 exists.
+   *
+   * `revoke execute on function f() from public` is the idiom you reach for after
+   * learning that PostgreSQL grants EXECUTE on a new function to PUBLIC by
+   * default. It is necessary and it is not sufficient: Supabase also sets
+   *
+   *     alter default privileges in schema public
+   *       grant execute on functions to anon, authenticated, service_role;
+   *
+   * and revoking from PUBLIC does not touch a grant made directly to a role. Ten
+   * functions were written with the insufficient form before this was noticed;
+   * one of them, dispatch_due_reminders(), was service-role-only by intent and
+   * callable by every signed-in user.
+   *
+   * The migrations apply cleanly either way, and a permission test written per
+   * function only catches the functions someone thought to write a test for. So
+   * these two tests enumerate the catalog instead.
+   */
+
+  /** Functions in `public` that a signed-in user is meant to be able to call. */
+  const CLIENT_RPCS = [
+    'convert_idea_to_project',
+    'create_group_conversation',
+    'current_study_streak',
+    'mark_conversation_read',
+    'start_direct_conversation',
+    'total_unread_messages',
+    'touch_last_active',
+    'transfer_project_ownership',
+    'unread_notification_count',
+  ]
+
+  /** Functions in `public` that no client may call, at all. */
+  const SERVICE_ONLY = ['dispatch_due_reminders']
+
+  it('exposes no app helper to a client unless a policy or constraint needs it', async () => {
+    // `security invoker` helpers are exempt by design: app.is_trusted_write()
+    // reads pg_trigger_depth() and a session GUC, so it has to be evaluated in
+    // the caller's own context, which means the caller needs EXECUTE. Running as
+    // the invoker is all it does, so it cannot be used to reach anything the
+    // caller could not reach directly.
+    const rows = await db.asService<{ proname: string; role_name: string }>(`
+      with referenced as (
+        select coalesce(pg_get_expr(p.polqual, p.polrelid), '') || ' ' ||
+               coalesce(pg_get_expr(p.polwithcheck, p.polrelid), '') as expr
+          from pg_policy p
+        union all
+        select pg_get_constraintdef(c.oid) from pg_constraint c where c.contype = 'c'
+      ),
+      fn as (
+        select pr.oid, pr.proname, pr.proname || '(' as needle
+          from pg_proc pr
+          join pg_namespace n on n.oid = pr.pronamespace
+         where n.nspname = 'app'
+           and pr.prosecdef
+      )
+      select fn.proname, role_name
+        from fn
+        cross join unnest(array['anon', 'authenticated']) as role_name
+       where has_function_privilege(role_name, fn.oid, 'EXECUTE')
+         and not exists (
+           select 1 from referenced r where position(fn.needle in r.expr) > 0
+         )
+       order by 1, 2
+    `)
+
+    expect(rows.map((r) => `${r.role_name} -> app.${r.proname}()`)).toEqual([])
+  })
+
+  it('lets no anonymous visitor call any function in public', async () => {
+    // Every RPC here derives its caller from auth.uid(), which is null for an
+    // anonymous request. There is no correct thing for any of them to do on an
+    // anonymous caller's behalf, and several raise distinguishable errors
+    // depending on whether a row exists -- which makes an anonymous EXECUTE an
+    // enumeration oracle for rows the caller cannot read.
+    const rows = await db.asService<{ signature: string }>(`
+      select p.oid::regprocedure::text as signature
+        from pg_proc p
+        join pg_namespace n on n.oid = p.pronamespace
+       where n.nspname = 'public'
+         and not exists (
+           select 1 from pg_depend d
+            where d.objid = p.oid and d.deptype = 'e'
+         )
+         and has_function_privilege('anon', p.oid, 'EXECUTE')
+       order by 1
+    `)
+    expect(rows.map((r) => r.signature)).toEqual([])
+  })
+
+  it('sorts every function in public into exactly one intended audience', async () => {
+    // A new function in `public` fails this test until someone puts its name in
+    // one of the two lists above. That is the point: the decision about who may
+    // call it is made deliberately rather than inherited from a default grant.
+    const rows = await db.asService<{ proname: string; authenticated: boolean }>(`
+      select p.proname,
+             has_function_privilege('authenticated', p.oid, 'EXECUTE') as authenticated
+        from pg_proc p
+        join pg_namespace n on n.oid = p.pronamespace
+       where n.nspname = 'public'
+         and not exists (
+           select 1 from pg_depend d
+            where d.objid = p.oid and d.deptype = 'e'
+         )
+       order by 1
+    `)
+
+    const unaccounted = rows
+      .map((r) => r.proname)
+      .filter((name) => !CLIENT_RPCS.includes(name) && !SERVICE_ONLY.includes(name))
+    expect(unaccounted).toEqual([])
+
+    // Non-vacuity. If the extension filter ever excluded everything, the two
+    // assertions below would both pass against an empty set.
+    expect(rows).toHaveLength(CLIENT_RPCS.length + SERVICE_ONLY.length)
+
+    const wrongAudience = rows
+      .filter((r) => r.authenticated !== CLIENT_RPCS.includes(r.proname))
+      .map((r) => `${r.proname}: authenticated=${r.authenticated}`)
+    expect(wrongAudience).toEqual([])
+  })
+})
+
 describe('signup', () => {
   it('creates a profile row via the auth.users trigger', async () => {
     const userId = await db.createUser({ fullName: 'Ada Lovelace' })
