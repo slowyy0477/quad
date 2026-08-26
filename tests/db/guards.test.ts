@@ -83,6 +83,20 @@ describe('app.is_privileged_role', () => {
 })
 
 describe('app.reject_protected_column_change', () => {
+  it('returns false, never null, when nothing marks the write as trusted', async () => {
+    // The trusted-write helpers read a GUC with current_setting(..., true),
+    // which is NULL until something sets it. `false or null or false` is NULL,
+    // and `if not null then` skips its body -- so a guard written as
+    // `if not app.is_trusted_write() then <enforce> end if` silently stops
+    // enforcing. Both helpers coalesce for exactly this reason.
+    const rows = await db.asUser<{ a: boolean; b: boolean }>(
+      user,
+      `select app.is_trusted_write() as a, app.is_marked_trusted_write() as b`,
+    )
+    expect(rows[0]!.a).toBe(false)
+    expect(rows[0]!.b).toBe(false)
+  })
+
   it('refuses a client write to a protected column', async () => {
     // profiles.follower_count is trigger-maintained. Letting a client set it
     // would make every follower number on the site a claim rather than a fact.

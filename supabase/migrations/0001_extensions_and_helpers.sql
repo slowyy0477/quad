@@ -207,6 +207,49 @@ revoke execute on function app.begin_trusted_write() from public;
 
 
 -- -----------------------------------------------------------------------------
+-- app.is_trusted_write() — "was this write issued by the schema's own code?"
+--
+-- True in three cases:
+--   * pg_trigger_depth() > 1, i.e. the statement was issued by another trigger.
+--     A statement the client issued itself always fires at depth 1.
+--   * the transaction was explicitly marked by app.begin_trusted_write().
+--   * the caller is not a browser client at all (migration, cron, service role).
+--
+-- app.is_marked_trusted_write() is the strict variant, without the depth
+-- allowance, for guards where the only legitimate bypass is one specific RPC.
+-- -----------------------------------------------------------------------------
+-- Both coalesce the GUC lookup. current_setting(..., true) returns NULL when the
+-- setting has never been set, and `false or null or false` is NULL rather than
+-- false in SQL's three-valued logic -- which makes `if not f() then` skip its
+-- body instead of running it, silently disabling the guard that calls it.
+create or replace function app.is_trusted_write()
+returns boolean
+language sql
+stable
+set search_path = ''
+as $$
+  select pg_catalog.pg_trigger_depth() > 1
+      or coalesce(pg_catalog.current_setting('app.trusted_write', true), '') = 'on'
+      or app.is_privileged_role();
+$$;
+
+create or replace function app.is_marked_trusted_write()
+returns boolean
+language sql
+stable
+set search_path = ''
+as $$
+  select coalesce(pg_catalog.current_setting('app.trusted_write', true), '') = 'on'
+      or app.is_privileged_role();
+$$;
+
+revoke execute on function app.is_trusted_write()        from public;
+revoke execute on function app.is_marked_trusted_write() from public;
+grant execute on function app.is_trusted_write()        to authenticated, anon, service_role;
+grant execute on function app.is_marked_trusted_write() to authenticated, anon, service_role;
+
+
+-- -----------------------------------------------------------------------------
 -- app.reject_protected_column_change(col, ...)
 --
 -- Makes specific columns immutable from client roles even though the row itself
@@ -249,10 +292,7 @@ declare
 begin
   -- Written by one of our own triggers, or by a SECURITY DEFINER function that
   -- explicitly declared the write trusted.
-  if pg_catalog.pg_trigger_depth() > 1
-     or pg_catalog.current_setting('app.trusted_write', true) = 'on'
-     or app.is_privileged_role()
-  then
+  if app.is_trusted_write() then
     return new;
   end if;
 

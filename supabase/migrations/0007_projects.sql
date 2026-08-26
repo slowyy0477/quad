@@ -187,7 +187,11 @@ begin
   new.title := btrim(new.title);
 
   if tg_op = 'INSERT' then
-    if not app.is_privileged_role() then
+    -- The strict variant: only a SECURITY DEFINER function that has explicitly
+    -- marked its write (public.convert_idea_to_project) may name an owner other
+    -- than the caller. A client insert always has owner_id overwritten, so a
+    -- forged value is inert rather than rejected.
+    if not app.is_marked_trusted_write() then
       new.owner_id          := auth.uid();
       new.member_count      := 0;
       new.star_count        := 0;
@@ -541,14 +545,18 @@ begin
 
   elsif tg_op = 'UPDATE' then
     -- Ownership transfer is a deliberate, separate operation
-    -- (app.transfer_project_ownership), not a role edit.
-    if old.role = 'owner' and new.role <> 'owner' then
-      raise exception 'Cannot demote the project owner'
-        using errcode = '42501', hint = 'owner_role_immutable';
-    end if;
-    if new.role = 'owner' and old.role <> 'owner' then
-      raise exception 'Use transfer_project_ownership to change owner'
-        using errcode = '42501', hint = 'owner_role_reserved';
+    -- (public.transfer_project_ownership), not a role edit. That function marks
+    -- its transaction with app.begin_trusted_write(); nothing else may move the
+    -- owner role, and in particular no client UPDATE can.
+    if not app.is_marked_trusted_write() then
+      if old.role = 'owner' and new.role <> 'owner' then
+        raise exception 'Cannot demote the project owner'
+          using errcode = '42501', hint = 'owner_role_immutable';
+      end if;
+      if new.role = 'owner' and old.role <> 'owner' then
+        raise exception 'Use transfer_project_ownership to change owner'
+          using errcode = '42501', hint = 'owner_role_reserved';
+      end if;
     end if;
   end if;
 
@@ -735,6 +743,12 @@ begin
     raise exception 'The new owner must already be a project member'
       using errcode = '23514', hint = 'new_owner_not_member';
   end if;
+
+  -- Everything below rewrites columns that are deliberately closed to clients:
+  -- projects.owner_id is in the protected list, and the owner role on
+  -- project_members is guarded against any UPDATE. Ownership can only move
+  -- through this function, so this is where the write is declared trusted.
+  perform app.begin_trusted_write();
 
   -- Vacate the owner slot first so the partial unique index is never violated.
   update public.project_members

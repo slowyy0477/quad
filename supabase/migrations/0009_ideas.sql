@@ -128,10 +128,11 @@ begin
   );
 
   -- Conversion is done through public.convert_idea_to_project, which sets both
-  -- columns together. Blocking the direct path keeps the coherence constraints
-  -- from being the only thing standing between us and a half-converted idea.
+  -- columns together and marks the transaction with app.begin_trusted_write().
+  -- Blocking the direct path keeps the coherence constraints from being the only
+  -- thing standing between us and a half-converted idea.
   if tg_op = 'UPDATE'
-     and not app.is_privileged_role()
+     and not app.is_marked_trusted_write()
      and new.converted_project_id is distinct from old.converted_project_id
   then
     raise exception 'Use convert_idea_to_project to convert an idea'
@@ -350,6 +351,12 @@ begin
     raise exception 'This idea has already become a project'
       using errcode = '23505', hint = 'already_converted';
   end if;
+
+  -- The project is created on the idea author's behalf, which means naming an
+  -- owner_id rather than letting the trigger default it to the caller. That is a
+  -- protected write, so it is declared trusted here; it also covers the
+  -- converted_project_id update at the end of this function.
+  perform app.begin_trusted_write();
 
   insert into public.projects
     (owner_id, title, tagline, description, category, status, visibility,
