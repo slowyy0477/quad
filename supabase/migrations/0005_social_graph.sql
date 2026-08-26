@@ -198,7 +198,19 @@ as $$
 $$;
 
 revoke execute on function app.share_university(uuid, uuid) from public;
-grant execute on function app.share_university(uuid, uuid) to authenticated, service_role;
+-- anon needs EXECUTE even though an anonymous visitor can never share a
+-- university with anyone. RLS policy expressions run with the privileges of the
+-- CALLING role, and every visibility policy in the schema is written as
+--
+--   visibility = 'public' or (visibility = 'university' and app.share_university(...))
+--
+-- SQL does not guarantee left-to-right short-circuiting of OR, so as soon as a
+-- single university-scoped row exists, an anonymous SELECT reaches this function
+-- and fails the whole statement with "permission denied for function
+-- share_university" -- not a filtered row, an outright error on the feed.
+-- Granting it is safe: the body returns false when either argument is null, and
+-- auth.uid() is null for anon.
+grant execute on function app.share_university(uuid, uuid) to authenticated, anon, service_role;
 
 
 -- -----------------------------------------------------------------------------

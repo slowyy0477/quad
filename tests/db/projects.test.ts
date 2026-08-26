@@ -211,11 +211,36 @@ describe('visibility', () => {
     expect(notSeen).toEqual([])
   })
 
-  it('hides projects from anonymous visitors entirely', async () => {
-    await createProject(owner, { visibility: 'public' })
+  it('shows an anonymous visitor public projects and nothing else', async () => {
+    // A public project page has to work for a visitor with no account -- it is
+    // the main way a project gets found. So `anon` holds SELECT on the table and
+    // the policy does the filtering, which means the policy has to be right.
+    //
+    // This test previously asserted that anonymous reads were refused outright,
+    // and passed: the statement really did fail, but with "permission denied for
+    // function is_moderator" -- projects_select calls helpers that were granted
+    // only to `authenticated`. A broad /permission denied/ matcher read a broken
+    // feed as a working access control. The helpers are granted to anon now (see
+    // 0002/0005) and the invariant is checked for every policy in schema.test.ts.
+    const open = await createProject(owner, { visibility: 'public' })
+    const scoped = await createProject(owner, { visibility: 'university' })
+    const hidden = await createProject(owner, { visibility: 'private' })
 
+    const rows = await db.asAnon<{ id: string }>(
+      `select id from public.projects where id = any($1::uuid[])`,
+      [[open, scoped, hidden]],
+    )
+    expect(rows.map((r) => r.id)).toEqual([open])
+  })
+
+  it('does not let an anonymous visitor write anything', async () => {
     await expectRejection(
-      () => db.asAnon(`select id from public.projects`),
+      () =>
+        db.asAnon(
+          `insert into public.projects (owner_id, title, category)
+           values ($1, 'Anonymous Project', 'web')`,
+          [owner],
+        ),
       REJECTS.permissionDenied,
     )
   })

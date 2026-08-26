@@ -136,6 +136,7 @@ alter table public.skills enable row level security;
 -- public profile need to read the skill names on it.
 create policy skills_select_approved
   on public.skills for select
+  to anon, authenticated
   using (is_approved);
 
 create policy skills_select_own_proposal
@@ -301,6 +302,7 @@ alter table public.profile_skills enable row level security;
 -- can drift apart.
 create policy profile_skills_select
   on public.profile_skills for select
+  to anon, authenticated
   using (app.can_view_profile(profile_id));
 
 create policy profile_skills_insert_self
@@ -419,6 +421,7 @@ alter table public.profile_skill_endorsements enable row level security;
 
 create policy profile_skill_endorsements_select
   on public.profile_skill_endorsements for select
+  to anon, authenticated
   using (app.can_view_profile(profile_id));
 
 create policy profile_skill_endorsements_insert
@@ -521,6 +524,7 @@ alter table public.interests enable row level security;
 
 create policy interests_select_approved
   on public.interests for select
+  to anon, authenticated
   using (is_approved);
 
 create policy interests_select_own_proposal
@@ -638,6 +642,7 @@ alter table public.profile_interests enable row level security;
 
 create policy profile_interests_select
   on public.profile_interests for select
+  to anon, authenticated
   using (app.can_view_profile(profile_id));
 
 create policy profile_interests_insert_self

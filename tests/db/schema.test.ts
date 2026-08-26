@@ -110,6 +110,97 @@ describe('function hardening', () => {
   })
 })
 
+describe('policy execute privileges', () => {
+  /**
+   * Every `app` function named in a policy expression, cross-joined with every
+   * role that policy applies to.
+   *
+   * This exists because of a failure mode that is invisible in every other test
+   * here. RLS policy expressions are evaluated with the privileges of the
+   * CALLING role, so a policy declared `to anon, authenticated` that calls a
+   * helper granted only to `authenticated` does not quietly return fewer rows --
+   * it raises "permission denied for function ..." and fails the entire SELECT.
+   * And because SQL does not promise left-to-right short-circuiting of OR, the
+   * failure does not even require the guarded branch to be relevant: one
+   * university-scoped row in the table is enough to break anonymous browsing of
+   * the whole feed.
+   *
+   * The migrations apply cleanly either way -- GRANTs are not validated against
+   * policy bodies -- so nothing catches this except reading every policy, which
+   * is what the query below does.
+   */
+  const GAPS_SQL = `
+    with pol as (
+      select c.relname as tablename,
+             p.polname,
+             case
+               when p.polroles = '{0}'::oid[] then array['public']
+               else array(select r.rolname::text from pg_roles r
+                           where r.oid = any(p.polroles))
+             end as roles,
+             coalesce(pg_get_expr(p.polqual, p.polrelid), '') || ' ' ||
+             coalesce(pg_get_expr(p.polwithcheck, p.polrelid), '') as expr
+        from pg_policy p
+        join pg_class c on c.oid = p.polrelid
+        join pg_namespace n on n.oid = c.relnamespace
+       where n.nspname = 'public'
+    ),
+    fn as (
+      -- Matched on the bare name rather than "app.name(" so the assertion does
+      -- not depend on how pg_get_expr chooses to schema-qualify the call.
+      select pr.oid, pr.proname, pr.proname || '(' as needle
+        from pg_proc pr
+        join pg_namespace n on n.oid = pr.pronamespace
+       where n.nspname = 'app'
+    )
+    select pol.tablename, pol.polname, role_name, fn.proname
+      from pol
+      cross join unnest(pol.roles) as role_name
+      join fn on position(fn.needle in pol.expr) > 0
+     where role_name <> 'service_role'
+       and not has_function_privilege(role_name, fn.oid, 'EXECUTE')
+     order by 1, 2, 3, 4
+  `
+
+  it('grants EXECUTE on every helper a policy calls, to every role it applies to', async () => {
+    const rows = await db.asService<{
+      tablename: string
+      polname: string
+      role_name: string
+      proname: string
+    }>(GAPS_SQL)
+
+    expect(
+      rows.map((r) => `${r.tablename}.${r.polname}: ${r.role_name} -> app.${r.proname}()`),
+    ).toEqual([])
+  })
+
+  it('actually matches policy expressions to functions', async () => {
+    // Guards the test above against passing vacuously. If pg_get_expr ever
+    // renders calls in a form the needle does not match, the gap query returns
+    // zero rows for the wrong reason and the check silently stops working.
+    const rows = await db.asService<{ pairs: number }>(`
+      with pol as (
+        select coalesce(pg_get_expr(p.polqual, p.polrelid), '') || ' ' ||
+               coalesce(pg_get_expr(p.polwithcheck, p.polrelid), '') as expr
+          from pg_policy p
+          join pg_class c on c.oid = p.polrelid
+          join pg_namespace n on n.oid = c.relnamespace
+         where n.nspname = 'public'
+      ),
+      fn as (
+        select pr.proname || '(' as needle
+          from pg_proc pr
+          join pg_namespace n on n.oid = pr.pronamespace
+         where n.nspname = 'app'
+      )
+      select count(*)::int as pairs
+        from pol join fn on position(fn.needle in pol.expr) > 0
+    `)
+    expect(rows[0]!.pairs).toBeGreaterThan(20)
+  })
+})
+
 describe('signup', () => {
   it('creates a profile row via the auth.users trigger', async () => {
     const userId = await db.createUser({ fullName: 'Ada Lovelace' })

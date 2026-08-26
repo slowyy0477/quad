@@ -219,6 +219,7 @@ alter table public.ideas enable row level security;
 -- ideas_popular_idx instead of evaluating a function for every row.
 create policy ideas_select
   on public.ideas for select
+  to anon, authenticated
   using (
     (
       deleted_at is null
@@ -293,6 +294,7 @@ alter table public.idea_skills enable row level security;
 
 create policy idea_skills_select
   on public.idea_skills for select
+  to anon, authenticated
   using (app.can_view_idea(idea_id));
 
 create policy idea_skills_write_author
@@ -454,6 +456,7 @@ alter table public.idea_votes enable row level security;
 
 create policy idea_votes_select
   on public.idea_votes for select
+  to anon, authenticated
   using (app.can_view_idea(idea_id));
 
 create policy idea_votes_insert_self
@@ -705,6 +708,7 @@ alter table public.idea_comments enable row level security;
 
 create policy idea_comments_select
   on public.idea_comments for select
+  to anon, authenticated
   using (
     app.can_view_idea(idea_id)
     and (

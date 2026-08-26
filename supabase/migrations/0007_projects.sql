@@ -447,6 +447,7 @@ alter table public.projects enable row level security;
 -- the policy would force a sequential scan of every project in the table.
 create policy projects_select
   on public.projects for select
+  to anon, authenticated
   using (
     (
       deleted_at is null
@@ -657,6 +658,7 @@ alter table public.project_members enable row level security;
 
 create policy project_members_select
   on public.project_members for select
+  to anon, authenticated
   using (app.can_view_project(project_id));
 
 -- Owners and maintainers add members directly (used by the accept-application
@@ -1227,6 +1229,7 @@ alter table public.project_skills enable row level security;
 
 create policy project_skills_select
   on public.project_skills for select
+  to anon, authenticated
   using (app.can_view_project(project_id));
 
 create policy project_skills_write_manage
@@ -1313,6 +1316,7 @@ alter table public.project_media enable row level security;
 
 create policy project_media_select
   on public.project_media for select
+  to anon, authenticated
   using (app.can_view_project(project_id));
 
 create policy project_media_insert_manage
@@ -1400,6 +1404,7 @@ alter table public.project_stars enable row level security;
 
 create policy project_stars_select
   on public.project_stars for select
+  to anon, authenticated
   using (app.can_view_project(project_id));
 
 create policy project_stars_insert_self
