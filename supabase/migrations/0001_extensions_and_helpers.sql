@@ -128,8 +128,35 @@ revoke execute on function app.unique_slug(text, text, text) from public;
 
 
 -- -----------------------------------------------------------------------------
--- app.is_privileged_role() — true for the roles that legitimately bypass the
--- client-facing guards (migrations, server-side admin operations, Auth hooks).
+-- app.is_privileged_role() — true when the statement is NOT running on behalf of
+-- a browser client, i.e. a migration, a cron job, or a trusted server using the
+-- service-role key. Client-facing guards ("force owner_id to auth.uid()", "zero
+-- the denormalised counters") are skipped only for these callers.
+--
+-- WHY NOT current_user
+--
+-- The obvious implementation -- `current_user in ('postgres', 'service_role', …)`
+-- -- is wrong, and wrong in the most dangerous direction. Inside a SECURITY
+-- DEFINER function current_user is the function OWNER, not the caller. Nearly
+-- every guard in this schema lives in a SECURITY DEFINER trigger, so a
+-- current_user test reports "privileged" for every ordinary user and silently
+-- skips the defence it was written to apply.
+--
+-- session_user is no better: under PostgREST the connection authenticates as
+-- `authenticator` and then issues SET ROLE, so session_user is `authenticator`
+-- for browser requests and `postgres` for migrations -- neither of which
+-- identifies the caller.
+--
+-- So the decision is made from the request context instead, and it requires TWO
+-- independent signals to agree before granting the bypass:
+--
+--   1. the verified JWT role claim, which PostgREST sets from the signed token
+--      and which SQL running inside a request cannot rewrite; and
+--   2. the `role` GUC, which reflects the SET ROLE PostgREST issued and which
+--      SECURITY DEFINER does not disturb.
+--
+-- Requiring both makes the function fail closed: if either signal says this
+-- looks like a client request, no bypass.
 -- -----------------------------------------------------------------------------
 create or replace function app.is_privileged_role()
 returns boolean
@@ -137,13 +164,46 @@ language sql
 stable
 set search_path = ''
 as $$
-  select current_user in (
-    'postgres', 'service_role', 'supabase_admin', 'supabase_auth_admin'
-  );
+  select coalesce(
+           nullif(current_setting('request.jwt.claims', true), '')::jsonb ->> 'role',
+           ''
+         ) not in ('anon', 'authenticated')
+     and coalesce(current_setting('role', true), 'none')
+         not in ('anon', 'authenticated');
 $$;
+
+comment on function app.is_privileged_role() is
+  'True only for non-client callers (migrations, cron, service-role requests).
+   Deliberately does not use current_user, which SECURITY DEFINER rewrites to the
+   function owner and would therefore report every user as privileged.';
 
 revoke execute on function app.is_privileged_role() from public;
 grant execute on function app.is_privileged_role() to authenticated, anon, service_role;
+
+
+-- -----------------------------------------------------------------------------
+-- app.begin_trusted_write() — marks the remainder of the current transaction as
+-- a trusted server-side write, exempting it from the protected-column guard.
+--
+-- For the handful of SECURITY DEFINER functions that legitimately rewrite a
+-- protected column as part of an atomic operation (transferring project
+-- ownership, converting an idea into a project). The flag is transaction-local,
+-- so it cannot leak into a later request on a pooled connection.
+--
+-- A client cannot set this: PostgREST executes only the RPCs we define, and even
+-- if the flag were somehow set, the column-level UPDATE grants still stand.
+-- -----------------------------------------------------------------------------
+create or replace function app.begin_trusted_write()
+returns void
+language plpgsql
+set search_path = ''
+as $$
+begin
+  perform pg_catalog.set_config('app.trusted_write', 'on', true);
+end;
+$$;
+
+revoke execute on function app.begin_trusted_write() from public;
 
 
 -- -----------------------------------------------------------------------------
@@ -157,6 +217,24 @@ grant execute on function app.is_privileged_role() to authenticated, anon, servi
 -- Usage:
 --   create trigger x before update on public.t for each row
 --     execute function app.reject_protected_column_change('status', 'role');
+--
+-- WHY THE EXEMPTION IS BASED ON TRIGGER DEPTH, NOT ON THE ROLE
+--
+-- Most protected columns are denormalised counters and summaries that our own
+-- triggers maintain -- conversations.last_message_at, profiles.follower_count,
+-- projects.member_count. Those triggers are SECURITY DEFINER, so they cannot be
+-- recognised by any test on the current role: app.is_privileged_role()
+-- deliberately reports them as unprivileged (see its comment), and current_user
+-- reports them as the owner, which would exempt real client writes too.
+--
+-- pg_trigger_depth() answers the question exactly. A statement the client issued
+-- itself fires this guard at depth 1. A statement issued *by another trigger*
+-- fires it at depth 2 or more. So the guard polices client statements and trusts
+-- writes made by the schema's own trigger code, which is the only code that can
+-- reach depth 2.
+--
+-- The second-layer property survives: if a `grant update` is added by mistake
+-- tomorrow, the client's direct UPDATE is still at depth 1 and is still refused.
 -- -----------------------------------------------------------------------------
 create or replace function app.reject_protected_column_change()
 returns trigger
@@ -169,7 +247,12 @@ declare
   v_old text;
   v_new text;
 begin
-  if app.is_privileged_role() then
+  -- Written by one of our own triggers, or by a SECURITY DEFINER function that
+  -- explicitly declared the write trusted.
+  if pg_catalog.pg_trigger_depth() > 1
+     or pg_catalog.current_setting('app.trusted_write', true) = 'on'
+     or app.is_privileged_role()
+  then
     return new;
   end if;
 
