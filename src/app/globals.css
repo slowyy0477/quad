@@ -1,1 +1,275 @@
-@import "tailwindcss";
+@import 'tailwindcss';
+
+/* =============================================================================
+   Quad — design tokens
+
+   The brief said the result must not look like it was generated. Concretely that
+   ruled out the house style of AI-built dashboards: violet-to-blue gradients,
+   frosted glass, a glow behind every card, and a layout where each paragraph
+   sits in its own rounded box.
+
+   So this is built the other way round, from print. A university network is a
+   reading and writing tool -- profiles, posts, project write-ups, notes -- and
+   editorial design has solved that problem for a century. What that means here:
+
+     * Warm paper rather than pure white, near-black ink rather than grey-on-grey.
+     * One institutional accent (a deep green) used for actions and nothing else,
+       so a green thing on the page is always something you can click.
+     * Rules, not shadows. A 1px line is how print separates things; a drop shadow
+       is how a UI kit does. Two elevations exist, both barely visible, both for
+       things that genuinely float (menus, dialogs).
+     * 4px radius. Enough to look intentional, not enough to look like a pill.
+     * A serif for display type and a real type scale, so hierarchy comes from
+       size and weight instead of from colour and borders.
+
+   Dark mode is a genuine inversion rather than a filter: the paper becomes a warm
+   near-black, the accent lightens to hold its contrast against it, and the rules
+   get slightly brighter because a hairline that reads on paper disappears on ink.
+   ============================================================================= */
+
+@theme {
+  /* ---------------------------------------------------------------------------
+     Palette
+
+     Written in oklch because it makes lightness mean the same thing across hues:
+     `--color-accent-600` and `--color-danger-600` are genuinely equally dark, so
+     swapping one for the other does not change how heavy a button looks.
+     --------------------------------------------------------------------------- */
+
+  /* Paper and ink. Not #fff and #000: pure white glares under long reading and
+     pure black on white vibrates at small sizes. */
+  --color-paper: oklch(99.1% 0.004 85);
+  --color-paper-raised: oklch(100% 0 0);
+  --color-paper-sunken: oklch(97.2% 0.006 85);
+  --color-ink: oklch(21% 0.012 265);
+  --color-ink-muted: oklch(46% 0.014 265);
+  --color-ink-faint: oklch(62% 0.012 265);
+
+  /* Rules. Two weights: hairline for inside a component, rule for between them. */
+  --color-hairline: oklch(92.5% 0.005 85);
+  --color-rule: oklch(87% 0.007 85);
+
+  /* Accent — a deep institutional green. Chosen partly because it is *not* the
+     default: violet and cornflower blue are the two colours every generated
+     interface reaches for, and avoiding them does more for the result than any
+     amount of layout work. */
+  --color-accent-50: oklch(97% 0.018 160);
+  --color-accent-100: oklch(93.5% 0.035 160);
+  --color-accent-200: oklch(87% 0.055 160);
+  --color-accent-400: oklch(64% 0.085 162);
+  --color-accent-600: oklch(46.5% 0.078 163);
+  --color-accent-700: oklch(39.5% 0.068 164);
+  --color-accent-900: oklch(26% 0.045 165);
+
+  /* Highlight — a warm ochre, for the few places that need attention without
+     implying an action: new-since-last-visit marks, unread dots, annotations. */
+  --color-highlight-100: oklch(95% 0.045 85);
+  --color-highlight-400: oklch(78% 0.115 78);
+  --color-highlight-700: oklch(52% 0.095 70);
+
+  /* Status. Danger is a brick red rather than a fire-engine red so that a
+     destructive button does not shout louder than the content around it. */
+  --color-danger-50: oklch(96.5% 0.02 25);
+  --color-danger-100: oklch(92% 0.04 25);
+  --color-danger-600: oklch(51% 0.155 27);
+  --color-danger-700: oklch(44% 0.14 27);
+  --color-success-50: oklch(96.5% 0.025 155);
+  --color-success-600: oklch(52% 0.11 157);
+  --color-warning-50: oklch(97% 0.035 90);
+  --color-warning-600: oklch(58% 0.115 75);
+
+  /* -------------------------------------------------------------------------
+     Type
+
+     A serif display face for headings and a sans for interface text. Both are
+     system stacks: a self-hosted webfont is two more network requests and a
+     layout shift, and the argument for one has to be stronger than "it looks
+     more designed".
+     ------------------------------------------------------------------------- */
+  --font-display: 'Iowan Old Style', 'Palatino Linotype', Palatino, 'Book Antiqua',
+    'Source Serif 4', Georgia, ui-serif, serif;
+  --font-sans: ui-sans-serif, system-ui, -apple-system, 'Segoe UI', Roboto, 'Helvetica Neue',
+    Arial, sans-serif;
+  --font-mono: ui-monospace, 'SF Mono', 'Cascadia Mono', 'Roboto Mono', Menlo, Consolas, monospace;
+
+  /* A modular scale, roughly 1.2, with line heights set per size rather than
+     inherited -- display type needs tighter leading than body text, and a single
+     `leading-relaxed` on the body makes headings look loose. */
+  --text-2xs: 0.6875rem;
+  --text-2xs--line-height: 1.45;
+  --text-xs: 0.775rem;
+  --text-xs--line-height: 1.5;
+  --text-sm: 0.875rem;
+  --text-sm--line-height: 1.55;
+  --text-base: 1rem;
+  --text-base--line-height: 1.65;
+  --text-lg: 1.125rem;
+  --text-lg--line-height: 1.6;
+  --text-xl: 1.375rem;
+  --text-xl--line-height: 1.4;
+  --text-2xl: 1.75rem;
+  --text-2xl--line-height: 1.28;
+  --text-3xl: 2.25rem;
+  --text-3xl--line-height: 1.18;
+  --text-4xl: 2.9rem;
+  --text-4xl--line-height: 1.08;
+  --text-5xl: 3.6rem;
+  --text-5xl--line-height: 1.03;
+
+  --radius-xs: 2px;
+  --radius-sm: 3px;
+  --radius-DEFAULT: 4px;
+  --radius-md: 6px;
+  --radius-lg: 8px;
+
+  /* Two elevations, both restrained, both for things that actually float. */
+  --shadow-raised: 0 1px 2px oklch(21% 0.012 265 / 0.05), 0 1px 1px oklch(21% 0.012 265 / 0.04);
+  --shadow-float: 0 8px 24px -6px oklch(21% 0.012 265 / 0.13), 0 2px 6px oklch(21% 0.012 265 / 0.06);
+
+  --ease-out-soft: cubic-bezier(0.22, 1, 0.36, 1);
+}
+
+/* -----------------------------------------------------------------------------
+   Dark mode.
+
+   Class-based rather than media-query-based, because the settings page offers an
+   explicit choice and a preference the user stated must beat one the OS inferred.
+   The `:where()` keeps specificity at zero so component classes still win.
+   ----------------------------------------------------------------------------- */
+@custom-variant dark (&:where(.dark, .dark *));
+
+.dark {
+  --color-paper: oklch(17.5% 0.008 265);
+  --color-paper-raised: oklch(21.5% 0.009 265);
+  --color-paper-sunken: oklch(14.5% 0.007 265);
+  --color-ink: oklch(94% 0.005 85);
+  --color-ink-muted: oklch(72% 0.008 265);
+  --color-ink-faint: oklch(57% 0.009 265);
+
+  --color-hairline: oklch(27% 0.008 265);
+  --color-rule: oklch(33% 0.009 265);
+
+  /* The accent lightens. The light-mode green is legible on paper and nearly
+     invisible on ink; keeping one value for both would fail contrast in one of
+     them, and it is always the dark one nobody checks. */
+  --color-accent-50: oklch(24% 0.03 163);
+  --color-accent-100: oklch(29% 0.042 163);
+  --color-accent-200: oklch(36% 0.055 163);
+  --color-accent-400: oklch(62% 0.09 162);
+  --color-accent-600: oklch(74% 0.105 161);
+  --color-accent-700: oklch(82% 0.095 160);
+  --color-accent-900: oklch(92% 0.05 160);
+
+  --color-highlight-100: oklch(28% 0.045 80);
+  --color-highlight-400: oklch(76% 0.11 80);
+  --color-highlight-700: oklch(86% 0.08 82);
+
+  --color-danger-50: oklch(25% 0.045 27);
+  --color-danger-100: oklch(31% 0.06 27);
+  --color-danger-600: oklch(69% 0.14 27);
+  --color-danger-700: oklch(78% 0.11 27);
+  --color-success-50: oklch(24% 0.04 157);
+  --color-success-600: oklch(72% 0.1 157);
+  --color-warning-50: oklch(26% 0.04 80);
+  --color-warning-600: oklch(78% 0.1 80);
+}
+
+@layer base {
+  *,
+  *::before,
+  *::after {
+    border-color: var(--color-hairline);
+  }
+
+  html {
+    /* Not `scroll-behavior: smooth` unconditionally -- it makes anchor navigation
+       nauseating for some readers and is one of the things a reduced-motion
+       preference is specifically about. */
+    -webkit-text-size-adjust: 100%;
+  }
+
+  @media (prefers-reduced-motion: no-preference) {
+    html:focus-within {
+      scroll-behavior: smooth;
+    }
+  }
+
+  body {
+    background-color: var(--color-paper);
+    color: var(--color-ink);
+    font-family: var(--font-sans);
+    font-size: var(--text-base);
+    line-height: var(--text-base--line-height);
+    -webkit-font-smoothing: antialiased;
+    text-rendering: optimizeLegibility;
+  }
+
+  h1,
+  h2,
+  h3 {
+    font-family: var(--font-display);
+    font-weight: 600;
+    letter-spacing: -0.011em;
+    text-wrap: balance;
+  }
+
+  /* Long-form text reads better when the last line isn't a single word. */
+  p {
+    text-wrap: pretty;
+  }
+
+  /* One focus style for everything, defined once. A component that overrides it
+     usually means someone found it ugly on that one control and made it invisible
+     everywhere similar. */
+  :focus-visible {
+    outline: 2px solid var(--color-accent-600);
+    outline-offset: 2px;
+    border-radius: var(--radius-xs);
+  }
+
+  /* Keyboard users get the ring; a mouse click on a button should not leave one. */
+  :focus:not(:focus-visible) {
+    outline: none;
+  }
+
+  ::selection {
+    background-color: var(--color-accent-100);
+    color: var(--color-accent-900);
+  }
+
+  /* Tabular figures wherever numbers are compared vertically -- counts, dates,
+     grades. Proportional digits make a column of numbers look ragged. */
+  .tabular {
+    font-variant-numeric: tabular-nums;
+  }
+
+  @media (prefers-reduced-motion: reduce) {
+    *,
+    *::before,
+    *::after {
+      animation-duration: 0.01ms !important;
+      animation-iteration-count: 1 !important;
+      transition-duration: 0.01ms !important;
+    }
+  }
+}
+
+@layer components {
+  /* The skip link. Present in the DOM, off-screen until focused, so a keyboard
+     user can jump the navigation instead of tabbing through it on every page. */
+  .skip-link {
+    position: absolute;
+    left: -9999px;
+    z-index: 999;
+  }
+
+  .skip-link:focus {
+    left: 1rem;
+    top: 1rem;
+    padding: 0.5rem 0.875rem;
+    background-color: var(--color-paper-raised);
+    border: 1px solid var(--color-rule);
+    border-radius: var(--radius-DEFAULT);
+    box-shadow: var(--shadow-float);
+  }
+}
