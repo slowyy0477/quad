@@ -1,6 +1,24 @@
 # Architecture
 
-> Status: **authoritative**. Change this document before changing the structure it describes.
+> Status: **target design.** This document was written before implementation and
+> describes where the codebase is going. Change it before changing the structure it
+> describes.
+>
+> **Where the code differs from this document today** — stated up front, because a
+> design doc that quietly disagrees with the repository is worse than no design doc:
+>
+> | This document says | The code does | Why |
+> | --- | --- | --- |
+> | `src/modules/<domain>/` | `src/features/<domain>/` | renamed for consistency with the route groups; the boundaries are the same |
+> | `schema.ts` / `service.ts` per domain | `schemas.ts`, `queries.ts`, `actions.ts` | no `service.ts` yet — the two implemented domains are thin enough that a service layer would be a file with one function in it |
+> | route groups `(marketing)`, `(auth)`, `(app)` | flat routes under `src/app/` | route groups get added when a group needs its own layout; two of them do not yet |
+> | `lib/supabase/middleware.ts` | `proxy.ts` at the repo root | **Next 16 renamed `middleware.ts` to `proxy.ts`**; the logic lives there rather than in a helper |
+> | ESLint `no-restricted-imports` enforces §3 | not configured | the four rules in §3 are followed by hand and are not yet mechanically enforced |
+> | `revalidateTag('feed:${user.id}')` | `revalidatePath('/feed')` | see §4 |
+> | `lib/rate-limit/` | does not exist | migration `0017_rate_limits` is unwritten |
+> | Realtime (§4), Storage | not wired | no subscriptions, no buckets |
+>
+> Section 12 lists what exists per domain.
 
 ## 1. What this is
 
@@ -13,18 +31,33 @@ tables — not by network hops.
 
 | Concern | Choice | Why |
 |---|---|---|
-| Framework | Next.js (App Router) | RSC lets reads happen server-side with no client bundle cost |
+| Framework | Next.js 16 (App Router) | RSC lets reads happen server-side with no client bundle cost |
 | Language | TypeScript, `strict` | non-negotiable for a schema this size |
 | Styling | Tailwind CSS v4 | CSS-first config; tokens live in `globals.css` |
 | Primitives | Radix UI via shadcn-style local components | accessible by default, we own the source |
 | Database | Supabase Postgres | RLS is the security floor |
 | Auth | Supabase Auth (email/password + Google OAuth) | cookie-based SSR sessions |
-| Realtime | Supabase Realtime | chat + notifications, no polling |
-| Storage | Supabase Storage | avatars, post media, project media, attachments |
+| Realtime | Supabase Realtime | chat + notifications, no polling — **not wired yet** |
+| Storage | Supabase Storage | avatars, post media, attachments — **not wired yet** |
 | Validation | Zod | one schema shared by client form, server action, and tests |
-| Forms | React Hook Form + `zodResolver` | uncontrolled inputs, minimal re-render |
+| Forms | React Hook Form + `zodResolver`, or `useActionState` | uncontrolled inputs, minimal re-render; the auth forms use `useActionState` because they post to Server Actions and must work without JS |
 | Unit/integration | Vitest | fast, ESM-native |
-| E2E | Playwright | real browser, real DB |
+| E2E | Playwright | real browser, real DB — **no specs written** |
+
+### Next 16 notes that cost real debugging time
+
+- `cookies()`, `headers()`, `params` and `searchParams` are **async**. Awaiting them is
+  not optional.
+- `middleware.ts` is now **`proxy.ts`**, exporting `proxy` rather than `middleware`.
+- `next typegen` generates `PageProps<'/route'>` and `LayoutProps<'/'>` into
+  `.next/types`. `tsc --noEmit` fails without it, which is why `npm run typecheck` runs
+  typegen first.
+- The proxy matcher **must** exclude `_next/static`, or an auth check runs in front of
+  the stylesheet — and a redirect there does not fail loudly, it renders the site
+  unstyled.
+- A `'use server'` module may only export **async functions**. Exporting a plain object
+  (a shared `emptyState` constant, say) throws at module evaluation. That is why
+  `form-state.ts` files exist beside the `actions.ts` files.
 
 ## 3. Directory layout
 
@@ -119,13 +152,46 @@ export const createPost = action(CreatePostInput)
 ```
 
 The wrapper does: Zod parse → auth → account status → rate limit → ownership guard →
-service → `revalidateTag` → typed `Result<T>`. Errors become safe user-facing messages;
+service → revalidate → typed `Result<T>`. Errors become safe user-facing messages;
 raw Postgres errors never reach the browser.
+
+**Implemented today** without the wrapper (which does not exist yet), because the
+wrapper's middleware — account status, rate limiting — has no database support yet:
+
+```ts
+export async function createPostAction(_prev: PostFormState, formData: FormData) {
+  const parsed = postSchema.safeParse(...)          // Zod
+  if (!parsed.success) return fieldErrors(parsed)
+  const supabase = await createClient()             // runs AS THE USER, so RLS applies
+  const { error } = await supabase.from('posts').insert({ ...parsed.data })
+  if (error?.code === '42501') return { error: 'You are not allowed to post right now.' }
+  if (error) return { error: GENERIC }              // never the Postgres message
+  revalidatePath('/feed')
+}
+```
+
+Note the insert carries **no `author_id`**: the column defaults to `auth.uid()` and a
+trigger overwrites anything sent, so authorship cannot be forged even by a caller who
+constructs the request by hand.
+
+### Caching decision: `revalidatePath`, not tags — for now
+
+`revalidateTag('feed:${user.id}')` is the design above, and it is wrong for
+user-scoped data as things stand. A per-user tag needs a per-user cache entry, and the
+feed is rendered dynamically per request because RLS makes every user's result
+different. Tagging a response that is never reused buys nothing and creates a cache key
+that must be invalidated correctly forever. `revalidatePath('/feed')` on the writer's
+own request is honest about what is happening. Revisit when there is a genuinely shared,
+cacheable read (a university directory, a public project page).
+
+Also note: `revalidateTag` takes a single argument in Next 16.
 
 ### Realtime
 
 `messages` and `notifications` only. Client subscribes to a filtered channel; RLS applies
 to Realtime too, so a subscription cannot leak rows the user can't already read.
+
+**Not wired.** There are no subscriptions in the codebase. Messaging has no UI.
 
 ## 5. Security model — three independent layers
 
@@ -173,14 +239,33 @@ Generated **in the database**, by triggers, through one function
 
 - the client cannot forge a notification,
 - the sender cannot be trusted to write one,
-- deduplication is a `UNIQUE (recipient, actor, type, entity_type, entity_id) NULLS NOT
-  DISTINCT` constraint rather than application logic that races.
+- deduplication is a constraint rather than application logic that races.
+
+**As built** (migration 0014), the entity reference is a set of **typed, nullable
+foreign-key columns** — `post_id`, `project_id`, `idea_id`, `message_id`, … — with a
+check constraint asserting that exactly one is non-null and that it matches the
+`type`. The design above implied a polymorphic `(entity_type, entity_id)` pair. Typed
+columns won for one reason: a polymorphic id has no referential integrity, so deleting
+a post leaves a notification pointing at nothing, and every read has to defend against
+it. With real foreign keys, `on delete cascade` removes the notification with the row
+it refers to, and the database — not a query — guarantees the target exists.
+
+The cost is a wider table and a migration whenever a new notifiable entity appears.
+That is a good trade: adding a column is a decision someone reviews, which is what you
+want when the question is "should this generate a notification".
+
+Deduplication is `unique (recipient_id, actor_id, type, post_id, project_id, …) nulls
+not distinct` — `nulls not distinct` is load-bearing, because without it every row with
+a null column is unique and the constraint never fires.
 
 ## 9. Error and state contract
 
 Every route that loads data ships four states: `loading.tsx` (or `<Suspense>` + skeleton),
 error boundary, empty state, and content. This is checked in review — a route with no
 empty state is not done.
+
+`src/app/error.tsx` renders `error.digest` **only**, never `error.message`: in a Server
+Component that message can contain a query, a path, or row data.
 
 ## 10. What is deliberately NOT here
 
@@ -193,4 +278,27 @@ empty state is not done.
 
 ## 11. Decisions
 
-Recorded in [`docs/decisions/`](decisions/). Every non-obvious choice above has an ADR.
+The reasoning for each non-obvious choice is written **at the top of the file it
+governs** — the migration headers and the module doc comments — rather than in a
+separate ADR directory. `docs/decisions/` does not exist. That is a deliberate choice
+for a codebase this young: a decision recorded next to the code it constrains is read
+by the person about to change it; one filed in a directory is read by nobody. The
+load-bearing ones are collected in [SECURITY.md](SECURITY.md) and in §2 above.
+
+## 12. What exists today
+
+The single source of truth is [`src/lib/build-status.ts`](../src/lib/build-status.ts),
+which the running application renders at `/status`. It is code, not prose, so the
+placeholder pages and the status page cannot disagree: `PlannedFeature` looks its own
+state up in the same list.
+
+| State | Meaning | Count |
+| --- | --- | --- |
+| `working` | usable end to end, once Supabase is configured | 5 |
+| `partial` | real, incomplete — the gap is named on the page | 2 |
+| `schema-only` | tables, policies and tests exist; **no interface** | 11 |
+| `planned` | designed, not built; the route says so | 7 |
+
+Per-domain: `auth` and `feed` have `schemas.ts` + `queries.ts` + `actions.ts` +
+`components/`. Every other domain exists only as SQL. That asymmetry is the honest
+picture of the project, and `/status` shows it to users rather than hiding it.
