@@ -23,8 +23,7 @@
     "db:types": "supabase gen types typescript --linked --schema public > src/lib/db/database.types.ts",
     "db:push": "supabase db push",
     "db:reset": "supabase db reset",
-    "create-admin": "tsx scripts/create-admin.ts",
-    "seed": "tsx scripts/seed.ts"
+    "create-admin": "tsx scripts/create-admin.ts"
   },
   "dependencies": {
     "@hookform/resolvers": "5.2.2",
