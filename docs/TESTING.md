@@ -9,11 +9,11 @@ Current state, measured — not estimated:
 
 ```
 Test Files  8 passed (8)
-     Tests  292 passed (292)
-  Duration  ~79s
+     Tests  296 passed (296)
+  Duration  ~84s
 ```
 
-All 292 are **database permission tests**. That is a deliberate order of work, not an
+All 296 are **database permission tests**. That is a deliberate order of work, not an
 oversight: the database is the authorization layer, so it is the layer where a missing
 test is a vulnerability rather than a bug.
 
@@ -23,7 +23,7 @@ test is a vulnerability rather than a bug.
 
 | Suite | Assertions | Covers |
 | --- | --- | --- |
-| `tests/db/schema.test.ts` | 13 | Invariants: every table has RLS + a policy; every function's EXECUTE grants match its declared audience |
+| `tests/db/schema.test.ts` | 17 | Invariants: every table has RLS + a policy; every function's EXECUTE grants match its declared audience; the 0016 profile backfill |
 | `tests/db/guards.test.ts` | 14 | `is_privileged_role`, `is_trusted_write`, protected-column rejection, `forbid_write` |
 | `tests/db/projects.test.ts` | 33 | Project membership, roles, invitations, collaboration requests |
 | `tests/db/messaging.test.ts` | 34 | Conversation access — the ID-substitution cases in particular |
@@ -124,6 +124,6 @@ feature works, not that it is safe.
 - Vitest, with `vite-tsconfig-paths` so `@/` resolves.
 - Test names state the rule, not the mechanism: "a non-member cannot read a private
   project", not "test policy 4".
-- The database suite is slow (~79s) because each file boots a Postgres. That is
+- The database suite is slow (~84s) because each file boots a Postgres. That is
   acceptable for a suite that runs on push; do not optimise it by sharing state between
   tests, which would make failures order-dependent.

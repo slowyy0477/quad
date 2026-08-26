@@ -14,8 +14,8 @@ feature is unbuilt says so instead of showing a mock-up.
 
 | Layer | State |
 | --- | --- |
-| Database schema, RLS policies, triggers, functions | **Working.** 15 migrations, 52 tables, 132 `app.*` functions. Every table has policies. |
-| Automated database permission tests | **Working.** 292 tests over 8 files, run against a real Postgres in-process. |
+| Database schema, RLS policies, triggers, functions | **Working.** 16 migrations, 52 tables, 132 `app.*` functions. Every table has policies. |
+| Automated database permission tests | **Working.** 296 tests over 8 files, run against a real Postgres in-process. |
 | Auth — sign up, sign in, sign out, password reset, Google OAuth | **Working**, once Supabase credentials exist. |
 | Design system, app shell, landing/legal/status pages | **Working.** |
 | Feed — write a post, read the feed | **Partly working.** Real reads and writes; no likes/comments controls, no ranking, no pagination UI. |
@@ -100,7 +100,7 @@ Longer discussion in [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md). The other doc
 | [DATABASE.md](docs/DATABASE.md) | the 15 migrations, conventions, the `app` schema |
 | [AUTH.md](docs/AUTH.md) | the four auth flows, the proxy, the cookie dance |
 | [SECURITY.md](docs/SECURITY.md) | threat model, the four authorization layers, what is not protected yet |
-| [TESTING.md](docs/TESTING.md) | what the 292 tests assert — and what has no tests |
+| [TESTING.md](docs/TESTING.md) | what the 296 tests assert — and what has no tests |
 | [ENVIRONMENT.md](docs/ENVIRONMENT.md) | every variable, who may see it, what breaks |
 | [DEPLOYMENT.md](docs/DEPLOYMENT.md) | deploy steps and the production launch checklist |
 | [ADMIN.md](docs/ADMIN.md) | creating the first admin; what admins cannot see |
@@ -123,7 +123,7 @@ Be clear about what has and has not been checked:
 
 - **Verified:** the database layer. `npm test` runs all 15 migrations against
   PostgreSQL 18 (PGlite) and asserts, per role, what each kind of user can read and
-  write. 292 tests pass.
+  write. 296 tests pass.
 - **Verified:** the app compiles, typechecks, lints, and every route returns the
   status it should — checked in a browser against the dev server.
 - **Not verified:** anything requiring a live Supabase project. No Supabase

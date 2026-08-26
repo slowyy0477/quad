@@ -1,6 +1,6 @@
 # Database
 
-PostgreSQL, on Supabase. **15 migrations, 52 tables, 132 functions in the `app`
+PostgreSQL, on Supabase. **16 migrations, 52 tables, 132 functions in the `app`
 schema, ~10,500 lines of SQL.** The schema is the authorization layer, not a storage
 detail — read [SECURITY.md](SECURITY.md) alongside this.
 
@@ -16,6 +16,41 @@ npm run db:push
 Migrations are ordinary, ordered SQL files in `supabase/migrations/`. They are applied
 in filename order and are **not** idempotent by design: each one describes a change
 from the previous state, which is what makes the sequence reviewable.
+
+### Without the CLI
+
+`db:push` needs the CLI logged in and the database password to hand. When that is a
+wall — a first-time setup, a machine without the CLI — bundle the migrations into one
+file and paste it into the dashboard's SQL editor instead:
+
+```bash
+npm run db:bundle
+```
+
+That writes `supabase/apply-all.sql` (git-ignored): every migration in order, wrapped
+in one `begin`/`commit`, ending with the rows the CLI reads from
+`supabase_migrations.schema_migrations` so a later `db push` does not try to re-run
+them. DDL is transactional in Postgres, so it either all applies or none of it does —
+there is no half-applied state to diagnose.
+
+Once the schema is applied, that file will fail on its first `create table`. To apply
+only what is outstanding:
+
+```bash
+node scripts/bundle-migrations.mjs --from 0016
+```
+
+### Checking it landed
+
+```bash
+npm run db:check
+```
+
+Read-only. It parses the expected table list out of `supabase/migrations/`, compares it
+against what the project actually exposes, and confirms `anon` is refused on
+`public.user_roles` — which proves the GRANT statements ran, not just the
+`create table`s. An empty table returns an empty array either way, so "it returned no
+rows" is not evidence.
 
 Regenerate types after any schema change:
 
@@ -42,11 +77,19 @@ npm run db:types
 | 0013 | `opportunities_events` | opportunity and event boards, applications, RSVPs |
 | 0014 | `notifications` | typed-FK notifications with a non-forgeable write path |
 | 0015 | `function_grants` | the grant correction described in SECURITY.md §3 |
+| 0016 | `backfill_profiles` | a profile row for any auth user created before 0004's trigger existed |
+
+0016 is the one migration that is deliberately idempotent, because it repairs data
+rather than describing a schema change. It exists because the order people really do
+first-time setup in is *create project → sign up to check the form → apply migrations*,
+and the trigger that creates profiles only fires for auth users inserted after it
+exists. The user left behind can sign in and has no profile: signed in and unusable at
+once, which is more confusing to debug than being locked out.
 
 ### Planned, not written
 
-`0016_moderation`, `0017_rate_limits`, `0018_search`, `0019_feed`, `0020_storage`,
-`0021_analytics`. Their absence is why the corresponding features read
+`0017_moderation`, `0018_rate_limits`, `0019_search`, `0020_feed`, `0021_storage`,
+`0022_analytics`. Their absence is why the corresponding features read
 **schema-only** or **planned** on `/status`.
 
 ## Conventions

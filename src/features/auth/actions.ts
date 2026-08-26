@@ -142,7 +142,7 @@ export async function signUpAction(
   }
 
   const supabase = await createClient()
-  const { error } = await supabase.auth.signUp({
+  const { data, error } = await supabase.auth.signUp({
     email: parsed.data.email,
     password: parsed.data.password,
     options: {
@@ -160,6 +160,21 @@ export async function signUpAction(
       message: describe(error, 'sign-up'),
       values: { email: raw.email, displayName: raw.displayName },
     }
+  }
+
+  // A project with "Confirm email" switched off signs the user in immediately and
+  // sends no email at all. Sending them to "check your inbox" would be a dead end
+  // waiting for a message that never arrives, so follow the session instead of
+  // assuming the project's configuration.
+  //
+  // This does not weaken the enumeration resistance below. With confirmation on,
+  // an existing address and a new one both come back without a session, so both
+  // take the same branch. With confirmation off, Supabase answers an existing
+  // address with `user_already_exists` — handled above — so the distinction is
+  // already visible whatever this code does.
+  if (data.session) {
+    revalidatePath('/', 'layout')
+    redirect('/onboarding')
   }
 
   // Deliberately the same destination whether or not the address was already

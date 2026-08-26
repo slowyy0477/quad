@@ -11,6 +11,7 @@
  * unprotected table is not a small bug; with Supabase it is a public API.
  */
 import { beforeAll, afterAll, describe, expect, it } from 'vitest'
+import { readFileSync } from 'node:fs'
 import { createTestDb, type TestDb } from './harness'
 
 let db: TestDb
@@ -358,5 +359,88 @@ describe('signup', () => {
     await expect(
       db.asService(`update public.profiles set username = 'TakenHandle' where id = $1`, [b]),
     ).rejects.toThrow(/duplicate key value|unique/i)
+  })
+})
+
+describe('profile backfill (0016)', () => {
+  /**
+   * The trigger above only fires for auth users inserted after it exists, and
+   * the order people do first-time setup in is: create project, sign up to check
+   * the form works, apply migrations. That leaves a user who can sign in and has
+   * no profile -- signed in and unusable simultaneously.
+   *
+   * 0016 repairs it. The statement is read from the migration file rather than
+   * copied here, so the test breaks if the file stops working rather than
+   * agreeing with a stale copy of it.
+   */
+  const BACKFILL = readFileSync('supabase/migrations/0016_backfill_profiles.sql', 'utf8')
+
+  /** An auth user inserted with the trigger off, i.e. one that predates 0004. */
+  async function orphanedUser(meta: Record<string, string>, email: string) {
+    await db.raw.exec('alter table auth.users disable trigger on_auth_user_created;')
+    try {
+      const rows = await db.asService<{ id: string }>(
+        `insert into auth.users (email, email_confirmed_at, raw_user_meta_data)
+         values ($1, now(), $2::jsonb) returning id`,
+        [email, JSON.stringify(meta)],
+      )
+      return rows[0]!.id
+    } finally {
+      await db.raw.exec('alter table auth.users enable trigger on_auth_user_created;')
+    }
+  }
+
+  it('creates a usable profile for a user that predates the trigger', async () => {
+    const id = await orphanedUser({ full_name: 'Grace Hopper' }, 'grace@backfill.test')
+
+    // Precondition. If this ever fails the test below proves nothing.
+    const before = await db.asService(`select 1 from public.profiles where id = $1`, [id])
+    expect(before).toHaveLength(0)
+
+    await db.raw.exec(BACKFILL)
+
+    const after = await db.asService<{ username: string; display_name: string }>(
+      `select username, display_name from public.profiles where id = $1`,
+      [id],
+    )
+    expect(after).toHaveLength(1)
+    expect(after[0]!.display_name).toBe('Grace Hopper')
+    expect(after[0]!.username).toMatch(/^u[0-9a-f]{12}$/)
+  })
+
+  it('falls back to the email local part when there is no name in the metadata', async () => {
+    // The path a plain email/password signup takes when the form posted no
+    // display name -- which is what happens when someone signs up before the
+    // app is wired to send one.
+    const id = await orphanedUser({}, 'margaret.hamilton@backfill.test')
+    await db.raw.exec(BACKFILL)
+
+    const rows = await db.asService<{ display_name: string }>(
+      `select display_name from public.profiles where id = $1`,
+      [id],
+    )
+    expect(rows[0]!.display_name).toBe('margaret.hamilton')
+  })
+
+  it('is safe to run twice', async () => {
+    const id = await orphanedUser({ full_name: 'Katherine Johnson' }, 'katherine@backfill.test')
+
+    await db.raw.exec(BACKFILL)
+    // The claim in the migration header. A second run must be a no-op, not a
+    // duplicate-key error, because it is pasted into a SQL editor by hand.
+    await db.raw.exec(BACKFILL)
+
+    const rows = await db.asService(`select id from public.profiles where id = $1`, [id])
+    expect(rows).toHaveLength(1)
+  })
+
+  it('leaves soft-deleted auth users alone', async () => {
+    const id = await orphanedUser({ full_name: 'Deleted Person' }, 'deleted@backfill.test')
+    await db.asService(`update auth.users set deleted_at = now() where id = $1`, [id])
+
+    await db.raw.exec(BACKFILL)
+
+    const rows = await db.asService(`select id from public.profiles where id = $1`, [id])
+    expect(rows).toHaveLength(0)
   })
 })
