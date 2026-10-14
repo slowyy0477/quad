@@ -1,0 +1,3248 @@
+{
+  "generated": "2026-10-14T17:40:07.823Z",
+  "migrations": 17,
+  "tables": {
+    "achievement_definitions": [
+      {
+        "name": "key",
+        "type": "text",
+        "nullable": false,
+        "default": null
+      },
+      {
+        "name": "name",
+        "type": "text",
+        "nullable": false,
+        "default": null
+      },
+      {
+        "name": "description",
+        "type": "text",
+        "nullable": false,
+        "default": null
+      },
+      {
+        "name": "criteria",
+        "type": "text",
+        "nullable": false,
+        "default": null
+      },
+      {
+        "name": "category",
+        "type": "text",
+        "nullable": false,
+        "default": null
+      },
+      {
+        "name": "tier",
+        "type": "text",
+        "nullable": false,
+        "default": "'bronze'::text"
+      },
+      {
+        "name": "icon",
+        "type": "text",
+        "nullable": false,
+        "default": null
+      },
+      {
+        "name": "sort_order",
+        "type": "int4",
+        "nullable": false,
+        "default": "0"
+      },
+      {
+        "name": "is_active",
+        "type": "bool",
+        "nullable": false,
+        "default": "true"
+      },
+      {
+        "name": "created_at",
+        "type": "timestamptz",
+        "nullable": false,
+        "default": "now()"
+      }
+    ],
+    "blocks": [
+      {
+        "name": "blocker_id",
+        "type": "uuid",
+        "nullable": false,
+        "default": null
+      },
+      {
+        "name": "blocked_id",
+        "type": "uuid",
+        "nullable": false,
+        "default": null
+      },
+      {
+        "name": "reason",
+        "type": "text",
+        "nullable": true,
+        "default": null
+      },
+      {
+        "name": "created_at",
+        "type": "timestamptz",
+        "nullable": false,
+        "default": "now()"
+      }
+    ],
+    "comment_likes": [
+      {
+        "name": "comment_id",
+        "type": "uuid",
+        "nullable": false,
+        "default": null
+      },
+      {
+        "name": "profile_id",
+        "type": "uuid",
+        "nullable": false,
+        "default": null
+      },
+      {
+        "name": "created_at",
+        "type": "timestamptz",
+        "nullable": false,
+        "default": "now()"
+      }
+    ],
+    "comments": [
+      {
+        "name": "id",
+        "type": "uuid",
+        "nullable": false,
+        "default": "gen_random_uuid()"
+      },
+      {
+        "name": "post_id",
+        "type": "uuid",
+        "nullable": false,
+        "default": null
+      },
+      {
+        "name": "author_id",
+        "type": "uuid",
+        "nullable": false,
+        "default": null
+      },
+      {
+        "name": "parent_id",
+        "type": "uuid",
+        "nullable": true,
+        "default": null
+      },
+      {
+        "name": "body",
+        "type": "text",
+        "nullable": false,
+        "default": null
+      },
+      {
+        "name": "like_count",
+        "type": "int4",
+        "nullable": false,
+        "default": "0"
+      },
+      {
+        "name": "reply_count",
+        "type": "int4",
+        "nullable": false,
+        "default": "0"
+      },
+      {
+        "name": "is_edited",
+        "type": "bool",
+        "nullable": false,
+        "default": "false"
+      },
+      {
+        "name": "moderation_status",
+        "type": "text",
+        "nullable": false,
+        "default": "'active'::text"
+      },
+      {
+        "name": "created_at",
+        "type": "timestamptz",
+        "nullable": false,
+        "default": "now()"
+      },
+      {
+        "name": "updated_at",
+        "type": "timestamptz",
+        "nullable": false,
+        "default": "now()"
+      },
+      {
+        "name": "deleted_at",
+        "type": "timestamptz",
+        "nullable": true,
+        "default": null
+      }
+    ],
+    "connections": [
+      {
+        "name": "id",
+        "type": "uuid",
+        "nullable": false,
+        "default": "gen_random_uuid()"
+      },
+      {
+        "name": "requester_id",
+        "type": "uuid",
+        "nullable": false,
+        "default": null
+      },
+      {
+        "name": "addressee_id",
+        "type": "uuid",
+        "nullable": false,
+        "default": null
+      },
+      {
+        "name": "status",
+        "type": "text",
+        "nullable": false,
+        "default": "'pending'::text"
+      },
+      {
+        "name": "message",
+        "type": "text",
+        "nullable": true,
+        "default": null
+      },
+      {
+        "name": "pair_low",
+        "type": "uuid",
+        "nullable": false,
+        "default": null
+      },
+      {
+        "name": "pair_high",
+        "type": "uuid",
+        "nullable": false,
+        "default": null
+      },
+      {
+        "name": "created_at",
+        "type": "timestamptz",
+        "nullable": false,
+        "default": "now()"
+      },
+      {
+        "name": "updated_at",
+        "type": "timestamptz",
+        "nullable": false,
+        "default": "now()"
+      },
+      {
+        "name": "responded_at",
+        "type": "timestamptz",
+        "nullable": true,
+        "default": null
+      }
+    ],
+    "conversation_participants": [
+      {
+        "name": "conversation_id",
+        "type": "uuid",
+        "nullable": false,
+        "default": null
+      },
+      {
+        "name": "profile_id",
+        "type": "uuid",
+        "nullable": false,
+        "default": null
+      },
+      {
+        "name": "role",
+        "type": "text",
+        "nullable": false,
+        "default": "'member'::text"
+      },
+      {
+        "name": "last_read_at",
+        "type": "timestamptz",
+        "nullable": true,
+        "default": null
+      },
+      {
+        "name": "unread_count",
+        "type": "int4",
+        "nullable": false,
+        "default": "0"
+      },
+      {
+        "name": "is_muted",
+        "type": "bool",
+        "nullable": false,
+        "default": "false"
+      },
+      {
+        "name": "left_at",
+        "type": "timestamptz",
+        "nullable": true,
+        "default": null
+      },
+      {
+        "name": "joined_at",
+        "type": "timestamptz",
+        "nullable": false,
+        "default": "now()"
+      },
+      {
+        "name": "updated_at",
+        "type": "timestamptz",
+        "nullable": false,
+        "default": "now()"
+      }
+    ],
+    "conversations": [
+      {
+        "name": "id",
+        "type": "uuid",
+        "nullable": false,
+        "default": "gen_random_uuid()"
+      },
+      {
+        "name": "type",
+        "type": "text",
+        "nullable": false,
+        "default": "'direct'::text"
+      },
+      {
+        "name": "title",
+        "type": "text",
+        "nullable": true,
+        "default": null
+      },
+      {
+        "name": "created_by",
+        "type": "uuid",
+        "nullable": true,
+        "default": null
+      },
+      {
+        "name": "last_message_at",
+        "type": "timestamptz",
+        "nullable": true,
+        "default": null
+      },
+      {
+        "name": "last_message_id",
+        "type": "uuid",
+        "nullable": true,
+        "default": null
+      },
+      {
+        "name": "last_message_preview",
+        "type": "text",
+        "nullable": true,
+        "default": null
+      },
+      {
+        "name": "pair_low",
+        "type": "uuid",
+        "nullable": true,
+        "default": null
+      },
+      {
+        "name": "pair_high",
+        "type": "uuid",
+        "nullable": true,
+        "default": null
+      },
+      {
+        "name": "created_at",
+        "type": "timestamptz",
+        "nullable": false,
+        "default": "now()"
+      },
+      {
+        "name": "updated_at",
+        "type": "timestamptz",
+        "nullable": false,
+        "default": "now()"
+      }
+    ],
+    "courses": [
+      {
+        "name": "id",
+        "type": "uuid",
+        "nullable": false,
+        "default": "gen_random_uuid()"
+      },
+      {
+        "name": "profile_id",
+        "type": "uuid",
+        "nullable": false,
+        "default": null
+      },
+      {
+        "name": "semester_id",
+        "type": "uuid",
+        "nullable": true,
+        "default": null
+      },
+      {
+        "name": "code",
+        "type": "text",
+        "nullable": true,
+        "default": null
+      },
+      {
+        "name": "title",
+        "type": "text",
+        "nullable": false,
+        "default": null
+      },
+      {
+        "name": "instructor",
+        "type": "text",
+        "nullable": true,
+        "default": null
+      },
+      {
+        "name": "credits",
+        "type": "numeric",
+        "nullable": true,
+        "default": null
+      },
+      {
+        "name": "status",
+        "type": "text",
+        "nullable": false,
+        "default": "'in_progress'::text"
+      },
+      {
+        "name": "grade",
+        "type": "text",
+        "nullable": true,
+        "default": null
+      },
+      {
+        "name": "color",
+        "type": "text",
+        "nullable": true,
+        "default": null
+      },
+      {
+        "name": "notes",
+        "type": "text",
+        "nullable": true,
+        "default": null
+      },
+      {
+        "name": "created_at",
+        "type": "timestamptz",
+        "nullable": false,
+        "default": "now()"
+      },
+      {
+        "name": "updated_at",
+        "type": "timestamptz",
+        "nullable": false,
+        "default": "now()"
+      }
+    ],
+    "daily_logs": [
+      {
+        "name": "id",
+        "type": "uuid",
+        "nullable": false,
+        "default": "gen_random_uuid()"
+      },
+      {
+        "name": "profile_id",
+        "type": "uuid",
+        "nullable": false,
+        "default": null
+      },
+      {
+        "name": "log_date",
+        "type": "date",
+        "nullable": false,
+        "default": null
+      },
+      {
+        "name": "mood",
+        "type": "int2",
+        "nullable": true,
+        "default": null
+      },
+      {
+        "name": "productivity",
+        "type": "int2",
+        "nullable": true,
+        "default": null
+      },
+      {
+        "name": "hours_studied",
+        "type": "numeric",
+        "nullable": true,
+        "default": null
+      },
+      {
+        "name": "summary",
+        "type": "text",
+        "nullable": true,
+        "default": null
+      },
+      {
+        "name": "wins",
+        "type": "text",
+        "nullable": true,
+        "default": null
+      },
+      {
+        "name": "blockers",
+        "type": "text",
+        "nullable": true,
+        "default": null
+      },
+      {
+        "name": "created_at",
+        "type": "timestamptz",
+        "nullable": false,
+        "default": "now()"
+      },
+      {
+        "name": "updated_at",
+        "type": "timestamptz",
+        "nullable": false,
+        "default": "now()"
+      }
+    ],
+    "departments": [
+      {
+        "name": "id",
+        "type": "uuid",
+        "nullable": false,
+        "default": "gen_random_uuid()"
+      },
+      {
+        "name": "university_id",
+        "type": "uuid",
+        "nullable": false,
+        "default": null
+      },
+      {
+        "name": "name",
+        "type": "text",
+        "nullable": false,
+        "default": null
+      },
+      {
+        "name": "slug",
+        "type": "text",
+        "nullable": false,
+        "default": null
+      },
+      {
+        "name": "is_verified",
+        "type": "bool",
+        "nullable": false,
+        "default": "false"
+      },
+      {
+        "name": "created_by",
+        "type": "uuid",
+        "nullable": true,
+        "default": null
+      },
+      {
+        "name": "created_at",
+        "type": "timestamptz",
+        "nullable": false,
+        "default": "now()"
+      },
+      {
+        "name": "updated_at",
+        "type": "timestamptz",
+        "nullable": false,
+        "default": "now()"
+      }
+    ],
+    "event_attendees": [
+      {
+        "name": "event_id",
+        "type": "uuid",
+        "nullable": false,
+        "default": null
+      },
+      {
+        "name": "profile_id",
+        "type": "uuid",
+        "nullable": false,
+        "default": null
+      },
+      {
+        "name": "status",
+        "type": "text",
+        "nullable": false,
+        "default": "'going'::text"
+      },
+      {
+        "name": "created_at",
+        "type": "timestamptz",
+        "nullable": false,
+        "default": "now()"
+      },
+      {
+        "name": "updated_at",
+        "type": "timestamptz",
+        "nullable": false,
+        "default": "now()"
+      }
+    ],
+    "events": [
+      {
+        "name": "id",
+        "type": "uuid",
+        "nullable": false,
+        "default": "gen_random_uuid()"
+      },
+      {
+        "name": "slug",
+        "type": "text",
+        "nullable": false,
+        "default": null
+      },
+      {
+        "name": "created_by",
+        "type": "uuid",
+        "nullable": false,
+        "default": null
+      },
+      {
+        "name": "title",
+        "type": "text",
+        "nullable": false,
+        "default": null
+      },
+      {
+        "name": "description",
+        "type": "text",
+        "nullable": true,
+        "default": null
+      },
+      {
+        "name": "type",
+        "type": "text",
+        "nullable": false,
+        "default": "'other'::text"
+      },
+      {
+        "name": "starts_at",
+        "type": "timestamptz",
+        "nullable": false,
+        "default": null
+      },
+      {
+        "name": "ends_at",
+        "type": "timestamptz",
+        "nullable": true,
+        "default": null
+      },
+      {
+        "name": "time_zone",
+        "type": "text",
+        "nullable": false,
+        "default": "'UTC'::text"
+      },
+      {
+        "name": "is_all_day",
+        "type": "bool",
+        "nullable": false,
+        "default": "false"
+      },
+      {
+        "name": "attendance_mode",
+        "type": "text",
+        "nullable": false,
+        "default": "'onsite'::text"
+      },
+      {
+        "name": "location",
+        "type": "text",
+        "nullable": true,
+        "default": null
+      },
+      {
+        "name": "location_url",
+        "type": "text",
+        "nullable": true,
+        "default": null
+      },
+      {
+        "name": "join_url",
+        "type": "text",
+        "nullable": true,
+        "default": null
+      },
+      {
+        "name": "project_id",
+        "type": "uuid",
+        "nullable": true,
+        "default": null
+      },
+      {
+        "name": "university_id",
+        "type": "uuid",
+        "nullable": true,
+        "default": null
+      },
+      {
+        "name": "visibility",
+        "type": "text",
+        "nullable": false,
+        "default": "'public'::text"
+      },
+      {
+        "name": "capacity",
+        "type": "int4",
+        "nullable": true,
+        "default": null
+      },
+      {
+        "name": "attendee_count",
+        "type": "int4",
+        "nullable": false,
+        "default": "0"
+      },
+      {
+        "name": "interested_count",
+        "type": "int4",
+        "nullable": false,
+        "default": "0"
+      },
+      {
+        "name": "status",
+        "type": "text",
+        "nullable": false,
+        "default": "'scheduled'::text"
+      },
+      {
+        "name": "moderation_status",
+        "type": "text",
+        "nullable": false,
+        "default": "'active'::text"
+      },
+      {
+        "name": "created_at",
+        "type": "timestamptz",
+        "nullable": false,
+        "default": "now()"
+      },
+      {
+        "name": "updated_at",
+        "type": "timestamptz",
+        "nullable": false,
+        "default": "now()"
+      },
+      {
+        "name": "deleted_at",
+        "type": "timestamptz",
+        "nullable": true,
+        "default": null
+      }
+    ],
+    "follows": [
+      {
+        "name": "follower_id",
+        "type": "uuid",
+        "nullable": false,
+        "default": null
+      },
+      {
+        "name": "following_id",
+        "type": "uuid",
+        "nullable": false,
+        "default": null
+      },
+      {
+        "name": "created_at",
+        "type": "timestamptz",
+        "nullable": false,
+        "default": "now()"
+      }
+    ],
+    "goal_milestones": [
+      {
+        "name": "id",
+        "type": "uuid",
+        "nullable": false,
+        "default": "gen_random_uuid()"
+      },
+      {
+        "name": "goal_id",
+        "type": "uuid",
+        "nullable": false,
+        "default": null
+      },
+      {
+        "name": "title",
+        "type": "text",
+        "nullable": false,
+        "default": null
+      },
+      {
+        "name": "is_completed",
+        "type": "bool",
+        "nullable": false,
+        "default": "false"
+      },
+      {
+        "name": "completed_at",
+        "type": "timestamptz",
+        "nullable": true,
+        "default": null
+      },
+      {
+        "name": "target_date",
+        "type": "date",
+        "nullable": true,
+        "default": null
+      },
+      {
+        "name": "sort_order",
+        "type": "int4",
+        "nullable": false,
+        "default": "0"
+      },
+      {
+        "name": "created_at",
+        "type": "timestamptz",
+        "nullable": false,
+        "default": "now()"
+      },
+      {
+        "name": "updated_at",
+        "type": "timestamptz",
+        "nullable": false,
+        "default": "now()"
+      }
+    ],
+    "goals": [
+      {
+        "name": "id",
+        "type": "uuid",
+        "nullable": false,
+        "default": "gen_random_uuid()"
+      },
+      {
+        "name": "profile_id",
+        "type": "uuid",
+        "nullable": false,
+        "default": null
+      },
+      {
+        "name": "title",
+        "type": "text",
+        "nullable": false,
+        "default": null
+      },
+      {
+        "name": "description",
+        "type": "text",
+        "nullable": true,
+        "default": null
+      },
+      {
+        "name": "category",
+        "type": "text",
+        "nullable": false,
+        "default": "'other'::text"
+      },
+      {
+        "name": "status",
+        "type": "text",
+        "nullable": false,
+        "default": "'active'::text"
+      },
+      {
+        "name": "target_value",
+        "type": "numeric",
+        "nullable": false,
+        "default": "100"
+      },
+      {
+        "name": "current_value",
+        "type": "numeric",
+        "nullable": false,
+        "default": "0"
+      },
+      {
+        "name": "unit",
+        "type": "text",
+        "nullable": true,
+        "default": null
+      },
+      {
+        "name": "progress_percent",
+        "type": "int4",
+        "nullable": true,
+        "default": null
+      },
+      {
+        "name": "course_id",
+        "type": "uuid",
+        "nullable": true,
+        "default": null
+      },
+      {
+        "name": "semester_id",
+        "type": "uuid",
+        "nullable": true,
+        "default": null
+      },
+      {
+        "name": "project_id",
+        "type": "uuid",
+        "nullable": true,
+        "default": null
+      },
+      {
+        "name": "visibility",
+        "type": "text",
+        "nullable": false,
+        "default": "'private'::text"
+      },
+      {
+        "name": "start_date",
+        "type": "date",
+        "nullable": true,
+        "default": null
+      },
+      {
+        "name": "target_date",
+        "type": "date",
+        "nullable": true,
+        "default": null
+      },
+      {
+        "name": "completed_at",
+        "type": "timestamptz",
+        "nullable": true,
+        "default": null
+      },
+      {
+        "name": "milestone_count",
+        "type": "int4",
+        "nullable": false,
+        "default": "0"
+      },
+      {
+        "name": "completed_milestone_count",
+        "type": "int4",
+        "nullable": false,
+        "default": "0"
+      },
+      {
+        "name": "created_at",
+        "type": "timestamptz",
+        "nullable": false,
+        "default": "now()"
+      },
+      {
+        "name": "updated_at",
+        "type": "timestamptz",
+        "nullable": false,
+        "default": "now()"
+      }
+    ],
+    "idea_comments": [
+      {
+        "name": "id",
+        "type": "uuid",
+        "nullable": false,
+        "default": "gen_random_uuid()"
+      },
+      {
+        "name": "idea_id",
+        "type": "uuid",
+        "nullable": false,
+        "default": null
+      },
+      {
+        "name": "author_id",
+        "type": "uuid",
+        "nullable": false,
+        "default": null
+      },
+      {
+        "name": "body",
+        "type": "text",
+        "nullable": false,
+        "default": null
+      },
+      {
+        "name": "is_edited",
+        "type": "bool",
+        "nullable": false,
+        "default": "false"
+      },
+      {
+        "name": "moderation_status",
+        "type": "text",
+        "nullable": false,
+        "default": "'active'::text"
+      },
+      {
+        "name": "created_at",
+        "type": "timestamptz",
+        "nullable": false,
+        "default": "now()"
+      },
+      {
+        "name": "updated_at",
+        "type": "timestamptz",
+        "nullable": false,
+        "default": "now()"
+      },
+      {
+        "name": "deleted_at",
+        "type": "timestamptz",
+        "nullable": true,
+        "default": null
+      }
+    ],
+    "idea_interest": [
+      {
+        "name": "idea_id",
+        "type": "uuid",
+        "nullable": false,
+        "default": null
+      },
+      {
+        "name": "profile_id",
+        "type": "uuid",
+        "nullable": false,
+        "default": null
+      },
+      {
+        "name": "message",
+        "type": "text",
+        "nullable": true,
+        "default": null
+      },
+      {
+        "name": "offering",
+        "type": "text",
+        "nullable": true,
+        "default": null
+      },
+      {
+        "name": "created_at",
+        "type": "timestamptz",
+        "nullable": false,
+        "default": "now()"
+      }
+    ],
+    "idea_skills": [
+      {
+        "name": "idea_id",
+        "type": "uuid",
+        "nullable": false,
+        "default": null
+      },
+      {
+        "name": "skill_id",
+        "type": "uuid",
+        "nullable": false,
+        "default": null
+      },
+      {
+        "name": "created_at",
+        "type": "timestamptz",
+        "nullable": false,
+        "default": "now()"
+      }
+    ],
+    "idea_votes": [
+      {
+        "name": "idea_id",
+        "type": "uuid",
+        "nullable": false,
+        "default": null
+      },
+      {
+        "name": "profile_id",
+        "type": "uuid",
+        "nullable": false,
+        "default": null
+      },
+      {
+        "name": "created_at",
+        "type": "timestamptz",
+        "nullable": false,
+        "default": "now()"
+      }
+    ],
+    "ideas": [
+      {
+        "name": "id",
+        "type": "uuid",
+        "nullable": false,
+        "default": "gen_random_uuid()"
+      },
+      {
+        "name": "author_id",
+        "type": "uuid",
+        "nullable": false,
+        "default": null
+      },
+      {
+        "name": "title",
+        "type": "text",
+        "nullable": false,
+        "default": null
+      },
+      {
+        "name": "description",
+        "type": "text",
+        "nullable": false,
+        "default": null
+      },
+      {
+        "name": "category",
+        "type": "text",
+        "nullable": false,
+        "default": "'other'::text"
+      },
+      {
+        "name": "looking_for",
+        "type": "text",
+        "nullable": true,
+        "default": null
+      },
+      {
+        "name": "status",
+        "type": "text",
+        "nullable": false,
+        "default": "'open'::text"
+      },
+      {
+        "name": "visibility",
+        "type": "text",
+        "nullable": false,
+        "default": "'public'::text"
+      },
+      {
+        "name": "university_id",
+        "type": "uuid",
+        "nullable": true,
+        "default": null
+      },
+      {
+        "name": "converted_project_id",
+        "type": "uuid",
+        "nullable": true,
+        "default": null
+      },
+      {
+        "name": "converted_at",
+        "type": "timestamptz",
+        "nullable": true,
+        "default": null
+      },
+      {
+        "name": "upvote_count",
+        "type": "int4",
+        "nullable": false,
+        "default": "0"
+      },
+      {
+        "name": "comment_count",
+        "type": "int4",
+        "nullable": false,
+        "default": "0"
+      },
+      {
+        "name": "interest_count",
+        "type": "int4",
+        "nullable": false,
+        "default": "0"
+      },
+      {
+        "name": "moderation_status",
+        "type": "text",
+        "nullable": false,
+        "default": "'active'::text"
+      },
+      {
+        "name": "created_at",
+        "type": "timestamptz",
+        "nullable": false,
+        "default": "now()"
+      },
+      {
+        "name": "updated_at",
+        "type": "timestamptz",
+        "nullable": false,
+        "default": "now()"
+      },
+      {
+        "name": "deleted_at",
+        "type": "timestamptz",
+        "nullable": true,
+        "default": null
+      }
+    ],
+    "interests": [
+      {
+        "name": "id",
+        "type": "uuid",
+        "nullable": false,
+        "default": "gen_random_uuid()"
+      },
+      {
+        "name": "name",
+        "type": "text",
+        "nullable": false,
+        "default": null
+      },
+      {
+        "name": "slug",
+        "type": "text",
+        "nullable": false,
+        "default": null
+      },
+      {
+        "name": "category",
+        "type": "text",
+        "nullable": false,
+        "default": "'other'::text"
+      },
+      {
+        "name": "is_approved",
+        "type": "bool",
+        "nullable": false,
+        "default": "false"
+      },
+      {
+        "name": "usage_count",
+        "type": "int4",
+        "nullable": false,
+        "default": "0"
+      },
+      {
+        "name": "created_by",
+        "type": "uuid",
+        "nullable": true,
+        "default": null
+      },
+      {
+        "name": "created_at",
+        "type": "timestamptz",
+        "nullable": false,
+        "default": "now()"
+      },
+      {
+        "name": "updated_at",
+        "type": "timestamptz",
+        "nullable": false,
+        "default": "now()"
+      }
+    ],
+    "messages": [
+      {
+        "name": "id",
+        "type": "uuid",
+        "nullable": false,
+        "default": "gen_random_uuid()"
+      },
+      {
+        "name": "conversation_id",
+        "type": "uuid",
+        "nullable": false,
+        "default": null
+      },
+      {
+        "name": "sender_id",
+        "type": "uuid",
+        "nullable": false,
+        "default": null
+      },
+      {
+        "name": "body",
+        "type": "text",
+        "nullable": true,
+        "default": null
+      },
+      {
+        "name": "attachment_path",
+        "type": "text",
+        "nullable": true,
+        "default": null
+      },
+      {
+        "name": "attachment_mime",
+        "type": "text",
+        "nullable": true,
+        "default": null
+      },
+      {
+        "name": "attachment_size",
+        "type": "int4",
+        "nullable": true,
+        "default": null
+      },
+      {
+        "name": "attachment_name",
+        "type": "text",
+        "nullable": true,
+        "default": null
+      },
+      {
+        "name": "reply_to_id",
+        "type": "uuid",
+        "nullable": true,
+        "default": null
+      },
+      {
+        "name": "is_edited",
+        "type": "bool",
+        "nullable": false,
+        "default": "false"
+      },
+      {
+        "name": "edited_at",
+        "type": "timestamptz",
+        "nullable": true,
+        "default": null
+      },
+      {
+        "name": "deleted_at",
+        "type": "timestamptz",
+        "nullable": true,
+        "default": null
+      },
+      {
+        "name": "moderation_status",
+        "type": "text",
+        "nullable": false,
+        "default": "'active'::text"
+      },
+      {
+        "name": "created_at",
+        "type": "timestamptz",
+        "nullable": false,
+        "default": "now()"
+      }
+    ],
+    "notification_categories": [
+      {
+        "name": "category",
+        "type": "text",
+        "nullable": false,
+        "default": null
+      },
+      {
+        "name": "label",
+        "type": "text",
+        "nullable": false,
+        "default": null
+      },
+      {
+        "name": "description",
+        "type": "text",
+        "nullable": false,
+        "default": null
+      },
+      {
+        "name": "is_suppressible",
+        "type": "bool",
+        "nullable": false,
+        "default": "true"
+      },
+      {
+        "name": "sort_order",
+        "type": "int4",
+        "nullable": false,
+        "default": "100"
+      }
+    ],
+    "notification_preferences": [
+      {
+        "name": "profile_id",
+        "type": "uuid",
+        "nullable": false,
+        "default": null
+      },
+      {
+        "name": "category",
+        "type": "text",
+        "nullable": false,
+        "default": null
+      },
+      {
+        "name": "in_app_enabled",
+        "type": "bool",
+        "nullable": false,
+        "default": "true"
+      },
+      {
+        "name": "updated_at",
+        "type": "timestamptz",
+        "nullable": false,
+        "default": "now()"
+      }
+    ],
+    "notification_types": [
+      {
+        "name": "type",
+        "type": "text",
+        "nullable": false,
+        "default": null
+      },
+      {
+        "name": "category",
+        "type": "text",
+        "nullable": false,
+        "default": null
+      },
+      {
+        "name": "resurfaces",
+        "type": "bool",
+        "nullable": false,
+        "default": "false"
+      },
+      {
+        "name": "sort_order",
+        "type": "int4",
+        "nullable": false,
+        "default": "100"
+      }
+    ],
+    "notifications": [
+      {
+        "name": "id",
+        "type": "uuid",
+        "nullable": false,
+        "default": "gen_random_uuid()"
+      },
+      {
+        "name": "recipient_id",
+        "type": "uuid",
+        "nullable": false,
+        "default": null
+      },
+      {
+        "name": "type",
+        "type": "text",
+        "nullable": false,
+        "default": null
+      },
+      {
+        "name": "actor_id",
+        "type": "uuid",
+        "nullable": true,
+        "default": null
+      },
+      {
+        "name": "post_id",
+        "type": "uuid",
+        "nullable": true,
+        "default": null
+      },
+      {
+        "name": "comment_id",
+        "type": "uuid",
+        "nullable": true,
+        "default": null
+      },
+      {
+        "name": "project_id",
+        "type": "uuid",
+        "nullable": true,
+        "default": null
+      },
+      {
+        "name": "idea_id",
+        "type": "uuid",
+        "nullable": true,
+        "default": null
+      },
+      {
+        "name": "event_id",
+        "type": "uuid",
+        "nullable": true,
+        "default": null
+      },
+      {
+        "name": "opportunity_id",
+        "type": "uuid",
+        "nullable": true,
+        "default": null
+      },
+      {
+        "name": "conversation_id",
+        "type": "uuid",
+        "nullable": true,
+        "default": null
+      },
+      {
+        "name": "skill_id",
+        "type": "uuid",
+        "nullable": true,
+        "default": null
+      },
+      {
+        "name": "achievement_key",
+        "type": "text",
+        "nullable": true,
+        "default": null
+      },
+      {
+        "name": "body",
+        "type": "text",
+        "nullable": true,
+        "default": null
+      },
+      {
+        "name": "is_read",
+        "type": "bool",
+        "nullable": false,
+        "default": "false"
+      },
+      {
+        "name": "read_at",
+        "type": "timestamptz",
+        "nullable": true,
+        "default": null
+      },
+      {
+        "name": "created_at",
+        "type": "timestamptz",
+        "nullable": false,
+        "default": "now()"
+      }
+    ],
+    "opportunities": [
+      {
+        "name": "id",
+        "type": "uuid",
+        "nullable": false,
+        "default": "gen_random_uuid()"
+      },
+      {
+        "name": "slug",
+        "type": "text",
+        "nullable": false,
+        "default": null
+      },
+      {
+        "name": "posted_by",
+        "type": "uuid",
+        "nullable": false,
+        "default": null
+      },
+      {
+        "name": "title",
+        "type": "text",
+        "nullable": false,
+        "default": null
+      },
+      {
+        "name": "organisation",
+        "type": "text",
+        "nullable": false,
+        "default": null
+      },
+      {
+        "name": "description",
+        "type": "text",
+        "nullable": false,
+        "default": null
+      },
+      {
+        "name": "type",
+        "type": "text",
+        "nullable": false,
+        "default": null
+      },
+      {
+        "name": "compensation",
+        "type": "text",
+        "nullable": true,
+        "default": null
+      },
+      {
+        "name": "work_mode",
+        "type": "text",
+        "nullable": false,
+        "default": "'onsite'::text"
+      },
+      {
+        "name": "location",
+        "type": "text",
+        "nullable": true,
+        "default": null
+      },
+      {
+        "name": "apply_url",
+        "type": "text",
+        "nullable": true,
+        "default": null
+      },
+      {
+        "name": "apply_email",
+        "type": "text",
+        "nullable": true,
+        "default": null
+      },
+      {
+        "name": "deadline",
+        "type": "date",
+        "nullable": true,
+        "default": null
+      },
+      {
+        "name": "starts_on",
+        "type": "date",
+        "nullable": true,
+        "default": null
+      },
+      {
+        "name": "university_id",
+        "type": "uuid",
+        "nullable": true,
+        "default": null
+      },
+      {
+        "name": "visibility",
+        "type": "text",
+        "nullable": false,
+        "default": "'public'::text"
+      },
+      {
+        "name": "status",
+        "type": "text",
+        "nullable": false,
+        "default": "'open'::text"
+      },
+      {
+        "name": "source",
+        "type": "text",
+        "nullable": false,
+        "default": "'user_submitted'::text"
+      },
+      {
+        "name": "save_count",
+        "type": "int4",
+        "nullable": false,
+        "default": "0"
+      },
+      {
+        "name": "moderation_status",
+        "type": "text",
+        "nullable": false,
+        "default": "'active'::text"
+      },
+      {
+        "name": "created_at",
+        "type": "timestamptz",
+        "nullable": false,
+        "default": "now()"
+      },
+      {
+        "name": "updated_at",
+        "type": "timestamptz",
+        "nullable": false,
+        "default": "now()"
+      },
+      {
+        "name": "deleted_at",
+        "type": "timestamptz",
+        "nullable": true,
+        "default": null
+      }
+    ],
+    "opportunity_saves": [
+      {
+        "name": "opportunity_id",
+        "type": "uuid",
+        "nullable": false,
+        "default": null
+      },
+      {
+        "name": "profile_id",
+        "type": "uuid",
+        "nullable": false,
+        "default": null
+      },
+      {
+        "name": "note",
+        "type": "text",
+        "nullable": true,
+        "default": null
+      },
+      {
+        "name": "created_at",
+        "type": "timestamptz",
+        "nullable": false,
+        "default": "now()"
+      }
+    ],
+    "opportunity_skills": [
+      {
+        "name": "opportunity_id",
+        "type": "uuid",
+        "nullable": false,
+        "default": null
+      },
+      {
+        "name": "skill_id",
+        "type": "uuid",
+        "nullable": false,
+        "default": null
+      },
+      {
+        "name": "is_required",
+        "type": "bool",
+        "nullable": false,
+        "default": "false"
+      },
+      {
+        "name": "created_at",
+        "type": "timestamptz",
+        "nullable": false,
+        "default": "now()"
+      }
+    ],
+    "post_likes": [
+      {
+        "name": "post_id",
+        "type": "uuid",
+        "nullable": false,
+        "default": null
+      },
+      {
+        "name": "profile_id",
+        "type": "uuid",
+        "nullable": false,
+        "default": null
+      },
+      {
+        "name": "created_at",
+        "type": "timestamptz",
+        "nullable": false,
+        "default": "now()"
+      }
+    ],
+    "post_media": [
+      {
+        "name": "id",
+        "type": "uuid",
+        "nullable": false,
+        "default": "gen_random_uuid()"
+      },
+      {
+        "name": "post_id",
+        "type": "uuid",
+        "nullable": false,
+        "default": null
+      },
+      {
+        "name": "storage_path",
+        "type": "text",
+        "nullable": false,
+        "default": null
+      },
+      {
+        "name": "mime_type",
+        "type": "text",
+        "nullable": false,
+        "default": null
+      },
+      {
+        "name": "size_bytes",
+        "type": "int4",
+        "nullable": false,
+        "default": null
+      },
+      {
+        "name": "width",
+        "type": "int4",
+        "nullable": true,
+        "default": null
+      },
+      {
+        "name": "height",
+        "type": "int4",
+        "nullable": true,
+        "default": null
+      },
+      {
+        "name": "alt_text",
+        "type": "text",
+        "nullable": true,
+        "default": null
+      },
+      {
+        "name": "sort_order",
+        "type": "int4",
+        "nullable": false,
+        "default": "0"
+      },
+      {
+        "name": "created_at",
+        "type": "timestamptz",
+        "nullable": false,
+        "default": "now()"
+      }
+    ],
+    "post_saves": [
+      {
+        "name": "post_id",
+        "type": "uuid",
+        "nullable": false,
+        "default": null
+      },
+      {
+        "name": "profile_id",
+        "type": "uuid",
+        "nullable": false,
+        "default": null
+      },
+      {
+        "name": "created_at",
+        "type": "timestamptz",
+        "nullable": false,
+        "default": "now()"
+      }
+    ],
+    "posts": [
+      {
+        "name": "id",
+        "type": "uuid",
+        "nullable": false,
+        "default": "gen_random_uuid()"
+      },
+      {
+        "name": "author_id",
+        "type": "uuid",
+        "nullable": false,
+        "default": null
+      },
+      {
+        "name": "type",
+        "type": "text",
+        "nullable": false,
+        "default": "'text'::text"
+      },
+      {
+        "name": "body",
+        "type": "text",
+        "nullable": true,
+        "default": null
+      },
+      {
+        "name": "title",
+        "type": "text",
+        "nullable": true,
+        "default": null
+      },
+      {
+        "name": "link_url",
+        "type": "text",
+        "nullable": true,
+        "default": null
+      },
+      {
+        "name": "project_id",
+        "type": "uuid",
+        "nullable": true,
+        "default": null
+      },
+      {
+        "name": "achievement_key",
+        "type": "text",
+        "nullable": true,
+        "default": null
+      },
+      {
+        "name": "goal_id",
+        "type": "uuid",
+        "nullable": true,
+        "default": null
+      },
+      {
+        "name": "opportunity_id",
+        "type": "uuid",
+        "nullable": true,
+        "default": null
+      },
+      {
+        "name": "university_id",
+        "type": "uuid",
+        "nullable": true,
+        "default": null
+      },
+      {
+        "name": "visibility",
+        "type": "text",
+        "nullable": false,
+        "default": "'public'::text"
+      },
+      {
+        "name": "like_count",
+        "type": "int4",
+        "nullable": false,
+        "default": "0"
+      },
+      {
+        "name": "comment_count",
+        "type": "int4",
+        "nullable": false,
+        "default": "0"
+      },
+      {
+        "name": "save_count",
+        "type": "int4",
+        "nullable": false,
+        "default": "0"
+      },
+      {
+        "name": "is_edited",
+        "type": "bool",
+        "nullable": false,
+        "default": "false"
+      },
+      {
+        "name": "edited_at",
+        "type": "timestamptz",
+        "nullable": true,
+        "default": null
+      },
+      {
+        "name": "moderation_status",
+        "type": "text",
+        "nullable": false,
+        "default": "'active'::text"
+      },
+      {
+        "name": "created_at",
+        "type": "timestamptz",
+        "nullable": false,
+        "default": "now()"
+      },
+      {
+        "name": "updated_at",
+        "type": "timestamptz",
+        "nullable": false,
+        "default": "now()"
+      },
+      {
+        "name": "deleted_at",
+        "type": "timestamptz",
+        "nullable": true,
+        "default": null
+      }
+    ],
+    "profile_achievements": [
+      {
+        "name": "profile_id",
+        "type": "uuid",
+        "nullable": false,
+        "default": null
+      },
+      {
+        "name": "achievement_key",
+        "type": "text",
+        "nullable": false,
+        "default": null
+      },
+      {
+        "name": "awarded_at",
+        "type": "timestamptz",
+        "nullable": false,
+        "default": "now()"
+      },
+      {
+        "name": "awarded_value",
+        "type": "int4",
+        "nullable": true,
+        "default": null
+      },
+      {
+        "name": "is_pinned",
+        "type": "bool",
+        "nullable": false,
+        "default": "false"
+      }
+    ],
+    "profile_interests": [
+      {
+        "name": "profile_id",
+        "type": "uuid",
+        "nullable": false,
+        "default": null
+      },
+      {
+        "name": "interest_id",
+        "type": "uuid",
+        "nullable": false,
+        "default": null
+      },
+      {
+        "name": "created_at",
+        "type": "timestamptz",
+        "nullable": false,
+        "default": "now()"
+      }
+    ],
+    "profile_skill_endorsements": [
+      {
+        "name": "profile_id",
+        "type": "uuid",
+        "nullable": false,
+        "default": null
+      },
+      {
+        "name": "skill_id",
+        "type": "uuid",
+        "nullable": false,
+        "default": null
+      },
+      {
+        "name": "endorser_id",
+        "type": "uuid",
+        "nullable": false,
+        "default": null
+      },
+      {
+        "name": "created_at",
+        "type": "timestamptz",
+        "nullable": false,
+        "default": "now()"
+      }
+    ],
+    "profile_skills": [
+      {
+        "name": "profile_id",
+        "type": "uuid",
+        "nullable": false,
+        "default": null
+      },
+      {
+        "name": "skill_id",
+        "type": "uuid",
+        "nullable": false,
+        "default": null
+      },
+      {
+        "name": "level",
+        "type": "text",
+        "nullable": false,
+        "default": "'learning'::text"
+      },
+      {
+        "name": "is_learning",
+        "type": "bool",
+        "nullable": false,
+        "default": "false"
+      },
+      {
+        "name": "years_experience",
+        "type": "numeric",
+        "nullable": true,
+        "default": null
+      },
+      {
+        "name": "display_order",
+        "type": "int4",
+        "nullable": false,
+        "default": "0"
+      },
+      {
+        "name": "endorsement_count",
+        "type": "int4",
+        "nullable": false,
+        "default": "0"
+      },
+      {
+        "name": "created_at",
+        "type": "timestamptz",
+        "nullable": false,
+        "default": "now()"
+      },
+      {
+        "name": "updated_at",
+        "type": "timestamptz",
+        "nullable": false,
+        "default": "now()"
+      }
+    ],
+    "profiles": [
+      {
+        "name": "id",
+        "type": "uuid",
+        "nullable": false,
+        "default": null
+      },
+      {
+        "name": "username",
+        "type": "text",
+        "nullable": false,
+        "default": null
+      },
+      {
+        "name": "display_name",
+        "type": "text",
+        "nullable": false,
+        "default": null
+      },
+      {
+        "name": "avatar_url",
+        "type": "text",
+        "nullable": true,
+        "default": null
+      },
+      {
+        "name": "cover_url",
+        "type": "text",
+        "nullable": true,
+        "default": null
+      },
+      {
+        "name": "headline",
+        "type": "text",
+        "nullable": true,
+        "default": null
+      },
+      {
+        "name": "bio",
+        "type": "text",
+        "nullable": true,
+        "default": null
+      },
+      {
+        "name": "university_id",
+        "type": "uuid",
+        "nullable": true,
+        "default": null
+      },
+      {
+        "name": "department_id",
+        "type": "uuid",
+        "nullable": true,
+        "default": null
+      },
+      {
+        "name": "program_id",
+        "type": "uuid",
+        "nullable": true,
+        "default": null
+      },
+      {
+        "name": "degree",
+        "type": "text",
+        "nullable": true,
+        "default": null
+      },
+      {
+        "name": "semester",
+        "type": "int4",
+        "nullable": true,
+        "default": null
+      },
+      {
+        "name": "graduation_year",
+        "type": "int4",
+        "nullable": true,
+        "default": null
+      },
+      {
+        "name": "location",
+        "type": "text",
+        "nullable": true,
+        "default": null
+      },
+      {
+        "name": "website",
+        "type": "text",
+        "nullable": true,
+        "default": null
+      },
+      {
+        "name": "github_username",
+        "type": "text",
+        "nullable": true,
+        "default": null
+      },
+      {
+        "name": "linkedin_url",
+        "type": "text",
+        "nullable": true,
+        "default": null
+      },
+      {
+        "name": "twitter_username",
+        "type": "text",
+        "nullable": true,
+        "default": null
+      },
+      {
+        "name": "visibility",
+        "type": "text",
+        "nullable": false,
+        "default": "'public'::text"
+      },
+      {
+        "name": "allow_messages_from",
+        "type": "text",
+        "nullable": false,
+        "default": "'everyone'::text"
+      },
+      {
+        "name": "allow_connection_requests",
+        "type": "bool",
+        "nullable": false,
+        "default": "true"
+      },
+      {
+        "name": "searchable",
+        "type": "bool",
+        "nullable": false,
+        "default": "true"
+      },
+      {
+        "name": "onboarding_completed",
+        "type": "bool",
+        "nullable": false,
+        "default": "false"
+      },
+      {
+        "name": "onboarding_step",
+        "type": "int4",
+        "nullable": false,
+        "default": "0"
+      },
+      {
+        "name": "status",
+        "type": "text",
+        "nullable": false,
+        "default": "'active'::text"
+      },
+      {
+        "name": "suspended_until",
+        "type": "timestamptz",
+        "nullable": true,
+        "default": null
+      },
+      {
+        "name": "suspension_reason",
+        "type": "text",
+        "nullable": true,
+        "default": null
+      },
+      {
+        "name": "warning_count",
+        "type": "int4",
+        "nullable": false,
+        "default": "0"
+      },
+      {
+        "name": "username_changed_at",
+        "type": "timestamptz",
+        "nullable": true,
+        "default": null
+      },
+      {
+        "name": "follower_count",
+        "type": "int4",
+        "nullable": false,
+        "default": "0"
+      },
+      {
+        "name": "following_count",
+        "type": "int4",
+        "nullable": false,
+        "default": "0"
+      },
+      {
+        "name": "connection_count",
+        "type": "int4",
+        "nullable": false,
+        "default": "0"
+      },
+      {
+        "name": "post_count",
+        "type": "int4",
+        "nullable": false,
+        "default": "0"
+      },
+      {
+        "name": "project_count",
+        "type": "int4",
+        "nullable": false,
+        "default": "0"
+      },
+      {
+        "name": "last_active_at",
+        "type": "timestamptz",
+        "nullable": false,
+        "default": "now()"
+      },
+      {
+        "name": "created_at",
+        "type": "timestamptz",
+        "nullable": false,
+        "default": "now()"
+      },
+      {
+        "name": "updated_at",
+        "type": "timestamptz",
+        "nullable": false,
+        "default": "now()"
+      },
+      {
+        "name": "deleted_at",
+        "type": "timestamptz",
+        "nullable": true,
+        "default": null
+      }
+    ],
+    "programs": [
+      {
+        "name": "id",
+        "type": "uuid",
+        "nullable": false,
+        "default": "gen_random_uuid()"
+      },
+      {
+        "name": "department_id",
+        "type": "uuid",
+        "nullable": false,
+        "default": null
+      },
+      {
+        "name": "name",
+        "type": "text",
+        "nullable": false,
+        "default": null
+      },
+      {
+        "name": "slug",
+        "type": "text",
+        "nullable": false,
+        "default": null
+      },
+      {
+        "name": "degree_type",
+        "type": "text",
+        "nullable": false,
+        "default": "'bachelor'::text"
+      },
+      {
+        "name": "duration_semesters",
+        "type": "int4",
+        "nullable": true,
+        "default": null
+      },
+      {
+        "name": "is_verified",
+        "type": "bool",
+        "nullable": false,
+        "default": "false"
+      },
+      {
+        "name": "created_by",
+        "type": "uuid",
+        "nullable": true,
+        "default": null
+      },
+      {
+        "name": "created_at",
+        "type": "timestamptz",
+        "nullable": false,
+        "default": "now()"
+      },
+      {
+        "name": "updated_at",
+        "type": "timestamptz",
+        "nullable": false,
+        "default": "now()"
+      }
+    ],
+    "project_applications": [
+      {
+        "name": "id",
+        "type": "uuid",
+        "nullable": false,
+        "default": "gen_random_uuid()"
+      },
+      {
+        "name": "project_id",
+        "type": "uuid",
+        "nullable": false,
+        "default": null
+      },
+      {
+        "name": "applicant_id",
+        "type": "uuid",
+        "nullable": false,
+        "default": null
+      },
+      {
+        "name": "message",
+        "type": "text",
+        "nullable": true,
+        "default": null
+      },
+      {
+        "name": "desired_role",
+        "type": "text",
+        "nullable": true,
+        "default": null
+      },
+      {
+        "name": "status",
+        "type": "text",
+        "nullable": false,
+        "default": "'pending'::text"
+      },
+      {
+        "name": "reviewed_by",
+        "type": "uuid",
+        "nullable": true,
+        "default": null
+      },
+      {
+        "name": "reviewed_at",
+        "type": "timestamptz",
+        "nullable": true,
+        "default": null
+      },
+      {
+        "name": "review_note",
+        "type": "text",
+        "nullable": true,
+        "default": null
+      },
+      {
+        "name": "created_at",
+        "type": "timestamptz",
+        "nullable": false,
+        "default": "now()"
+      },
+      {
+        "name": "updated_at",
+        "type": "timestamptz",
+        "nullable": false,
+        "default": "now()"
+      }
+    ],
+    "project_invites": [
+      {
+        "name": "id",
+        "type": "uuid",
+        "nullable": false,
+        "default": "gen_random_uuid()"
+      },
+      {
+        "name": "project_id",
+        "type": "uuid",
+        "nullable": false,
+        "default": null
+      },
+      {
+        "name": "invitee_id",
+        "type": "uuid",
+        "nullable": false,
+        "default": null
+      },
+      {
+        "name": "inviter_id",
+        "type": "uuid",
+        "nullable": false,
+        "default": null
+      },
+      {
+        "name": "message",
+        "type": "text",
+        "nullable": true,
+        "default": null
+      },
+      {
+        "name": "proposed_role",
+        "type": "text",
+        "nullable": true,
+        "default": null
+      },
+      {
+        "name": "status",
+        "type": "text",
+        "nullable": false,
+        "default": "'pending'::text"
+      },
+      {
+        "name": "responded_at",
+        "type": "timestamptz",
+        "nullable": true,
+        "default": null
+      },
+      {
+        "name": "created_at",
+        "type": "timestamptz",
+        "nullable": false,
+        "default": "now()"
+      },
+      {
+        "name": "updated_at",
+        "type": "timestamptz",
+        "nullable": false,
+        "default": "now()"
+      }
+    ],
+    "project_media": [
+      {
+        "name": "id",
+        "type": "uuid",
+        "nullable": false,
+        "default": "gen_random_uuid()"
+      },
+      {
+        "name": "project_id",
+        "type": "uuid",
+        "nullable": false,
+        "default": null
+      },
+      {
+        "name": "storage_path",
+        "type": "text",
+        "nullable": false,
+        "default": null
+      },
+      {
+        "name": "mime_type",
+        "type": "text",
+        "nullable": false,
+        "default": null
+      },
+      {
+        "name": "size_bytes",
+        "type": "int4",
+        "nullable": false,
+        "default": null
+      },
+      {
+        "name": "width",
+        "type": "int4",
+        "nullable": true,
+        "default": null
+      },
+      {
+        "name": "height",
+        "type": "int4",
+        "nullable": true,
+        "default": null
+      },
+      {
+        "name": "alt_text",
+        "type": "text",
+        "nullable": true,
+        "default": null
+      },
+      {
+        "name": "display_order",
+        "type": "int4",
+        "nullable": false,
+        "default": "0"
+      },
+      {
+        "name": "uploaded_by",
+        "type": "uuid",
+        "nullable": true,
+        "default": null
+      },
+      {
+        "name": "created_at",
+        "type": "timestamptz",
+        "nullable": false,
+        "default": "now()"
+      }
+    ],
+    "project_members": [
+      {
+        "name": "project_id",
+        "type": "uuid",
+        "nullable": false,
+        "default": null
+      },
+      {
+        "name": "profile_id",
+        "type": "uuid",
+        "nullable": false,
+        "default": null
+      },
+      {
+        "name": "role",
+        "type": "text",
+        "nullable": false,
+        "default": "'member'::text"
+      },
+      {
+        "name": "title",
+        "type": "text",
+        "nullable": true,
+        "default": null
+      },
+      {
+        "name": "invited_by",
+        "type": "uuid",
+        "nullable": true,
+        "default": null
+      },
+      {
+        "name": "joined_at",
+        "type": "timestamptz",
+        "nullable": false,
+        "default": "now()"
+      },
+      {
+        "name": "updated_at",
+        "type": "timestamptz",
+        "nullable": false,
+        "default": "now()"
+      }
+    ],
+    "project_skills": [
+      {
+        "name": "project_id",
+        "type": "uuid",
+        "nullable": false,
+        "default": null
+      },
+      {
+        "name": "skill_id",
+        "type": "uuid",
+        "nullable": false,
+        "default": null
+      },
+      {
+        "name": "is_required",
+        "type": "bool",
+        "nullable": false,
+        "default": "false"
+      },
+      {
+        "name": "created_at",
+        "type": "timestamptz",
+        "nullable": false,
+        "default": "now()"
+      }
+    ],
+    "project_stars": [
+      {
+        "name": "project_id",
+        "type": "uuid",
+        "nullable": false,
+        "default": null
+      },
+      {
+        "name": "profile_id",
+        "type": "uuid",
+        "nullable": false,
+        "default": null
+      },
+      {
+        "name": "created_at",
+        "type": "timestamptz",
+        "nullable": false,
+        "default": "now()"
+      }
+    ],
+    "projects": [
+      {
+        "name": "id",
+        "type": "uuid",
+        "nullable": false,
+        "default": "gen_random_uuid()"
+      },
+      {
+        "name": "owner_id",
+        "type": "uuid",
+        "nullable": false,
+        "default": null
+      },
+      {
+        "name": "title",
+        "type": "text",
+        "nullable": false,
+        "default": null
+      },
+      {
+        "name": "slug",
+        "type": "text",
+        "nullable": false,
+        "default": null
+      },
+      {
+        "name": "tagline",
+        "type": "text",
+        "nullable": true,
+        "default": null
+      },
+      {
+        "name": "description",
+        "type": "text",
+        "nullable": true,
+        "default": null
+      },
+      {
+        "name": "category",
+        "type": "text",
+        "nullable": false,
+        "default": "'other'::text"
+      },
+      {
+        "name": "status",
+        "type": "text",
+        "nullable": false,
+        "default": "'planning'::text"
+      },
+      {
+        "name": "visibility",
+        "type": "text",
+        "nullable": false,
+        "default": "'public'::text"
+      },
+      {
+        "name": "university_id",
+        "type": "uuid",
+        "nullable": true,
+        "default": null
+      },
+      {
+        "name": "cover_url",
+        "type": "text",
+        "nullable": true,
+        "default": null
+      },
+      {
+        "name": "repo_url",
+        "type": "text",
+        "nullable": true,
+        "default": null
+      },
+      {
+        "name": "demo_url",
+        "type": "text",
+        "nullable": true,
+        "default": null
+      },
+      {
+        "name": "is_seeking_members",
+        "type": "bool",
+        "nullable": false,
+        "default": "false"
+      },
+      {
+        "name": "looking_for",
+        "type": "text",
+        "nullable": true,
+        "default": null
+      },
+      {
+        "name": "team_size_target",
+        "type": "int4",
+        "nullable": true,
+        "default": null
+      },
+      {
+        "name": "started_at",
+        "type": "date",
+        "nullable": true,
+        "default": null
+      },
+      {
+        "name": "completed_at",
+        "type": "date",
+        "nullable": true,
+        "default": null
+      },
+      {
+        "name": "member_count",
+        "type": "int4",
+        "nullable": false,
+        "default": "0"
+      },
+      {
+        "name": "star_count",
+        "type": "int4",
+        "nullable": false,
+        "default": "0"
+      },
+      {
+        "name": "application_count",
+        "type": "int4",
+        "nullable": false,
+        "default": "0"
+      },
+      {
+        "name": "post_count",
+        "type": "int4",
+        "nullable": false,
+        "default": "0"
+      },
+      {
+        "name": "moderation_status",
+        "type": "text",
+        "nullable": false,
+        "default": "'active'::text"
+      },
+      {
+        "name": "created_at",
+        "type": "timestamptz",
+        "nullable": false,
+        "default": "now()"
+      },
+      {
+        "name": "updated_at",
+        "type": "timestamptz",
+        "nullable": false,
+        "default": "now()"
+      },
+      {
+        "name": "deleted_at",
+        "type": "timestamptz",
+        "nullable": true,
+        "default": null
+      }
+    ],
+    "reserved_usernames": [
+      {
+        "name": "username",
+        "type": "text",
+        "nullable": false,
+        "default": null
+      },
+      {
+        "name": "reason",
+        "type": "text",
+        "nullable": false,
+        "default": "'reserved'::text"
+      }
+    ],
+    "semesters": [
+      {
+        "name": "id",
+        "type": "uuid",
+        "nullable": false,
+        "default": "gen_random_uuid()"
+      },
+      {
+        "name": "profile_id",
+        "type": "uuid",
+        "nullable": false,
+        "default": null
+      },
+      {
+        "name": "name",
+        "type": "text",
+        "nullable": false,
+        "default": null
+      },
+      {
+        "name": "term",
+        "type": "text",
+        "nullable": true,
+        "default": null
+      },
+      {
+        "name": "year",
+        "type": "int4",
+        "nullable": true,
+        "default": null
+      },
+      {
+        "name": "start_date",
+        "type": "date",
+        "nullable": true,
+        "default": null
+      },
+      {
+        "name": "end_date",
+        "type": "date",
+        "nullable": true,
+        "default": null
+      },
+      {
+        "name": "is_current",
+        "type": "bool",
+        "nullable": false,
+        "default": "false"
+      },
+      {
+        "name": "notes",
+        "type": "text",
+        "nullable": true,
+        "default": null
+      },
+      {
+        "name": "created_at",
+        "type": "timestamptz",
+        "nullable": false,
+        "default": "now()"
+      },
+      {
+        "name": "updated_at",
+        "type": "timestamptz",
+        "nullable": false,
+        "default": "now()"
+      }
+    ],
+    "skills": [
+      {
+        "name": "id",
+        "type": "uuid",
+        "nullable": false,
+        "default": "gen_random_uuid()"
+      },
+      {
+        "name": "name",
+        "type": "text",
+        "nullable": false,
+        "default": null
+      },
+      {
+        "name": "slug",
+        "type": "text",
+        "nullable": false,
+        "default": null
+      },
+      {
+        "name": "category",
+        "type": "text",
+        "nullable": false,
+        "default": "'other'::text"
+      },
+      {
+        "name": "description",
+        "type": "text",
+        "nullable": true,
+        "default": null
+      },
+      {
+        "name": "is_approved",
+        "type": "bool",
+        "nullable": false,
+        "default": "false"
+      },
+      {
+        "name": "usage_count",
+        "type": "int4",
+        "nullable": false,
+        "default": "0"
+      },
+      {
+        "name": "created_by",
+        "type": "uuid",
+        "nullable": true,
+        "default": null
+      },
+      {
+        "name": "reviewed_by",
+        "type": "uuid",
+        "nullable": true,
+        "default": null
+      },
+      {
+        "name": "reviewed_at",
+        "type": "timestamptz",
+        "nullable": true,
+        "default": null
+      },
+      {
+        "name": "created_at",
+        "type": "timestamptz",
+        "nullable": false,
+        "default": "now()"
+      },
+      {
+        "name": "updated_at",
+        "type": "timestamptz",
+        "nullable": false,
+        "default": "now()"
+      }
+    ],
+    "study_sessions": [
+      {
+        "name": "id",
+        "type": "uuid",
+        "nullable": false,
+        "default": "gen_random_uuid()"
+      },
+      {
+        "name": "profile_id",
+        "type": "uuid",
+        "nullable": false,
+        "default": null
+      },
+      {
+        "name": "course_id",
+        "type": "uuid",
+        "nullable": true,
+        "default": null
+      },
+      {
+        "name": "goal_id",
+        "type": "uuid",
+        "nullable": true,
+        "default": null
+      },
+      {
+        "name": "started_at",
+        "type": "timestamptz",
+        "nullable": false,
+        "default": "now()"
+      },
+      {
+        "name": "duration_minutes",
+        "type": "int4",
+        "nullable": false,
+        "default": null
+      },
+      {
+        "name": "ended_at",
+        "type": "timestamptz",
+        "nullable": false,
+        "default": null
+      },
+      {
+        "name": "focus_rating",
+        "type": "int2",
+        "nullable": true,
+        "default": null
+      },
+      {
+        "name": "notes",
+        "type": "text",
+        "nullable": true,
+        "default": null
+      },
+      {
+        "name": "created_at",
+        "type": "timestamptz",
+        "nullable": false,
+        "default": "now()"
+      }
+    ],
+    "universities": [
+      {
+        "name": "id",
+        "type": "uuid",
+        "nullable": false,
+        "default": "gen_random_uuid()"
+      },
+      {
+        "name": "slug",
+        "type": "text",
+        "nullable": false,
+        "default": null
+      },
+      {
+        "name": "name",
+        "type": "text",
+        "nullable": false,
+        "default": null
+      },
+      {
+        "name": "short_name",
+        "type": "text",
+        "nullable": true,
+        "default": null
+      },
+      {
+        "name": "country",
+        "type": "text",
+        "nullable": true,
+        "default": null
+      },
+      {
+        "name": "city",
+        "type": "text",
+        "nullable": true,
+        "default": null
+      },
+      {
+        "name": "website",
+        "type": "text",
+        "nullable": true,
+        "default": null
+      },
+      {
+        "name": "logo_url",
+        "type": "text",
+        "nullable": true,
+        "default": null
+      },
+      {
+        "name": "description",
+        "type": "text",
+        "nullable": true,
+        "default": null
+      },
+      {
+        "name": "email_domains",
+        "type": "_text",
+        "nullable": false,
+        "default": "'{}'::text[]"
+      },
+      {
+        "name": "status",
+        "type": "text",
+        "nullable": false,
+        "default": "'pending'::text"
+      },
+      {
+        "name": "rejection_reason",
+        "type": "text",
+        "nullable": true,
+        "default": null
+      },
+      {
+        "name": "submitted_by",
+        "type": "uuid",
+        "nullable": true,
+        "default": null
+      },
+      {
+        "name": "reviewed_by",
+        "type": "uuid",
+        "nullable": true,
+        "default": null
+      },
+      {
+        "name": "reviewed_at",
+        "type": "timestamptz",
+        "nullable": true,
+        "default": null
+      },
+      {
+        "name": "student_count",
+        "type": "int4",
+        "nullable": false,
+        "default": "0"
+      },
+      {
+        "name": "project_count",
+        "type": "int4",
+        "nullable": false,
+        "default": "0"
+      },
+      {
+        "name": "normalized_name",
+        "type": "text",
+        "nullable": true,
+        "default": null
+      },
+      {
+        "name": "created_at",
+        "type": "timestamptz",
+        "nullable": false,
+        "default": "now()"
+      },
+      {
+        "name": "updated_at",
+        "type": "timestamptz",
+        "nullable": false,
+        "default": "now()"
+      }
+    ],
+    "user_roles": [
+      {
+        "name": "user_id",
+        "type": "uuid",
+        "nullable": false,
+        "default": null
+      },
+      {
+        "name": "role",
+        "type": "text",
+        "nullable": false,
+        "default": null
+      },
+      {
+        "name": "granted_by",
+        "type": "uuid",
+        "nullable": true,
+        "default": null
+      },
+      {
+        "name": "granted_at",
+        "type": "timestamptz",
+        "nullable": false,
+        "default": "now()"
+      },
+      {
+        "name": "note",
+        "type": "text",
+        "nullable": true,
+        "default": null
+      }
+    ]
+  },
+  "enums": [],
+  "views": {},
+  "functions": [
+    {
+      "name": "convert_idea_to_project",
+      "args": "p_idea_id uuid",
+      "returns": "uuid"
+    },
+    {
+      "name": "create_group_conversation",
+      "args": "p_title text, p_members uuid[] DEFAULT '{}'::uuid[]",
+      "returns": "uuid"
+    },
+    {
+      "name": "current_study_streak",
+      "args": "",
+      "returns": "integer"
+    },
+    {
+      "name": "dispatch_due_reminders",
+      "args": "v_event_window interval DEFAULT '24:00:00'::interval, v_opportunity_window interval DEFAULT '48:00:00'::interval",
+      "returns": "integer"
+    },
+    {
+      "name": "mark_conversation_read",
+      "args": "p_conversation_id uuid",
+      "returns": "void"
+    },
+    {
+      "name": "start_direct_conversation",
+      "args": "p_other_user uuid",
+      "returns": "uuid"
+    },
+    {
+      "name": "total_unread_messages",
+      "args": "",
+      "returns": "integer"
+    },
+    {
+      "name": "touch_last_active",
+      "args": "",
+      "returns": "void"
+    },
+    {
+      "name": "transfer_project_ownership",
+      "args": "p_project_id uuid, p_new_owner uuid",
+      "returns": "void"
+    },
+    {
+      "name": "unread_notification_count",
+      "args": "",
+      "returns": "integer"
+    }
+  ]
+}

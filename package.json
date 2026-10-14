@@ -21,6 +21,8 @@
     "test:e2e:ui": "playwright test --ui",
     "verify": "npm run typecheck && npm run lint && npm run test",
     "db:types": "node -e \"require('fs').mkdirSync('src/lib/db',{recursive:true})\" && supabase gen types typescript --linked --schema public > src/lib/db/database.types.ts",
+    "db:types:local": "node scripts/db/schema.mjs --types",
+    "db:schema:local": "node scripts/db/schema.mjs --schema --json",
     "db:push": "supabase db push",
     "db:bundle": "node scripts/bundle-migrations.mjs",
     "db:check": "node scripts/check-database.mjs",
