@@ -8,6 +8,11 @@ permissions and no interface yet. That is stated plainly inside the running
 application: `/status` lists every feature and its real state, and any route whose
 feature is unbuilt says so instead of showing a mock-up.
 
+The plan to finish it — a measured audit of what exists, the findings that block it, three
+honest finish lines, and milestones M0–M8 with what each one is accepted against — is in
+**[docs/plan/PLAN.md](docs/plan/PLAN.md)**. Read [§1](docs/plan/PLAN.md#1-where-the-project-actually-stands)
+if you want the state in one table.
+
 ---
 
 ## What actually works today
@@ -96,6 +101,11 @@ Longer discussion in [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md). The other doc
 
 | Document | Covers |
 | --- | --- |
+| [plan/PLAN.md](docs/plan/PLAN.md) | **the plan to finish it** — measured audit, findings, three finish lines, milestones M0–M8, estimates, risks |
+| [plan/ROADMAP](docs/plan/PLAN.md#4-milestones) | the milestone order and what each one lands |
+| [plan/UX.md](docs/plan/UX.md) | interface contract: UI kit, screens by milestone, accessibility and performance budgets, copy standards |
+| [plan/ENGINEERING.md](docs/plan/ENGINEERING.md) | code standards, Definition of Done, CI, test strategy, review checklist |
+| [plan/GITHUB.md](docs/plan/GITHUB.md) | how the work is run: labels, milestones, board, cadence, metrics |
 | [PRODUCT.md](docs/PRODUCT.md) | what Quad is for, and what it deliberately is not |
 | [DATABASE.md](docs/DATABASE.md) | the 15 migrations, conventions, the `app` schema |
 | [AUTH.md](docs/AUTH.md) | the four auth flows, the proxy, the cookie dance |

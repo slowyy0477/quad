@@ -1,0 +1,498 @@
+{
+  "_comment": "Issue manifest for Quad. Consumed by scripts/github/bootstrap.mjs. Every issue carries acceptance criteria that can be checked by a command or a click, per docs/plan/ENGINEERING.md §4.",
+  "repo": {
+    "name": "quad",
+    "description": "Quad — a university student network for identity, projects, collaboration and learning. Next.js 16 + Supabase, authorisation enforced in Postgres.",
+    "topics": ["nextjs", "supabase", "postgres", "row-level-security", "typescript", "tailwindcss", "student-project", "university"],
+    "visibility": "public",
+    "license": "MIT"
+  },
+  "labels": [
+    { "name": "area:db", "color": "1d76db", "description": "Schema, migrations, policies, functions" },
+    { "name": "area:app", "color": "0e8a16", "description": "Routes, queries, server actions" },
+    { "name": "area:ui", "color": "5319e7", "description": "Design system and interface" },
+    { "name": "area:tests", "color": "fbca04", "description": "Test coverage of any layer" },
+    { "name": "area:ci", "color": "c2e0c6", "description": "CI, tooling, repository hygiene" },
+    { "name": "area:docs", "color": "0075ca", "description": "README, docs/, decision records" },
+    { "name": "area:ops", "color": "d4c5f9", "description": "Deploy, monitoring, backups, secrets" },
+    { "name": "area:safety", "color": "b60205", "description": "Moderation, rate limits, abuse" },
+    { "name": "type:feature", "color": "1d76db", "description": "New capability" },
+    { "name": "type:verification", "color": "fef2c0", "description": "Prove something already written actually works" },
+    { "name": "type:bug", "color": "d73a4a", "description": "Something is wrong" },
+    { "name": "type:chore", "color": "ededed", "description": "Maintenance with no behaviour change" },
+    { "name": "type:design", "color": "c5def5", "description": "Interface and interaction work" },
+    { "name": "type:honesty", "color": "5319e7", "description": "Makes a claim in the repo true again" },
+    { "name": "blocker", "color": "b60205", "description": "Blocks a finish line" },
+    { "name": "good-first-issue", "color": "7057ff", "description": "Small, well-bounded, safe to start with" },
+    { "name": "needs-decision", "color": "d4c5f9", "description": "Waiting on a product or design decision" }
+  ],
+  "milestones": [
+    { "title": "M0 — Freeze and make honest", "description": "Commit the in-flight work, correct every stale claim, add CI and a licence, push to GitHub. Nothing new is built until the repository tells the truth and the work is backed up." },
+    { "title": "M1 — Prove it against a live database", "description": "A real Supabase project, migrations applied, generated types, the deployment verification list run once, and the first end-to-end specs in CI." },
+    { "title": "M2 — Identity and people", "description": "Onboarding, profiles, universities, skills, connections, settings, mobile navigation, and the UI kit completion pass. Finish line A lands here." },
+    { "title": "M3 — A feed worth returning to", "description": "Likes, comments and saves as real controls; cursor pagination; ranking; post detail; composer upgrades." },
+    { "title": "M4 — Projects and collaboration", "description": "The differentiated feature: projects, membership, join requests, seeking members, ideas and conversion." },
+    { "title": "M5 — Talking to people", "description": "Messaging and notifications with realtime, RLS proved to apply to the socket." },
+    { "title": "M6 — Learning and discovery", "description": "Goals, daily log and streaks, achievements, opportunities, events, and search (migration 0018)." },
+    { "title": "M7 — Safety and operations", "description": "Moderation, rate limiting, storage, security headers, error reporting. The launch blockers live here." },
+    { "title": "M8 — Launch readiness", "description": "Accessibility, performance, legal, backups, domain, and a truthful launch state. Finish line B lands here." }
+  ],
+  "issues": [
+    {
+      "title": "Commit the in-flight profiles and projects work",
+      "milestone": "M0 — Freeze and make honest",
+      "labels": ["type:chore", "area:app", "blocker"],
+      "size": "S",
+      "body": "1,833 lines across 14 files exist only in the working tree: `src/features/profiles/` (601 lines), `src/features/projects/` (442), `src/app/u/[username]/`, `src/app/me/edit/`, `supabase/migrations/0017_university_reference_data.sql`, plus rewrites of `/me` and `/onboarding`. It typechecks, lints and passes the suite — it is finished work with no commit and no backup.\n\n**Do**\n- Split into logical conventional commits (migration, feature, routes) rather than one dump.\n- Verify `git status` is clean afterwards and that `0017` is included.\n\n**Acceptance**\n- [ ] `git status --short` is empty.\n- [ ] `git log --oneline` shows the work as 3–5 readable commits, each with a *why*.\n- [ ] `npm run verify` passes on the committed tree."
+    },
+    {
+      "title": "build-status.ts no longer matches the working tree",
+      "milestone": "M0 — Freeze and make honest",
+      "labels": ["type:honesty", "area:app", "blocker"],
+      "size": "S",
+      "body": "`/status` is the mechanism that keeps this project honest (PRODUCT.md rule 2). It currently says onboarding is `planned`, and profiles, universities and projects are `schema-only` — \"No interface\" — while the working tree contains all four interfaces. Under-reporting is still reporting inaccurately.\n\n**Do**\n- Update the four entries to their real state with an accurate note each.\n- Add a test that fails when a route group gains a real implementation while its status entry still says `schema-only` (e.g. a `schema-only` feature whose route file is longer than the `PlannedFeature` stub).\n\n**Acceptance**\n- [ ] Every status in `FEATURES` is defensible by clicking the route.\n- [ ] The new test fails against the old list and passes against the new one.\n- [ ] `/status` re-read in a browser after the change."
+    },
+    {
+      "title": "Fix documentation drift: migration counts, credential claim, migration numbering",
+      "milestone": "M0 — Freeze and make honest",
+      "labels": ["type:honesty", "area:docs"],
+      "size": "S",
+      "body": "Four documents disagree with the code.\n\n- README says \"15 migrations\" in one table and \"16 migrations\" in another; there are 17.\n- README, PRODUCT.md and TESTING.md say no Supabase credentials have been supplied. Credentials were supplied, and the project behind them does not resolve (see the Supabase issue) — so the claim is now wrong in a way that hides a real blocker.\n- PRODUCT.md and DEPLOYMENT.md name `0016_moderation`, `0017_rate_limits`, `0018_search`, `0020_storage`. Reality: `0016_backfill_profiles`, `0017_university_reference_data`.\n- DATABASE.md is titled \"the 15 migrations\".\n\n**Do**\n- Correct the counts and the credential claim in every file that makes it.\n- Rewrite the planned-migration table so numbers are reserved from **0018** upward, and state the rule: a number is reserved in the issue that writes it, and applied migrations are never renumbered.\n- Add the missing note that `src/lib/db/database.types.ts` does not exist yet.\n\n**Acceptance**\n- [ ] `grep -rn \"15 migrations\\|16 migrations\" docs README.md` returns only historical references marked as such.\n- [ ] Next free migration number is stated once, in one place, and referenced from the others."
+    },
+    {
+      "title": "Add CI: typecheck, lint, database suite and build on every push",
+      "milestone": "M0 — Freeze and make honest",
+      "labels": ["area:ci", "type:chore", "blocker"],
+      "size": "M",
+      "body": "`npm run verify` passes locally in 549 s and nothing runs it but a person who remembers to. A gate that depends on discipline is not a gate.\n\n**Do**\n- `.github/workflows/ci.yml` with two jobs: `verify` (typegen → tsc → eslint → vitest) and `build` (`npm run build`).\n- `npm ci` with the npm cache, Node 24 pinned, `concurrency` cancelling superseded runs.\n- Branch protection on `main`: both jobs required, no force-push, squash merge only.\n- A PR template carrying the Definition of Done checklist from docs/plan/ENGINEERING.md §4.\n- Issue templates: feature, bug, verification.\n\n**Acceptance**\n- [ ] A deliberately broken branch (a failing test) cannot merge; a green one can.\n- [ ] A full pipeline run finishes in under 6 minutes on a warmed cache.\n- [ ] No secret is required for CI to pass."
+    },
+    {
+      "title": "Add LICENSE (MIT) and CONTRIBUTING.md",
+      "milestone": "M0 — Freeze and make honest",
+      "labels": ["area:docs", "type:chore"],
+      "size": "S",
+      "body": "README says \"Not yet chosen\". With no licence the code is all-rights-reserved by default, which works against both stated goals (a portfolio read and, later, contributors).\n\n**Do**\n- Add MIT, copyright Abdullah Murtaza.\n- CONTRIBUTING.md: the one command that matters (`npm run verify`), the commit convention, the rule that a new database function without a declared audience fails the suite, and where the plan lives (`docs/plan/`).\n\n**Acceptance**\n- [ ] The licence badge/statement appears in the README and matches the `LICENSE` file.\n- [ ] A stranger can go from clone to running app following README alone."
+    },
+    {
+      "title": "Create the public GitHub repository and push the history",
+      "milestone": "M0 — Freeze and make honest",
+      "labels": ["area:ci", "area:ops", "blocker"],
+      "size": "S",
+      "body": "There is no remote. 24 commits and the project's entire history live on one laptop, and yesterday's work is not even committed.\n\n**Do**\n- `gh repo create quad --public` under slowyy0477, description and topics from the manifest in `docs/plan/issues.json`.\n- Push `main`, confirm the tree has no secrets: `git grep -nIE \"eyJ|sb_secret_|sb_publishable_\"` must not match a tracked file.\n- Confirm `.env.local`, `.next/`, `node_modules/` and the bundled SQL are not tracked.\n\n**Acceptance**\n- [ ] The repo URL renders the README.\n- [ ] `git ls-files | wc -l` on the remote equals the local tracked count.\n- [ ] No credential string exists anywhere in the pushed history."
+    },
+    {
+      "title": "Remove the admin password from .env.local and rotate the secret key if it was ever exposed",
+      "milestone": "M0 — Freeze and make honest",
+      "labels": ["area:ops", "area:safety"],
+      "size": "S",
+      "body": "`.env.local` currently holds `ADMIN_EMAIL` and `ADMIN_PASSWORD` (14 characters), and a real `sb_secret_…` service-role key. ADMIN.md says the admin values are deleted after `npm run create-admin` — that has not happened. The service-role key bypasses row-level security entirely: it can read every private message on the platform.\n\n**Do**\n- Run `npm run create-admin` against the new project once (see the Supabase issue), then delete both admin values.\n- If the secret key was ever pasted into a chat, an issue, a screenshot or a commit, rotate it in the Supabase dashboard and update `.env.local`.\n- Note in ENVIRONMENT.md that these two are one-shot values, not configuration.\n\n**Acceptance**\n- [ ] `.env.local` contains no `ADMIN_PASSWORD`.\n- [ ] The dashboard shows a key created after today's date if rotation was needed.\n- [ ] `git log -pS 'sb_secret'` returns nothing."
+    },
+
+    {
+      "title": "Create the Supabase project and apply all 17 migrations",
+      "milestone": "M1 — Prove it against a live database",
+      "labels": ["area:db", "area:ops", "blocker"],
+      "size": "S",
+      "body": "The project referenced in `.env.local` (`sctvuolmcvwakjhcflla`) **does not resolve**: `npm run db:check` fails with `getaddrinfo ENOTFOUND` while `supabase.com` and `github.com` resolve fine. There is no live database, which is why sign-up, sign-in, Google OAuth, the profile-creation trigger and reading/writing posts have never run in reality. This is the root of the whole \"not verified\" column.\n\n**Do**\n- Create a fresh Supabase project (free tier), copy the URL, publishable key and secret key into `.env.local`.\n- `npx supabase link --project-ref <ref>` then `npm run db:push` (or paste `supabase/apply-all.sql` into the SQL editor).\n- `npm run db:check` — all 52 tables present, `anon` refused on `user_roles`.\n\n**Acceptance**\n- [ ] `npm run db:check` exits 0 with all three checks passing.\n- [ ] Table editor shows 52 tables, every one with the RLS shield lit.\n- [ ] Project settings show whether backups are included on the plan, and that fact is written into DEPLOYMENT.md."
+    },
+    {
+      "title": "Generate database types and type every query from them",
+      "milestone": "M1 — Prove it against a live database",
+      "labels": ["area:app", "type:feature"],
+      "size": "M",
+      "body": "`src/lib/db/database.types.ts` does not exist, so 462 lines of `queries.ts` hand-declare row shapes against 52 tables. TypeScript cannot catch a rename, a nullability change or a dropped column — the exact class of bug that reaches production as a blank screen.\n\n**Do**\n- `npm run db:types` against the new project; commit the generated file.\n- Derive `Row` types in each `queries.ts` from it, keeping view models (`PostCard`, `ProfileHeader`) as the outward contract.\n- A CI check that regenerates and fails if the committed file is stale.\n\n**Acceptance**\n- [ ] Removing a column from a migration and re-running typecheck produces errors in the affected queries.\n- [ ] No `any` and no hand-written row interface remains in `src/features/*/queries.ts`.\n- [ ] The staleness check fails when the generated file is edited by hand."
+    },
+    {
+      "title": "Run and record the deployment verification list",
+      "milestone": "M1 — Prove it against a live database",
+      "labels": ["type:verification", "area:ops", "blocker"],
+      "size": "M",
+      "body": "DEPLOYMENT.md §6 lists eleven things to check by hand and none has ever been run, because there was no database. This issue is the one that converts \"written to work\" into \"works\".\n\n**Do** — the list, with evidence for each: `/` with no Setup badge; `/setup` reporting all four variables; `/status`; sign up → confirmation email arrives → link returns signed in; sign in / sign out / sign in; password reset; Google sign-in if configured; post to the feed and confirm the row's `author_id`; `/feed` while signed out redirects to `/login`; DevTools Network shows no service-role key; the built bundle contains no service key.\n\n**Acceptance**\n- [ ] Every item recorded as pass/fail in the issue, with a screenshot or log line for the two bundle checks.\n- [ ] Any failure gets its own issue rather than being noted in prose.\n- [ ] TESTING.md's \"Not verified\" section is rewritten from the results."
+    },
+    {
+      "title": "Create the first admin and confirm the admin gate refuses non-admins",
+      "milestone": "M1 — Prove it against a live database",
+      "labels": ["type:verification", "area:safety", "area:db"],
+      "size": "S",
+      "body": "Admin and moderator roles exist in `user_roles` and are enforced in policies, but no admin exists and the gate has never been exercised. Roles live in `user_roles` rather than on `profiles` so that a user's own-row UPDATE can never grant them — that claim deserves a test.\n\n**Do**\n- `npm run create-admin`, then delete the credentials afterwards (separate issue).\n- While signed in as a normal account, hit the admin route directly by URL and confirm refusal.\n- Add a database test: an account cannot insert into `user_roles`, cannot update another's role, and cannot make itself a moderator.\n\n**Acceptance**\n- [ ] `/admin` returns the refusal state for a non-admin, not a blank page.\n- [ ] The new test fails if the policies are dropped.\n- [ ] ADMIN.md's claims about what admins cannot see are still true after the change."
+    },
+    {
+      "title": "Add Playwright and the five critical end-to-end specs",
+      "milestone": "M1 — Prove it against a live database",
+      "labels": ["area:tests", "type:feature"],
+      "size": "L",
+      "body": "`@playwright/test` is installed, `npm run test:e2e` is wired and `tests/e2e/` is empty. The 296 existing tests cover the database only: today a broken button and a broken policy are equally invisible.\n\n**Do** — five specs, each runnable against the linked project:\n1. Sign up → confirmation → sign in → land on `/feed`.\n2. Create a post → it appears in the feed → the row exists with the right author.\n3. A gated route while signed out redirects to `/login` and returns to it after signing in.\n4. Sign out ends the session; the back button does not restore it.\n5. Password reset request does not reveal whether an address is registered.\n\n**Acceptance**\n- [ ] `npm run test:e2e` passes from a cold clone with a documented `.env.test`.\n- [ ] The suite uses a dedicated test project, never production data.\n- [ ] A deliberately broken selector makes the suite fail loudly, not silently skip."
+    },
+    {
+      "title": "Run e2e in CI against a dedicated test project",
+      "milestone": "M1 — Prove it against a live database",
+      "labels": ["area:ci", "area:tests"],
+      "size": "M",
+      "body": "Specs that only run when someone remembers are half a gate. This wires the M1 suite into the pipeline without putting production credentials in CI.\n\n**Do**\n- A second Supabase project used only by tests; its keys in GitHub Actions secrets.\n- An `e2e` job that builds, starts the app, and runs the suite headless; trace and video uploaded on failure.\n- `concurrency` so a superseded push cancels the run; a documented `.env.test.example`.\n\n**Acceptance**\n- [ ] A failing e2e run blocks merge on `main`.\n- [ ] The workflow contains no production URL or key.\n- [ ] A stack trace and a screenshot are attached to the failed run automatically."
+    },
+
+    {
+      "title": "Finish the UI kit: the 13 missing primitives in one pass",
+      "milestone": "M2 — Identity and people",
+      "labels": ["area:ui", "type:design"],
+      "size": "L",
+      "body": "Nine primitives exist and 13 Radix packages are installed and never imported (dialog, dropdown-menu, popover, select, tabs, tooltip, switch, checkbox, radio-group, scroll-area, separator, label, visually-hidden). `sonner`, `react-hook-form` and `@hookform/resolvers` are installed and unused too. Every feature milestone after this one would otherwise re-invent a dialog badly under time pressure.\n\nThe full contract is in [docs/plan/UX.md](../plan/UX.md) §3: Skeleton, EmptyState, Dialog, DropdownMenu, Select, Tabs, Tooltip, Switch, Checkbox, RadioGroup, ScrollArea, Separator, Toast, MobileNav, Pagination/LoadMore, Textarea, SearchInput, PersonRow, StatRow, ProgressMeter, ThemeToggle.\n\n**Do**\n- Build them as siblings of the existing primitives: `components/ui/**` still imports nothing from `features/**`.\n- Nothing gets a new shadow, colour or radius — see UX.md §1.\n- Delete any dependency that ends up genuinely unused rather than leaving it installed.\n\n**Acceptance**\n- [ ] Every component is keyboard operable, focus-visible, dark-mode correct and correct at 360 px.\n- [ ] Dialog traps focus and returns it to the trigger.\n- [ ] `npm ls @radix-ui/react-dialog sonner react-hook-form` shows no package that no file imports."
+    },
+    {
+      "title": "Implement the four-state contract: loading, error, empty, content",
+      "milestone": "M2 — Identity and people",
+      "labels": ["area:ui", "type:design", "area:app"],
+      "size": "M",
+      "body": "ARCHITECTURE §9 requires four states per data route and says \"a route with no empty state is not done\". There is one root `error.tsx`, **zero `loading.tsx` files**, no `Skeleton` and no `EmptyState`. On campus wifi every route currently shows a blank screen and a first-time user cannot tell loading from broken.\n\n**Do**\n- `Skeleton` and `EmptyState` primitives (blocked on the UI kit issue).\n- A `loading.tsx` and an empty state for every data route: feed, profile, projects, messages, notifications, universities, search, opportunities, events, goals.\n- Empty copy per UX.md §8 — name the reason, offer one way forward, never \"No data\".\n\n**Acceptance**\n- [ ] Throttling to slow-3G shows a skeleton on every route, never a blank body.\n- [ ] Every list route has a reachable empty state, verified with a fresh account.\n- [ ] A route-by-route table in the PR body: route → loading / error / empty file paths."
+    },
+    {
+      "title": "Mobile navigation: the app is unreachable on a phone",
+      "milestone": "M2 — Identity and people",
+      "labels": ["area:ui", "type:design", "blocker"],
+      "size": "M",
+      "body": "Feed, Projects and Messages are `hidden sm:inline-flex` in `site-header.tsx`, and there is no bottom bar or sheet. On a phone a signed-in user's only control is the avatar, which goes to `/me`. Campus users are mobile-first, so this is the most severe interface defect in the project — the product is unusable on the device most of its users will have.\n\n**Do**\n- A bottom navigation under `sm`: Feed, Projects, Notifications (with unread), Me; current route marked with `aria-current`.\n- Header compresses to logo + notifications + avatar; the rest moves into the bar.\n- Safe-area insets respected; the composer and message composer sit above the bar, not behind it.\n\n**Acceptance**\n- [ ] At 360 px every primary destination is reachable in one tap from any route.\n- [ ] `aria-current=\"page\"` is set on the active item.\n- [ ] No content is hidden behind the bar (checked on the feed and a message thread)."
+    },
+    {
+      "title": "Add /settings with a working theme toggle",
+      "milestone": "M2 — Identity and people",
+      "labels": ["area:ui", "type:design", "type:honesty"],
+      "size": "M",
+      "body": "`globals.css` defines a class-based dark theme and explains that \"the settings page offers an explicit choice\" — there is no settings route and nothing ever sets the `dark` class. A documented feature that does not exist is exactly what PRODUCT.md rule 2 forbids. Contrast was designed for both themes; neither can currently be reached.\n\n**Do**\n- `/settings` with sections: Appearance (light / dark / system), Privacy (who can see profile, projects, connections), Account (email, password change, delete account with typed confirmation).\n- Persist the choice; apply it before first paint so there is no flash; `prefers-color-scheme` is the default when the user has not chosen.\n- Record the privacy fields against the existing profile privacy columns — do not invent new storage.\n\n**Acceptance**\n- [ ] Dark mode survives a reload and a new tab, and is applied with no flash of light content.\n- [ ] Every control is backed by a real column; anything not backed is not shown.\n- [ ] Deleting an account is a confirmed, typed, irreversible action with the object named."
+    },
+    {
+      "title": "Verify onboarding end to end against the live project",
+      "milestone": "M2 — Identity and people",
+      "labels": ["type:verification", "area:app"],
+      "size": "S",
+      "body": "`/onboarding` gained a real three-step form in the in-flight work (187 lines) and `build-status.ts` still calls it `planned`. It has never run against a database, so the username-uniqueness rule and the profile update policy are untested in reality.\n\n**Do**\n- Two accounts, same username: the second must be refused with a field error, not a 500.\n- Complete onboarding as a new account and confirm the handle replaces the generated one everywhere (header, profile, post author).\n- Reload mid-onboarding: state is not lost silently.\n\n**Acceptance**\n- [ ] The username rule is enforced by the database, and the test proves a direct insert of a duplicate fails too.\n- [ ] A fresh account cannot post without completing onboarding, or is told clearly why.\n- [ ] `build-status.ts` reflects the verified state."
+    },
+    {
+      "title": "Verify the public profile and profile edit screens",
+      "milestone": "M2 — Identity and people",
+      "labels": ["type:verification", "area:app", "area:ui"],
+      "size": "M",
+      "body": "`/u/[username]` (49 lines), `/me/edit` (59) and `profile-view.tsx` (173) arrived in the in-flight work. They have never rendered against real rows, and a signed-out visitor hitting `/u/nobody` currently gets a 404 — which is correct but should be a designed state, not the framework default.\n\n**Do**\n- Signed-out visit to a public profile: renders public fields only, no private rows, no layout shift.\n- Unknown handle: a real \"no such profile\" page with a way forward.\n- Edit and save as a real account; confirm a stranger cannot edit another user's profile (permission test, not a hidden button).\n\n**Acceptance**\n- [ ] Private fields are absent from the HTML, not merely hidden with CSS.\n- [ ] `/u/nobody` returns a designed 404 that names the handle.\n- [ ] A direct UPDATE of `profiles.display_name` as another user is refused by policy, with a test."
+    },
+    {
+      "title": "Permission tests for profiles, universities, social graph, skills and interests",
+      "milestone": "M2 — Identity and people",
+      "labels": ["area:tests", "area:db"],
+      "size": "L",
+      "body": "TESTING.md names this as \"the largest gap\": profiles, universities, the social graph, skills and interests have a built schema and no permission tests. Every one of these tables holds personal data, and the suite is the only thing standing between a policy regression and a leak.\n\n**Do** — for each table, the three-direction shape: the owner can; an unrelated user cannot; an unrelated user cannot do it by substituting an ID. Cover: own-row update only; blocked users invisible in both directions; connection requests only from the requester; skill claims only on your own profile; university rows submittable but not self-approvable.\n\n**Acceptance**\n- [ ] At least 40 new assertions, each named as the rule it enforces.\n- [ ] Dropping any policy makes a test fail (spot-check two by hand).\n- [ ] TESTING.md's gap list is updated with what remains."
+    },
+    {
+      "title": "Build the universities browser with 'I study here'",
+      "milestone": "M2 — Identity and people",
+      "labels": ["area:app", "type:feature"],
+      "size": "M",
+      "body": "Migration 0017 ships 53 real institutions and the `universities` table has a user-submission path (insert files a `pending` row for a moderator). None of it is reachable: `/universities` is an 8-line placeholder.\n\n**Do**\n- Browse + search by name, city and short name; row shows name, city and a real student count (a stored counter, not a computed estimate).\n- \"I study here\" sets the profile and is reversible; a second claim moves the affiliation rather than creating two.\n- \"Request this university\" files a pending row and says who will look at it.\n\n**Acceptance**\n- [ ] The counter equals the number of profiles actually affiliated (assert in a test).\n- [ ] A submitted university cannot approve itself; a test proves a client cannot set `status = 'approved'`.\n- [ ] The list says plainly that it is incomplete and how to get an institution added."
+    },
+    {
+      "title": "Connections, follows and blocking interfaces",
+      "milestone": "M2 — Identity and people",
+      "labels": ["area:app", "type:feature"],
+      "size": "L",
+      "body": "Request/accept, mutual-connection rules and block enforcement exist as policies and are exercised by 33 project-membership tests but have no interface, so no user can actually connect with anyone — which is why the feed has nothing in it.\n\n**Do**\n- Connect / accept / decline / remove; follow for one-way interest; block with a confirmation that states what it does (hides each other, ends connection, stops messages).\n- Live lists: connections, requests (in and out), followers, blocked.\n- Blocked users disappear from search, feed, mentions and profile, not just from a list.\n\n**Acceptance**\n- [ ] After blocking, the blocked account cannot see the blocker's posts, profile or messages — including by direct URL and by API call.\n- [ ] Mutual connections are symmetric for both accounts.\n- [ ] Empty states for all four lists (UX.md §8)."
+    },
+    {
+      "title": "Skills and interests editor with the self-declared label",
+      "milestone": "M2 — Identity and people",
+      "labels": ["area:app", "type:feature", "type:honesty"],
+      "size": "M",
+      "body": "Skills and interests have tables and policies. PRODUCT.md rule 4 says skill levels are self-declared and the UI must say so — the risk here is a progress bar that implies verification the platform cannot perform.\n\n**Do**\n- Add, edit, remove skills with a level; interests as free tags; both shown on the profile and in the editor.\n- One visible sentence stating these are self-declared; no badge, no meter and no colour that implies assessment.\n- Later (M4) skills link to the projects that used them — leave the join point in the schema, not in the UI yet.\n\n**Acceptance**\n- [ ] No element of the skill UI implies verification; a screenshot in the PR body shows the label.\n- [ ] Skills are editable only on your own profile, with a policy test.\n- [ ] Empty state: \"Add the skills you are working with\" (UX.md §8)."
+    },
+
+    {
+      "title": "Likes, comments and saves as real controls",
+      "milestone": "M3 — A feed worth returning to",
+      "labels": ["area:app", "type:feature", "area:ui"],
+      "size": "L",
+      "body": "The tables, the trigger-maintained counters and 33 project tests exist. The feed renders counts as **static text** — correct per the honesty rules, because there is no affordance behind them, but it means the product's core loop does not exist. This issue is where the feed becomes a feed.\n\n**Do**\n- Like (optimistic, reconciled against the server), comment (with its own permission test), save to a private list.\n- Counts stay derived from stored counters — never incremented in the client as the source of truth.\n- Comment thread on the post detail route; on the feed, comment count links to it.\n- Report is wired to the moderation table (M7) rather than faked; until then it is absent.\n\n**Acceptance**\n- [ ] Double-tapping like does not produce two rows or a count of 2.\n- [ ] A failed like reverts visibly instead of silently lying.\n- [ ] Permission tests: cannot like as someone else; cannot comment on a post you cannot see; cannot read another user's saves."
+    },
+    {
+      "title": "Cursor pagination and the LoadMore contract",
+      "milestone": "M3 — A feed worth returning to",
+      "labels": ["area:app", "type:feature", "area:ui"],
+      "size": "M",
+      "body": "ARCHITECTURE §6 requires keyset pagination `(created_at, id)` everywhere that grows without bound and forbids offsets. The feed loads everything it can find.\n\n**Do**\n- Shared cursor encode/decode with unit tests (an opaque base64 cursor, not a raw timestamp).\n- `LoadMore` used by feed, comments, messages, notifications and search.\n- Scroll position preserved; a real end state (\"That is everything\"), not an endless spinner.\n\n**Acceptance**\n- [ ] With 50 posts and 3 inserted during scroll, no post is skipped or repeated.\n- [ ] A tampered cursor is rejected rather than executed as SQL.\n- [ ] Unit tests pin the boundary: same-timestamp rows, empty page, last page."
+    },
+    {
+      "title": "Feed lenses: For you / Following, and the following-only query",
+      "milestone": "M3 — A feed worth returning to",
+      "labels": ["area:app", "type:feature"],
+      "size": "M",
+      "body": "The feed currently has one unfiltered view. Tabs make the network legible: \"Following\" answers what the people you chose are doing; \"For you\" answers what is happening at your university.\n\n**Do**\n- Tabs, URL-addressable so a lens can be linked and survives reload.\n- Query safety: following-only must be enforced in SQL under RLS, not filtered in the client.\n- Per-tab empty states (UX.md §8), including the one that matters — a new account with no connections sees a way to find people, not a blank page.\n\n**Acceptance**\n- [ ] Following-only returns nothing from accounts you do not follow, even if you call the query directly.\n- [ ] Both tabs keep their own scroll and pagination state.\n- [ ] The empty state converts: it links to people from your university."
+    },
+    {
+      "title": "Feed ranking as a documented SQL function with tests",
+      "milestone": "M3 — A feed worth returning to",
+      "labels": ["area:db", "type:feature", "area:tests"],
+      "size": "M",
+      "body": "ARCHITECTURE §10 says feed ranking is a documented SQL function and deliberately not ML. Recency alone buries the good post; engagement alone rewards the loudest. The function is also the honest place for this decision — it can be read, argued with and swapped.\n\n**Do**\n- `app.rank_feed(...)` — weighted recency plus engagement plus a mild university proximity bonus, with the weights as named constants and the reasoning in the function header as the other migrations do.\n- Deterministic: same rows in, same order out, with `(created_at, id)` as the final tiebreak so pagination cannot loop.\n- A test with a fixed fixture asserting the exact order, so changing weights is a visible diff.\n\n**Acceptance**\n- [ ] The test fails if a weight is changed without updating the expectation.\n- [ ] Ordering is stable across two identical calls.\n- [ ] The function's comment states what it deliberately does not do (no personalisation, no ML, no invented score)."
+    },
+    {
+      "title": "Post detail route /post/[id]",
+      "milestone": "M3 — A feed worth returning to",
+      "labels": ["area:app", "type:feature"],
+      "size": "M",
+      "body": "Shared links have nowhere to land, comments have nowhere to live, and a post's permalink is the unit a university network will actually spread by WhatsApp.\n\n**Do**\n- Full post, author, attached object (project/goal), counts, comment thread, actions.\n- Renders for a signed-out visitor when the post is public; shows a sign-in prompt for actions instead of hiding them.\n- OpenGraph metadata so a shared link previews with real content (title, author, excerpt) — no invented image.\n\n**Acceptance**\n- [ ] A private post's URL returns a refusal to a stranger, not a blank page or a partial render.\n- [ ] The shared link previews correctly in WhatsApp and Telegram.\n- [ ] `author_id` and body can never be spoofed through the URL."
+    },
+    {
+      "title": "Composer upgrades: autosize, character budget, draft retention, attach",
+      "milestone": "M3 — A feed worth returning to",
+      "labels": ["area:ui", "type:feature"],
+      "size": "M",
+      "body": "The composer is a plain textarea: no autosize, no limit shown, and a failed submit loses what was typed — the fastest way to lose a user who was about to contribute. PRODUCT.md's differentiator also asks creation to *offer* a post, which needs the attach affordance.\n\n**Do**\n- Autosize with a max, counter shown only near the limit, `Cmd/Ctrl+Enter` to submit.\n- Draft kept in `sessionStorage` and restored with a visible \"draft restored\" marker.\n- Attach to a project, goal or idea with a picker; the attached object renders as a rule-bounded block in the post (the design language, not a card shadow).\n\n**Acceptance**\n- [ ] A failed submit preserves the text.\n- [ ] The counter appears at 80 % of the limit, not before.\n- [ ] An attached project renders as a real link and survives on the post detail route."
+    },
+    {
+      "title": "Permission tests for posts, comments, likes, saves and the feed queries",
+      "milestone": "M3 — A feed worth returning to",
+      "labels": ["area:tests", "area:db"],
+      "size": "M",
+      "body": "The feed is now the busiest surface in the app and its tables are the least tested in `tests/db/`. TESTING.md already names posts and comments as a gap.\n\n**Do** — authorship cannot be forged (`author_id` defaults to `auth.uid()` and a trigger overwrites); a private/university-scoped post is invisible outside its audience; comments inherit the post's visibility; saved posts are private to the saver; `like_count` cannot be written by a client.\n\n**Acceptance**\n- [ ] An insert carrying an explicit foreign `author_id` results in the caller's id, asserted by a test.\n- [ ] A client UPDATE of `like_count` is refused at the GRANT level, not by a policy alone.\n- [ ] At least 25 new assertions, named as rules."
+    },
+
+    {
+      "title": "/projects list with 'Mine' and 'Open to join' lenses",
+      "milestone": "M4 — Projects and collaboration",
+      "labels": ["area:app", "type:feature"],
+      "size": "M",
+      "body": "Projects are the reason this exists rather than being another feed: PRODUCT.md's claim is that a post is attached to something real, and the project is that something. The schema, membership rules and join requests are built and tested (33 assertions) with no interface — `/projects` is an 8-line placeholder.\n\n**Do** — rows show title, one-line purpose, member avatars, and a \"seeking members\" badge with slots and required skills. Filter by skill and university. Two lenses as URL-addressable tabs.\n\n**Acceptance**\n- [ ] Member counts and slot counts are stored values, not estimates.\n- [ ] A non-member sees a private project nowhere in the list.\n- [ ] Empty states for both lenses, the open-to-join one offering \"Create the first project\"."
+    },
+    {
+      "title": "Create a project, with a purpose and a first update",
+      "milestone": "M4 — Projects and collaboration",
+      "labels": ["area:app", "type:feature"],
+      "size": "M",
+      "body": "Creation is the conversion moment: someone with an idea either becomes a project owner in ninety seconds or leaves.\n\n**Do** — one page, three fields (title, purpose, seeking members), slug generated and collision-checked, then an optional first update that offers to post to the feed (the PRODUCT.md pattern: posting is the side effect of work).\n\n**Acceptance**\n- [ ] Slug collisions are handled (two projects with the same title both exist, with distinct URLs).\n- [ ] The creator becomes owner in a real membership row (assert in a test).\n- [ ] Slug is immutable after creation, or a rename leaves a redirect — decide and document."
+    },
+    {
+      "title": "Public project page /projects/[slug]",
+      "milestone": "M4 — Projects and collaboration",
+      "labels": ["area:app", "type:feature", "area:ui"],
+      "size": "L",
+      "body": "This is the one genuinely shareable, indexable surface in the product and the strongest thing to show in a portfolio: a real page describing real work by real people. It should be the best-looking route in the app.\n\n**Do** — purpose, timeline, member list with roles, required skills with slots filled, updates stream, \"ask to join\" with an optional note. Public variant hides member emails and private updates. OpenGraph metadata.\n\n**Acceptance**\n- [ ] A private update never appears in the public HTML (assert on the rendered response, not on the CSS).\n- [ ] \"Ask to join\" records a request the owner can accept or decline.\n- [ ] The page renders at 360 px and passes axe with no serious violations."
+    },
+    {
+      "title": "Membership, roles and join requests",
+      "milestone": "M4 — Projects and collaboration",
+      "labels": ["area:app", "type:feature"],
+      "size": "L",
+      "body": "Ownership transfer, roles, invitations and the \"seeking members\" gate are implemented and tested in the database. The interface has to expose the owner's side: pending requests, role changes, removing a member, transferring ownership.\n\n**Do** — owner sees requests with the requester's profile and note; accept/decline; change roles; remove a member; transfer ownership with a type-to-confirm whose consequences are stated (old owner becomes a member).\n\n**Acceptance**\n- [ ] A member cannot promote themselves; a test proves the policy, and the UI does not offer it.\n- [ ] Removing a member does not delete their posts or updates.\n- [ ] Transferring ownership is irreversible in the UI and says so before it happens."
+    },
+    {
+      "title": "Seeking members: required skills and open slots",
+      "milestone": "M4 — Projects and collaboration",
+      "labels": ["area:app", "type:feature"],
+      "size": "M",
+      "body": "PRODUCT.md: \"'Looking for teammates' is a structured record with required skills and slot counts, not a text post that decays.\" The schema exists; the interface does not — which is why the feature is currently worth nothing.\n\n**Do** — edit the required skills and slots, show filled/remaining honestly, close the call when full, and surface open calls in `/projects` and later in search.\n\n**Acceptance**\n- [ ] When slots are filled the project stops appearing in \"Open to join\", without a manual step.\n- [ ] Required skills come from the same skills vocabulary as profiles, so matching is real.\n- [ ] An owner cannot advertise more slots than members they can accept — or the UI says what happens."
+    },
+    {
+      "title": "Idea vault",
+      "milestone": "M4 — Projects and collaboration",
+      "labels": ["area:app", "type:feature"],
+      "size": "M",
+      "body": "The ideas domain has a schema and a conversion function; the route is a placeholder. An idea vault is what converts a lurking student into a contributor — you can post an idea without committing to a project.\n\n**Do** — list and detail, interests expressed (\"I would use this\", \"I would help build this\"), author can edit and close, moderation status respected.\n\n**Acceptance**\n- [ ] Interest counts are stored values.\n- [ ] A hidden idea (moderation) is invisible to everyone but its author and moderators.\n- [ ] Empty state invites an idea rather than apologising for having none."
+    },
+    {
+      "title": "Idea to project conversion in the interface",
+      "milestone": "M4 — Projects and collaboration",
+      "labels": ["area:app", "type:feature"],
+      "size": "M",
+      "body": "`app` has the conversion function that carries interested people across. It is the product's most distinctive mechanic and it is entirely invisible today.\n\n**Do** — a conversion wizard that states exactly what carries over (\"3 people interested will be invited\"), creates the project with the idea's text as its purpose, links back to the idea, and notifies the interested people through the existing non-forgeable notification path.\n\n**Acceptance**\n- [ ] A test asserts interested people are carried across, and that the same idea cannot be converted twice.\n- [ ] Notifications reach the interested users and cannot be faked by the client.\n- [ ] The original idea remains readable and links to its project."
+    },
+    {
+      "title": "Project updates with an optional cross-post",
+      "milestone": "M4 — Projects and collaboration",
+      "labels": ["area:app", "type:feature"],
+      "size": "M",
+      "body": "This is the loop that makes the feed worth reading: updates are written for collaborators, and posting to the feed is an offered side effect, not a separate chore. PRODUCT.md states the pattern; nothing implements it.\n\n**Do** — update composer inside the project, members notified through the existing path, and an offer to post a feed entry linked to the project. Unposted updates stay project-internal.\n\n**Acceptance**\n- [ ] Only members can post updates; a non-member is refused by policy, with a test.\n- [ ] The feed entry links to the project and the project shows the same update.\n- [ ] Deleting the feed post does not delete the project update, or the behaviour is documented in the PR."
+    },
+
+    {
+      "title": "Messages: conversation list and thread",
+      "milestone": "M5 — Talking to people",
+      "labels": ["area:app", "type:feature"],
+      "size": "L",
+      "body": "Participation-based access, read receipts and unread counts exist in the database and are covered by 34 tests including ID-substitution cases. `/messages` is an 8-line placeholder, so the platform has no private channel at all — and collaboration without it stalls at the first message.\n\n**Do** — 768+: list (20rem) beside the thread; 360: list, then thread as its own view with a back control. Day separators, unread divider, unread counts fed by real rows, composer pinned above the mobile nav.\n\n**Acceptance**\n- [ ] A third account cannot read the conversation by URL or by direct query — the existing tests extend to the new read paths.\n- [ ] Unread counts reconcile with the rows after reading.\n- [ ] Empty state: \"No conversations yet. Message someone from their profile.\""
+    },
+    {
+      "title": "Realtime for messages and notifications, with an RLS leak test",
+      "milestone": "M5 — Talking to people",
+      "labels": ["area:app", "area:safety", "type:feature"],
+      "size": "L",
+      "body": "ARCHITECTURE §4 says `messages` and `notifications` are the only realtime surfaces and that RLS applies to the socket too, \"so a subscription cannot leak rows the user can't already read\". That is currently an assertion with no code behind it.\n\n**Do** — subscribe to filtered channels, reconnect with an honest indicator, fall back to pull-to-refresh when the socket is down. Then prove the claim: a third account subscribes to the same topic and receives nothing.\n\n**Acceptance**\n- [ ] A message sent from another browser appears without a refresh.\n- [ ] A subscriber who is not a participant receives nothing — proved by a test, not by reading the docs.\n- [ ] Losing the network shows a state that says so rather than a frozen thread."
+    },
+    {
+      "title": "Notifications: list, header bell with a real unread count, mark as read",
+      "milestone": "M5 — Talking to people",
+      "labels": ["area:app", "type:feature"],
+      "size": "M",
+      "body": "Notifications are generated in the database by triggers, de-duplicated with `nulls not distinct`, impossible for a client to forge, and covered by 77 tests. Nothing displays them, so every one of those events is currently invisible.\n\n**Do** — grouped by day, unread marked with the highlight token, mark-one and mark-all, and a header bell whose dot is driven by a real count. Each notification links to the thing it is about.\n\n**Acceptance**\n- [ ] The badge matches the unread row count exactly (assert in a test and by eye).\n- [ ] A notification whose target was deleted is either gone (cascade) or handled — never a dead link.\n- [ ] Empty state names what will appear here."
+    },
+    {
+      "title": "Component tests for the components that carry logic",
+      "milestone": "M5 — Talking to people",
+      "labels": ["area:tests"],
+      "size": "M",
+      "body": "Testing Library is installed and configured and nothing is written. Purely presentational components do not need tests; the ones with logic do, and after M3–M5 there are several.\n\n**Do** — composer (counter threshold, draft restore, failed submit preserves text), `LoadMore` (end state, error state, no duplicate calls), form error display (field error under the field, announced), notification badge count, empty-state rendering for each variant.\n\n**Acceptance**\n- [ ] At least 15 assertions, all on behaviour rather than markup.\n- [ ] A regression in the composer's draft restoration fails a test.\n- [ ] No snapshot tests."
+    },
+
+    {
+      "title": "Semester goals with progress over real rows",
+      "milestone": "M6 — Learning and discovery",
+      "labels": ["area:app", "type:feature"],
+      "size": "M",
+      "body": "Semesters, courses, goals, milestones and study sessions exist and are covered by 53 tests. `/goals` is a placeholder. PRODUCT.md's question 2 (\"What am I learning?\") has no answer in the interface.\n\n**Do** — create a semester, add courses, create goals with milestones, and show progress as a meter over stored rows only. No invented percentages, no streaks computed in the client.\n\n**Acceptance**\n- [ ] Every meter value equals a query result; nothing is estimated client-side.\n- [ ] A goal with no milestones shows no meter rather than an empty bar.\n- [ ] Empty state: \"No goals for this semester yet.\""
+    },
+    {
+      "title": "Daily study log and the streak, with boundary tests",
+      "milestone": "M6 — Learning and discovery",
+      "labels": ["area:app", "area:db", "area:tests"],
+      "size": "L",
+      "body": "The streak calculation is implemented in SQL and tested, but streaks are the classic place to invent a number. PRODUCT.md rule 1 makes it non-negotiable: a streak must be computable from `daily_logs` and reproducible.\n\n**Do** — a log entry per day with minutes and a note; the streak shown as a number and as the last fourteen days of marks; PKT timezone (Asia/Karachi) stated explicitly, since a streak that resets at the wrong midnight is worse than none.\n\n**Acceptance**\n- [ ] Tests pin the boundaries: two entries in one day count once; missing a day resets; the reset hour is documented and matches the user's local day.\n- [ ] The number on screen equals a recomputation from the rows in a test fixture.\n- [ ] No streak is shown for an account with no entries."
+    },
+    {
+      "title": "Achievements surfaced where they are earned",
+      "milestone": "M6 — Learning and discovery",
+      "labels": ["area:app", "type:feature"],
+      "size": "M",
+      "body": "Achievements and certificates exist and are awarded **by triggers over real counts** rather than by a job inventing them — 34 tests cover it. Nothing shows them, so the only reward mechanic in the product is invisible.\n\n**Do** — achievements on the profile, newest first, each with what earned it and when; a certificate listed only when one exists. No locked/available grid implying progress that is not tracked.\n\n**Acceptance**\n- [ ] An achievement appears only after the event that earns it (test the trigger, not the UI).\n- [ ] Each achievement states the real condition that awarded it.\n- [ ] Nothing implies verification of a skill; the self-declared label still applies."
+    },
+    {
+      "title": "Opportunities board with applications",
+      "milestone": "M6 — Learning and discovery",
+      "labels": ["area:app", "type:feature"],
+      "size": "L",
+      "body": "Internships, scholarships and competitions have a schema with applications, deadlines and 34 tests; `/opportunities` is a placeholder. This is the feature with the clearest non-social value to a student, so it deserves more than a list.\n\n**Do** — filter by type, deadline and university; sort by deadline; application recorded per user with a status; a deadline that has passed is visibly closed, never hidden or re-sorted silently; posted by trusted roles only.\n\n**Acceptance**\n- [ ] Applied state survives a reload and is private to the applicant.\n- [ ] A past-deadline opportunity cannot be applied to, enforced by the database.\n- [ ] Who may post is enforced by role, with a test; the UI does not offer it to others."
+    },
+    {
+      "title": "Events board with RSVP",
+      "milestone": "M6 — Learning and discovery",
+      "labels": ["area:app", "type:feature"],
+      "size": "M",
+      "body": "Society events with attendance exist in the schema with tests and no interface. At COMSATS Attock this is the same feature that would make the pilot useful in week one.\n\n**Do** — list and event page, RSVP with capacity, attendee count from rows, past events separated, add-to-calendar export (a real `.ics`, not an invented link).\n\n**Acceptance**\n- [ ] Capacity is enforced in the database; the UI shows the refusal message.\n- [ ] An `.ics` file opens in the user's calendar app with the right times in PKT.\n- [ ] Attendee lists respect the event's visibility setting."
+    },
+    {
+      "title": "Search: migration 0018_search and the results page",
+      "milestone": "M6 — Learning and discovery",
+      "labels": ["area:db", "area:app", "type:feature"],
+      "size": "L",
+      "body": "Trigram indexes exist on names and titles and `/search` is a placeholder, so a user cannot find a person, a project or a post — the single biggest reason a network feels dead. Migration numbering is reserved from **0018** (see the docs issue).\n\n**Do** — migration `0018_search` with the query functions over people, projects, posts, ideas, opportunities and events; ranking with trigram similarity plus real signals; the `/search` page with tabs, cursor pagination and an empty state that suggests rather than shrugs.\n\n**Acceptance**\n- [ ] One query returns a person, a project and a post together, ranked sensibly (assert in a test).\n- [ ] RLS applies: a search never surfaces a private project, a blocked user or a hidden post.\n- [ ] Results return in under 300 ms on a seeded dataset of 5,000 rows."
+    },
+
+    {
+      "title": "Moderation: migration 0019_reports and the policy floor",
+      "milestone": "M7 — Safety and operations",
+      "labels": ["area:db", "area:safety", "blocker"],
+      "size": "L",
+      "body": "Named as a launch blocker in DEPLOYMENT.md and PRODUCT.md: there is no way to report content, no queue and no audit log. Admin and moderator roles exist and are enforced, so the missing piece is the reporting table, the action record and the policy that keeps a moderator honest.\n\n**Do** — `reports` (polymorphic target with typed FKs, as notifications do, and the same reasoning), `moderation_actions` with a required reason and an immutable actor, an audit log readable only by admins, and policies for who may report, who may act, and what may be hidden. Reports on all five surfaces: post, comment, profile, message, project.\n\n**Acceptance**\n- [ ] A report cannot be filed twice by the same user against the same target.\n- [ ] A moderator action without a reason fails at the database level.\n- [ ] An action cannot be deleted, only superseded — checked by attempting a delete in a test.\n- [ ] Every new table has RLS, policies, a permission test and a declared function audience."
+    },
+    {
+      "title": "Moderator queue and admin pages",
+      "milestone": "M7 — Safety and operations",
+      "labels": ["area:app", "area:safety"],
+      "size": "L",
+      "body": "Roles exist, the route is gated and refuses non-admins (M1), and there are no pages. A moderation system nobody can operate is the same as no moderation.\n\n**Do** — queue of open reports newest-first with the reported content inline; actions (hide, remove, warn, suspend, dismiss) each requiring a reason; pending university requests; the audit log; and a plain statement of what admins cannot see, matching SECURITY.md §9.\n\n**Acceptance**\n- [ ] Every action writes an audit row with actor, reason and time.\n- [ ] A moderator cannot act on a report against themselves, nor on an admin.\n- [ ] The 8-line `/report-a-bug` placeholder becomes a real form storing to the same pipeline."
+    },
+    {
+      "title": "Rate limiting: migration 0020_rate_limits and the action wrapper",
+      "milestone": "M7 — Safety and operations",
+      "labels": ["area:db", "area:safety", "area:app", "blocker"],
+      "size": "L",
+      "body": "Named as a launch blocker. Nothing limits how fast a user can post. ARCHITECTURE §4 already specifies the fix: a Postgres-backed fixed-window limiter and one Server Action wrapper that does parse → auth → account status → rate limit → ownership guard → write → revalidate. The wrapper does not exist, which is why every action hand-rolls the first three steps.\n\n**Do** — `0020_rate_limits` with a window table and a `check_rate_limit(key, limit, window)` function; `lib/rate-limit/`; the wrapper; migrate the existing auth, feed, profile and project actions onto it; a friendly refusal message, never a 500.\n\n**Acceptance**\n- [ ] A script posting 100 times in a minute is refused from the 11th with a clear message.\n- [ ] The limiter is per-user and per-action, and a test pins the window boundary.\n- [ ] Every existing Server Action goes through the wrapper — asserted by a lint rule or a test, not by review."
+    },
+    {
+      "title": "Storage buckets and uploads for avatars and project images",
+      "milestone": "M7 — Safety and operations",
+      "labels": ["area:db", "area:app", "area:ops"],
+      "size": "L",
+      "body": "PRODUCT.md lists uploads as planned; there is no bucket, no policy and no upload control anywhere. Avatars are initials today, which is fine, and profiles with a photo are what makes a network feel human.\n\n**Do** — buckets with ownership policies; MIME and size validation on the server, not only in the `accept` attribute; image resizing to fixed sizes; delete-on-replace; a documented limit per account.\n\n**Acceptance**\n- [ ] A non-image and an oversized file are both rejected server-side (test), with the reason shown.\n- [ ] A user cannot write into another user's folder, proved by a policy test.\n- [ ] Old avatars are deleted, not accumulated, and the storage cost per account is bounded."
+    },
+    {
+      "title": "Content Security Policy and security headers",
+      "milestone": "M7 — Safety and operations",
+      "labels": ["area:ops", "area:safety"],
+      "size": "M",
+      "body": "`next.config.ts` is 7 lines with nothing configured. There is no CSP, no `X-Content-Type-Options`, no referrer policy, no frame-ancestors — DEPLOYMENT.md lists it under \"Important\" and it is cheap.\n\n**Do** — headers in `next.config.ts` or the proxy, a nonce-based CSP compatible with Next 16 and Supabase, `X-Frame-Options`/`frame-ancestors`, `Referrer-Policy`, `Permissions-Policy`, HSTS once the domain exists.\n\n**Acceptance**\n- [ ] The site works with the CSP on: no console violations on feed, profile, messages, search, admin.\n- [ ] A test asserts the headers are present on a rendered response.\n- [ ] The policy is not `unsafe-inline` everywhere — the reason for any exception is written next to it."
+    },
+    {
+      "title": "Error reporting and uptime monitoring",
+      "milestone": "M7 — Safety and operations",
+      "labels": ["area:ops"],
+      "size": "M",
+      "body": "A silent 500 on a phone is currently invisible until someone complains. There is no error reporting and no uptime check, and `src/app/error.tsx` deliberately shows only `error.digest` — which is correct for users and useless for diagnosis without a place to look up the digest.\n\n**Do** — Sentry free tier (or an `error_events` table plus the digest as the key); an uptime check on `/status` with an email alert; a stated retention period in PRIVACY.md, since this is user data leaving the building.\n\n**Acceptance**\n- [ ] A deliberate thrown error in a preview deploy produces a report that identifies the route.\n- [ ] The uptime check has fired at least once and the alert was received.\n- [ ] PRIVACY.md names the provider, what is sent and for how long."
+    },
+    {
+      "title": "sitemap.ts, robots.ts and shareable metadata",
+      "milestone": "M7 — Safety and operations",
+      "labels": ["area:app", "area:ops"],
+      "size": "S",
+      "body": "Neither file exists. `robots: { index: false }` in `layout.tsx` must stay until launch (DEPLOYMENT.md warns that a half-built site in search results is harder to undo than to prevent), and the sitemap has to be ready for the day it comes off.\n\n**Do** — `robots.ts` that honours the current launch state from one constant; `sitemap.ts` listing public profiles, projects and events only, excluding private and admin routes; per-page OpenGraph metadata reused by post and project pages.\n\n**Acceptance**\n- [ ] Flipping one constant changes both robots and the sitemap consistently.\n- [ ] No private route appears in the sitemap — asserted by a test over the generated list.\n- [ ] A shared post link previews with real title and author."
+    },
+
+    {
+      "title": "Accessibility audit: automated in CI plus one screen-reader pass",
+      "milestone": "M8 — Launch readiness",
+      "labels": ["area:ui", "area:tests", "type:verification"],
+      "size": "L",
+      "body": "TESTING.md says primitives were built to be accessible, and that this is \"design, not verification\". A university platform that excludes a student with a screen reader is a product failure, not a compliance footnote.\n\n**Do** — `@axe-core/playwright` failing on serious/critical across the ten busiest routes; `eslint-plugin-jsx-a11y` in lint; one manual pass with NVDA over feed, profile, messages, composer and settings; a keyboard-only pass over the same; zoom to 200 %; and a contrast check of every token pair in both themes with the numbers written down.\n\n**Acceptance**\n- [ ] axe reports zero serious/critical violations on all ten routes, in CI.\n- [ ] Every issue found in the manual pass is filed as its own GitHub issue, including the ones deliberately deferred.\n- [ ] The contrast table is committed under `docs/plan/` so a future token change can be checked against it."
+    },
+    {
+      "title": "Performance budget on a mid-range phone",
+      "milestone": "M8 — Launch readiness",
+      "labels": ["area:ui", "area:ops", "type:verification"],
+      "size": "M",
+      "body": "There are no measurements of any kind. The reference device is a mid-range Android on campus wifi, not this laptop, and the feed plus realtime is exactly the combination that gets slow without anyone noticing.\n\n**Do** — measure LCP, CLS and INP on feed, profile, project and messages under mobile throttling; record client JS per route; fix what exceeds UX.md §7; add the numbers to the milestone record so the next change has a baseline.\n\n**Acceptance**\n- [ ] LCP under 2.5 s, CLS under 0.1, INP under 200 ms on the measured routes.\n- [ ] Client JS under 130 kB gzip on feed and profile.\n- [ ] The before/after numbers are in the PR body, not a claim."
+    },
+    {
+      "title": "Legal review of /terms and /privacy, and the data the pilot will hold",
+      "milestone": "M8 — Launch readiness",
+      "labels": ["area:docs", "type:honesty", "blocker"],
+      "size": "M",
+      "body": "Both pages are drafts and say so on the page — the banners must not be removed to make the site look finished. Before 50 real students are let in, the documents have to describe what is actually collected (student identity, university, messages, study logs, error reports) and for how long.\n\n**Do** — a lawyer or the university's own review; align the documents with ENVIRONMENT.md and the error-reporting choice; state the retention period for messages, reports and logs; state the age position (a campus platform will have 16- and 17-year-olds in first year); remove the draft banners only when they are true.\n\n**Acceptance**\n- [ ] No claim in the privacy page is contradicted by the code (check each against the schema).\n- [ ] The retention periods are implemented, not just written.\n- [ ] The banners are removed in a commit whose message names the review that authorised it."
+    },
+    {
+      "title": "Backup restore drill and a written recovery procedure",
+      "milestone": "M8 — Launch readiness",
+      "labels": ["area:ops", "blocker"],
+      "size": "M",
+      "body": "DEPLOYMENT.md states the position correctly: the free tier has no backups, and an untested backup is not a backup. The database holds real messages and identity data with no verified recovery path.\n\n**Do** — enable daily backups or a weekly `pg_dump` to a private repository; restore one into a scratch project and confirm the app runs against it; write the recovery procedure including the honest recovery window (what is lost, how much); decide what happens to storage objects, which a database restore does not bring back.\n\n**Acceptance**\n- [ ] A restore produced a working database with the app running against it.\n- [ ] The recovery window is stated in hours, measured, not promised.\n- [ ] The procedure is in DEPLOYMENT.md with the date it was last exercised."
+    },
+    {
+      "title": "Custom domain, production environment and the launch switch",
+      "milestone": "M8 — Launch readiness",
+      "labels": ["area:ops", "blocker"],
+      "size": "M",
+      "body": "The last mile: a domain the auth cookie can live on (DEPLOYMENT.md §3 — a wrong `NEXT_PUBLIC_SITE_URL` sends a user and their authorization code to another origin), production env vars, the OAuth redirect URLs, and the one-way switches that must be flipped in the right order.\n\n**Do** — domain and DNS; production variables in the host, excluding `ADMIN_EMAIL`/`ADMIN_PASSWORD`; Supabase Site URL and redirect URLs updated; `NEXT_PUBLIC_SITE_URL` set; then, in order: backups verified → moderation live → rate limits live → legal reviewed → `robots` indexed → copy updated.\n\n**Acceptance**\n- [ ] Sign in works from the production domain, including the email confirmation link.\n- [ ] The OAuth callback returns to the production origin, tested with a real Google account.\n- [ ] The ordered switch list is committed and each step is dated when it happens."
+    },
+    {
+      "title": "Release v0.2.0 with release notes written from closed issues",
+      "milestone": "M8 — Launch readiness",
+      "labels": ["type:chore", "area:docs"],
+      "size": "S",
+      "body": "A tag per finish line turns the issue history into a changelog, which is what a supervisor, a recruiter or a future contributor actually reads.\n\n**Do** — tag `v0.2.0` at finish line B; release notes grouped by milestone with links to the issues; the honest state restated in the notes (what is still `planned`, what is deliberately out of scope); the README's \"What actually works today\" table regenerated from `build-status.ts` rather than hand-written.\n\n**Acceptance**\n- [ ] Every closed issue in the milestone is represented or explicitly excluded.\n- [ ] The README table and `/status` agree on every row.\n- [ ] The release notes name what was *not* built."
+    },
+    {
+      "title": "Add the module-boundary lint rules the architecture already claims",
+      "milestone": "M2 — Identity and people",
+      "labels": ["area:ci", "area:app", "type:chore"],
+      "size": "M",
+      "body": "ARCHITECTURE §3 lists four import rules and admits they are \"not yet mechanically enforced\" and \"followed by hand\". Hand-followed boundaries decay exactly when a feature is built in a hurry, which is every milestone from M3 onward.\n\n**Do** — `no-restricted-imports` for: `components/ui/**` importing `features/**` or `lib/supabase/**`; `features/a` importing `features/b` internals; `app/**` importing feature internals; anything outside `lib/supabase/admin.ts` reading the service-role key. Then fix whatever the new rules catch.\n\n**Acceptance**\n- [ ] Each rule fails on a deliberate violation (shown in the PR body) and passes on the cleaned tree.\n- [ ] The four rules in ARCHITECTURE §3 are updated from \"not configured\" to the enforcement mechanism.\n- [ ] No existing code is exempted without a comment saying why."
+    },
+    {
+      "title": "Resolve the unused dependencies: use them or remove them",
+      "milestone": "M2 — Identity and people",
+      "labels": ["area:ci", "type:chore"],
+      "size": "S",
+      "body": "13 of 15 Radix packages, plus `sonner`, `react-hook-form` and `@hookform/resolvers`, are installed and never imported by any file. An unused dependency is a supply-chain liability and a larger install for no benefit — and the README's design-system description currently implies more exists than does.\n\n**Do** — after the UI kit pass, delete what is still unused, or justify it in the PR body with the milestone that will use it. Enable Dependabot weekly, grouped, with the rule that a failing update is closed rather than merged blind.\n\n**Acceptance**\n- [ ] Every dependency in `package.json` is imported by at least one file, or listed with the issue number that will use it.\n- [ ] `npm ls` is clean; no duplicate React or Radix versions.\n- [ ] The first Dependabot PR is triaged within a week of being enabled."
+    },
+    {
+      "title": "Write down the weekly review ritual and run it once",
+      "milestone": "M0 — Freeze and make honest",
+      "labels": ["area:docs", "type:chore"],
+      "size": "S",
+      "body": "The plan in docs/plan/ runs on a cadence, and a cadence that is not written down and rehearsed once does not survive a bad week. This is deliberately small: it exists so that a missed month has a recovery path (docs/plan/GITHUB.md §10).\n\n**Do** — a `docs/review/` folder with one file per week: what closed, what moved, what is blocked, which decision changed, and whether `/status` is still true. Twenty minutes, Sunday. Run the first one now, even though nothing has moved yet.\n\n**Acceptance**\n- [ ] The first review file exists and is committed.\n- [ ] It records the *open* questions, not only the achievements.\n- [ ] The ritual is described in GITHUB.md §6 and references the folder."
+    }
+  ]
+}
