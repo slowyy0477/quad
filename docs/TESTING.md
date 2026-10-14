@@ -94,7 +94,7 @@ Listed plainly, because a coverage number that hides this would be worse than no
 | Zod schemas | No tests. |
 | `safeRedirect` | No tests — and it should have them; it is 6 lines of pure function guarding a phishing vector. |
 | End-to-end flows | **No Playwright specs.** `@playwright/test` is installed, `npm run test:e2e` is wired, `tests/e2e/` is empty. |
-| Anything against a live Supabase project | Nothing. No credentials have been supplied. |
+| Anything against a live Supabase project | Nothing. Credentials exist in the git-ignored `.env.local`, but the project they name does not resolve (`getaddrinfo ENOTFOUND`), so no request has ever reached hosted Postgres. |
 | Accessibility | No automated checks. Primitives were built to be accessible (`Field` wires `aria-describedby`/`aria-invalid` through a render prop so it cannot drift); that is design, not verification. |
 | Performance | No measurements. |
 

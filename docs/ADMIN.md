@@ -53,7 +53,7 @@ own profile row can update every granted column of it — see
   that reads a password, because there is nothing to read. An admin who wants a user's
   password has to ask them, like anyone else.
 - **Private messages.** No admin or moderator policy grants read access to
-  `public.messages`. The planned `0016_moderation` migration adds one narrow policy: a
+  `public.messages`. The planned `0020_reports` migration adds one narrow policy: a
   moderator may read a message **that has been reported**, and only that message. Until
   that migration exists, nobody can read anyone's messages through the application at
   all.
@@ -96,7 +96,7 @@ Stated plainly so nothing here is mistaken for a working feature:
 | | State |
 | --- | --- |
 | `/admin` pages | **None.** The route is gated and empty. |
-| Moderation queue | Not built. `0016_moderation` unwritten. |
+| Moderation queue | Not built. `0020_reports` reserved, not written. |
 | Content reports | Not built — users cannot report anything. |
 | Bug reports | Not built. `/report-a-bug` is a placeholder. |
 | Audit log | Not built. Designed as append-only with `forbid_write`. |

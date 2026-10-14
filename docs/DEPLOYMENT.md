@@ -144,10 +144,10 @@ Unticked items are not ready. This is the honest state, not a wish list.
 - [ ] **Remove `robots: { index: false }`** from `src/app/layout.tsx` — but only when the
       rest of this list is done. A half-built site in search results is harder to undo
       than to prevent.
-- [ ] **Moderation.** Migration `0016_moderation` is not written. There is no way to
+- [ ] **Moderation.** Migration `0020_reports` is not written. There is no way to
       report content, no moderator queue, and no audit log. Do not open a social
       platform to strangers without these.
-- [ ] **Rate limiting.** `0017_rate_limits` is not written. Nothing limits how fast a
+- [ ] **Rate limiting.** `0021_rate_limits` is not written. Nothing limits how fast a
       user can post.
 - [ ] **A security contact.** [SECURITY.md](SECURITY.md) §9 has no address.
 - [ ] **Backups verified by restore.**

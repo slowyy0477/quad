@@ -74,7 +74,7 @@ tracked features.
 
 | Domain | Status | Note |
 |---|---|---|
-| Database schema + RLS | working | 15 migrations, 52 tables, 292 tests |
+| Database schema + RLS | working | 17 migrations, 52 tables, 182 policies, 296 tests |
 | Design system | working | tokens, primitives, accessible `Field` |
 | Auth — email, Google, reset, sign-out | working | not yet run against a live project |
 | Legal + guidelines pages | working | **drafts**, banner-marked, need legal review |
@@ -93,12 +93,12 @@ tracked features.
 | Achievements | schema-only | |
 | Opportunities + events | schema-only | |
 | Onboarding | planned | new accounts get a placeholder username |
-| Search | planned | migration `0018_search` unwritten |
-| Reports / moderation | planned | `0016_moderation` unwritten — **launch blocker** |
+| Search | planned | migration `0019_search` reserved, not written (see DATABASE.md) |
+| Reports / moderation | planned | `0020_reports` reserved, not written — **launch blocker** |
 | Bug reports | planned | |
 | Admin + audit log | planned | route gated, no pages |
-| Uploads / storage | planned | `0020_storage` unwritten; no upload path exists |
-| Rate limiting | planned | `0017_rate_limits` unwritten — **launch blocker** |
+| Uploads / storage | planned | `0022_storage` reserved, not written; no upload path exists |
+| Rate limiting | planned | `0021_rate_limits` reserved, not written — **launch blocker** |
 
 Nothing in this table is rounded up. A feature with a beautiful page and no working
 action is `planned`, not `partial`.

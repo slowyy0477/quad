@@ -1,8 +1,31 @@
 # Database
 
-PostgreSQL, on Supabase. **16 migrations, 52 tables, 132 functions in the `app`
+PostgreSQL, on Supabase. **17 migrations, 52 tables, 182 policies, 132 functions in the `app`
 schema, ~10,500 lines of SQL.** The schema is the authorization layer, not a storage
 detail — read [SECURITY.md](SECURITY.md) alongside this.
+
+---
+
+## Migration numbering
+
+Numbers are reserved, not guessed. Docs drift most easily on this point — four documents
+once named `0016_moderation`, `0017_rate_limits`, `0018_search` and `0020_storage`, while
+the files that existed were `0016_backfill_profiles` and `0017_university_reference_data`.
+The rule from here: **a number is reserved in the issue that will write it, and applied
+migrations are never renumbered.**
+
+| # | File | State |
+| --- | --- | --- |
+| 0001–0017 | extensions and helpers through university reference data | **applied** |
+| 0018 | `0018_feed_ranking.sql` | reserved — feed ranking function (see `app.rank_feed`) |
+| 0019 | `0019_search.sql` | reserved — search over people, projects, posts (trigram indexes exist) |
+| 0020 | `0020_reports.sql` | reserved — reports, moderator actions, audit log (**launch blocker**) |
+| 0021 | `0021_rate_limits.sql` | reserved — Postgres fixed-window limiter (**launch blocker**) |
+| 0022 | `0022_storage.sql` | reserved — buckets, upload policies, MIME and size limits |
+
+The next free number is **0023** once the reserved ones are written. If you are adding a
+migration and your number is taken, take the next free one and update this table in the
+same commit — this table is the only place the numbering is allowed to live.
 
 ---
 

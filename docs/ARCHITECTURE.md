@@ -15,7 +15,7 @@
 > | `lib/supabase/middleware.ts` | `proxy.ts` at the repo root | **Next 16 renamed `middleware.ts` to `proxy.ts`**; the logic lives there rather than in a helper |
 > | ESLint `no-restricted-imports` enforces §3 | not configured | the four rules in §3 are followed by hand and are not yet mechanically enforced |
 > | `revalidateTag('feed:${user.id}')` | `revalidatePath('/feed')` | see §4 |
-> | `lib/rate-limit/` | does not exist | migration `0017_rate_limits` is unwritten |
+> | `lib/rate-limit/` | does not exist | migration `0021_rate_limits` is reserved and unwritten |
 > | Realtime (§4), Storage | not wired | no subscriptions, no buckets |
 >
 > Section 12 lists what exists per domain.

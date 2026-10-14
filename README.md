@@ -19,8 +19,8 @@ if you want the state in one table.
 
 | Layer | State |
 | --- | --- |
-| Database schema, RLS policies, triggers, functions | **Working.** 16 migrations, 52 tables, 132 `app.*` functions. Every table has policies. |
-| Automated database permission tests | **Working.** 296 tests over 8 files, run against a real Postgres in-process. |
+| Database schema, RLS policies, triggers, functions | **Working.** 17 migrations, 52 tables, 182 policies, 132 `app.*` functions. Every table has row-level security enabled. |
+| Automated database permission tests | **Working.** 296 tests over 8 files, run against a real Postgres (PGlite) in process. |
 | Auth — sign up, sign in, sign out, password reset, Google OAuth | **Working**, once Supabase credentials exist. |
 | Design system, app shell, landing/legal/status pages | **Working.** |
 | Feed — write a post, read the feed | **Partly working.** Real reads and writes; no likes/comments controls, no ranking, no pagination UI. |
@@ -79,7 +79,9 @@ npm run db:types
 | `npm test` | Vitest, including the database permission suite |
 | `npm run verify` | typecheck + lint + test |
 | `npm run db:push` | Apply migrations to the linked project |
-| `npm run db:types` | Regenerate `src/lib/db/database.types.ts` |
+| `npm run db:types` | Regenerate `src/lib/db/database.types.ts` from a linked project |
+| `npm run db:types:local` | Same, but derived from `supabase/migrations` with no network and no Docker |
+| `npm run db:schema:local` | Regenerate `docs/plan/SCHEMA.md` and `schema.json` |
 
 ## How it is put together
 
@@ -107,7 +109,7 @@ Longer discussion in [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md). The other doc
 | [plan/ENGINEERING.md](docs/plan/ENGINEERING.md) | code standards, Definition of Done, CI, test strategy, review checklist |
 | [plan/GITHUB.md](docs/plan/GITHUB.md) | how the work is run: labels, milestones, board, cadence, metrics |
 | [PRODUCT.md](docs/PRODUCT.md) | what Quad is for, and what it deliberately is not |
-| [DATABASE.md](docs/DATABASE.md) | the 15 migrations, conventions, the `app` schema |
+| [DATABASE.md](docs/DATABASE.md) | the migrations, conventions, the `app` schema, and which numbers are reserved |
 | [AUTH.md](docs/AUTH.md) | the four auth flows, the proxy, the cookie dance |
 | [SECURITY.md](docs/SECURITY.md) | threat model, the four authorization layers, what is not protected yet |
 | [TESTING.md](docs/TESTING.md) | what the 296 tests assert — and what has no tests |
@@ -131,16 +133,20 @@ is **not** protected yet — is in [docs/SECURITY.md](docs/SECURITY.md).
 
 Be clear about what has and has not been checked:
 
-- **Verified:** the database layer. `npm test` runs all 15 migrations against
+- **Verified:** the database layer. `npm test` runs all 17 migrations against
   PostgreSQL 18 (PGlite) and asserts, per role, what each kind of user can read and
   write. 296 tests pass.
 - **Verified:** the app compiles, typechecks, lints, and every route returns the
   status it should — checked in a browser against the dev server.
-- **Not verified:** anything requiring a live Supabase project. No Supabase
-  credentials have been supplied to this repository, so sign-up, sign-in, Google
-  OAuth, the profile-creation trigger firing on a real `auth.users` insert, and
-  reading and writing posts have **not** been exercised end to end against hosted
-  Postgres. The code is written to work; it has not been run.
+- **Not verified:** anything requiring a live Supabase project. Credentials *are*
+  present in the git-ignored `.env.local`, but the project they point at does not
+  resolve — `npm run db:check` fails with `getaddrinfo ENOTFOUND`, verified on
+  14 October 2026 while `supabase.com` and `github.com` resolved normally. So
+  sign-up, sign-in, Google OAuth, the profile-creation trigger firing on a real
+  `auth.users` insert, and reading and writing posts have **not** been exercised
+  end to end against hosted Postgres. The code is written to work; it has not been
+  run. Recreating the project is the first task in
+  [docs/plan/PLAN.md](docs/plan/PLAN.md#m1--prove-it-against-a-live-database).
 - **Not written:** Playwright end-to-end specs. Playwright is installed; there are no
   specs yet.
 
@@ -152,4 +158,4 @@ until you record which audience it is for — that failure is the feature.
 
 ## Licence
 
-Not yet chosen.
+MIT — see [LICENSE](LICENSE).

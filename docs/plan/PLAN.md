@@ -425,6 +425,35 @@ Then M1's remaining sessions, then M2.
 
 ---
 
+## 9a. Progress since this plan was written (14 October 2026)
+
+This plan is kept honest the same way the application is: by recording what has actually
+changed since it was measured. Everything below is done and verified, not planned.
+
+| Was | Now |
+| --- | --- |
+| 1,833 lines uncommitted, no remote | committed in conventional commits, pushed to **https://github.com/slowyy0477/quad** (public, MIT) |
+| `build-status.ts` stale (F3) | **still to do** — it is updated after the feature workstreams land, in one pass |
+| Docs drifted, migration numbers guessed (F4) | corrected, and `docs/DATABASE.md` now carries the one table that owns numbering, reserved 0018–0022 |
+| No CI (F5) | `.github/workflows/ci.yml`: typecheck, lint, database suite, build, plus a job that fails if the service-role key reaches the build output |
+| No `.github/` | PR template, four issue templates (feature, bug, verification, honesty drift), Dependabot |
+| No licence (F10) | MIT, plus `CONTRIBUTING.md` |
+| No project management | 9 milestones, 64 issues with acceptance criteria, 17 labels, created on the repo by `scripts/github/bootstrap.mjs` |
+| `database.types.ts` missing (F6) | generated from the migrations by `npm run db:types:local` (52 tables, 2,972 lines) — no Docker, no network |
+| No schema reference | `docs/plan/SCHEMA.md` (every column, type, nullability, FK) and `schema.json` |
+| UI kit 9 of ~22 primitives (F8) | 22: dialog, dropdown, select, tabs, tooltip, switch, checkbox, radio group, scroll area, separator, textarea, search input, skeleton, stat row, progress meter, load-more, toaster, theme toggle, empty state, surface, avatar, badge |
+| No `/settings`, no theme toggle (U2) | `/settings` with a working three-way theme choice, applied before first paint |
+| No mobile navigation (U1) | bottom bar under `sm` with a real unread count; the header no longer hides every destination |
+| Zero `loading.tsx` (U3) | route skeletons added, and required by the Definition of Done for every new route |
+| No unit tests | `src/lib/cursor.test.ts` — the keyset cursor, including the forged-cursor case |
+| Live Supabase project dead (F1) | **still to do** — it needs an account login, see the note below |
+
+**Still blocked on a human:** the Supabase project. The credentials in `.env.local` point at
+a hostname that does not resolve, and creating a project requires a Supabase login. Every
+"not verified" claim in this repository is downstream of that one step.
+
+---
+
 ## 10. What this plan deliberately does not do
 
 - It does not plan the out-of-scope list in PRODUCT.md (GitHub sync, AI mentor, video calls,

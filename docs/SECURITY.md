@@ -221,10 +221,10 @@ Server Component can contain a query, a path, or a row.
 Stated explicitly so nobody reads this document as a description of a finished system:
 
 - **Rate limiting.** Supabase Auth rate-limits its own endpoints; Quad's own actions
-  (posting, messaging, reporting) have none. Migration `0017_rate_limits` is planned.
+  (posting, messaging, reporting) have none. Migration `0021_rate_limits` is planned.
 - **Uploads.** No storage buckets, no MIME/extension/size validation, no upload path at
-  all. Planned as `0020_storage`. Until then there is no upload to attack.
-- **Moderation and audit.** `0016_moderation` — reports, bug reports, an append-only
+  all. Planned as `0022_storage`. Until then there is no upload to attack.
+- **Moderation and audit.** `0020_reports` — reports, bug reports, an append-only
   admin audit log, and the narrow policy letting a moderator read a *reported* message
   and nothing else — is designed but not written. Today no moderator can read any
   private message, which is the safe end of that trade.
