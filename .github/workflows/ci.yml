@@ -1,0 +1,88 @@
+name: CI
+
+# The gate. `npm run verify` passes in ~9 minutes on the developer laptop this project was
+# built on, which is exactly why it must not depend on remembering to run it.
+#
+# Three jobs, one required check on main:
+#   verify — typecheck (after next typegen), lint, the 296-test database suite in PGlite
+#   build  — catches what typecheck cannot
+#   (e2e joins this workflow in M1, against a dedicated test project, never production)
+#
+# No secret is needed for verify or build to pass: the database suite runs the real
+# migrations against an in-process Postgres, so CI works without a Supabase project.
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+  workflow_dispatch:
+
+# A superseded push should cancel the run it replaced, not queue behind it.
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
+
+permissions:
+  contents: read
+
+jobs:
+  verify:
+    name: verify (typecheck, lint, tests)
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 24
+          cache: npm
+
+      - name: Install
+        run: npm ci
+
+      - name: Typecheck
+        run: npm run typecheck
+
+      - name: Lint
+        run: npm run lint
+
+      - name: Tests
+        run: npm test
+        env:
+          # No Supabase credentials on purpose. Anything that needs a live project
+          # belongs in the e2e job, which uses a throwaway project.
+          CI: true
+
+  build:
+    name: build
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 24
+          cache: npm
+
+      - name: Install
+        run: npm ci
+
+      - name: Build
+        run: npm run build
+        env:
+          NEXT_TELEMETRY_DISABLED: '1'
+
+      - name: The service-role key must not be in the bundle
+        # DEPLOYMENT.md §6: the last two checks are the ones to do properly. This makes
+        # one of them mechanical. A key that leaks into .next/static ships to every
+        # browser, and it bypasses row-level security completely.
+        run: |
+          if [ -n "$SUPABASE_SERVICE_ROLE_KEY" ]; then
+            if grep -rIl -- "$SUPABASE_SERVICE_ROLE_KEY" .next/static .next/server 2>/dev/null; then
+              echo "::error::The service-role key appears in the build output."
+              exit 1
+            fi
+          fi
+          echo "No service-role key in the build output."

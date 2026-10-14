@@ -1,0 +1,8 @@
+blank_issues_enabled: true
+contact_links:
+  - name: The plan
+    url: https://github.com/slowyy0477/quad/blob/main/docs/plan/PLAN.md
+    about: What is being built, in what order, and where each finish line is
+  - name: Security
+    url: https://github.com/slowyy0477/quad/blob/main/docs/SECURITY.md
+    about: What is protected, what is not, and the threat model

@@ -1,0 +1,38 @@
+version: 2
+
+# Weekly, grouped, and small enough to actually review. The rule from
+# docs/plan/ENGINEERING.md §5 applies: a failing update is closed, never merged blind —
+# a 52-table schema on an unpatched Postgres client is not a place to be casual.
+updates:
+  - package-ecosystem: npm
+    directory: /
+    schedule:
+      interval: weekly
+      day: sunday
+    open-pull-requests-limit: 3
+    groups:
+      minor-and-patch:
+        applies-to: version-updates
+        update-types: [minor, patch]
+    ignore:
+      # Next.js and React majors are a migration, not an update: they need their own
+      # milestone and their own reading (see docs/ARCHITECTURE.md §2 on Next 16's
+      # middleware → proxy rename, which cost real debugging time).
+      - dependency-name: next
+        update-types: [version-update:semver-major]
+      - dependency-name: react
+        update-types: [version-update:semver-major]
+      - dependency-name: react-dom
+        update-types: [version-update:semver-major]
+      - dependency-name: typescript
+        update-types: [version-update:semver-major]
+      - dependency-name: eslint
+        update-types: [version-update:semver-major]
+
+  - package-ecosystem: github-actions
+    directory: /
+    schedule:
+      interval: monthly
+    groups:
+      actions:
+        patterns: ['*']
