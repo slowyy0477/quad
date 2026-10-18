@@ -35,9 +35,31 @@
  * implies something is still working. A socket that has quietly died while the
  * page says "Live" is the failure mode worth designing against, not the one where
  * a message takes two seconds.
+ *
+ * ---------------------------------------------------------------------------
+ * LOCAL MODE: NO SUBSCRIPTION, AND NO "LIVE"
+ * ---------------------------------------------------------------------------
+ * `data/local.json` has no websocket behind it, so there is nothing to subscribe to.
+ * The choice here is to say so rather than to imitate it: in local mode no channel
+ * is opened and no interval is started, and the status stays `offline`, which
+ * `ConnectionState` renders as "Not connected" *with* the Refresh control beside it —
+ * a real way to re-read the thread, and a truthful account of how messages arrive.
+ *
+ * Polling was the alternative and was rejected on purpose: an interval that called
+ * `router.refresh()` would have to report itself as something, and "Live" from a
+ * ten-second timer is the exact lie this file's four words exist to prevent. The
+ * cost of the honest choice is that a message sent from another tab appears on
+ * refresh rather than by itself — in a single-machine local deployment that is a
+ * click, not a lost feature, and `docs/plan/LOCAL-MODE.md` already states that
+ * realtime is polling-only and not wired.
+ *
+ * The id check also differs by mode, for the same reason the queries do: local ids
+ * are `cnv_…` rather than uuids, and `scopedFilter` refuses anything it cannot
+ * recognise as an id rather than subscribing unscoped.
  */
 
 import { useEffect, useRef, useState } from 'react'
+import { isLocalMode } from '@/lib/mode'
 import { createClient } from '@/lib/supabase/client'
 
 /** The four states a reader can be told about. There is no fifth. */

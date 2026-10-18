@@ -2,7 +2,6 @@ import Link from 'next/link'
 import { redirect } from 'next/navigation'
 import type { Metadata } from 'next'
 import { Alert } from '@/components/ui/alert'
-import { Badge } from '@/components/ui/badge'
 import { EndOfList, LoadMore, cursorHref } from '@/components/ui/pagination'
 import { EmptyState, SectionHeading } from '@/components/ui/surface'
 import { encodeCursor } from '@/lib/cursor'
@@ -110,7 +109,7 @@ export default async function FeedPage({ searchParams }: { searchParams: Promise
         <FeedLensTabs lens={lens} forYouHref={forYouHref} followingHref={followingHref}>
           {feed.posts && feed.posts.length > 0 ? (
             <>
-              <div className="space-y-4">
+              <div className="mt-5 border-t border-hairline">
                 {feed.posts.map((post) => (
                   <PostCard key={post.id} post={post} signedIn />
                 ))}
@@ -149,8 +148,11 @@ export default async function FeedPage({ searchParams }: { searchParams: Promise
         </FeedLensTabs>
       </div>
 
-      {/* Sidebar. Every item links to a route; the ones whose feature is not
-          finished say so rather than looking finished. */}
+      {/* Sidebar. Every item links to a real route. There were "soon" badges here,
+          and they had gone stale: Messages, Projects and Goals were labelled as
+          unbuilt while all three were working, which is worse than saying nothing.
+          The status page is the single record of what works; this list does not
+          try to keep a second copy of that truth. */}
       <aside className="space-y-6 lg:border-l lg:border-hairline lg:pl-6">
         <nav aria-labelledby="feed-nav-heading">
           <h2
@@ -161,23 +163,22 @@ export default async function FeedPage({ searchParams }: { searchParams: Promise
           </h2>
           <ul className="mt-3 space-y-1 text-sm">
             {[
-              { href: '/me', label: 'Your profile', ready: false },
-              { href: '/feed/people', label: 'People at your university', ready: true },
-              { href: '/projects', label: 'Projects', ready: false },
-              { href: '/ideas', label: 'Ideas', ready: false },
-              { href: '/messages', label: 'Messages', ready: false },
-              { href: '/goals', label: 'Goals & study log', ready: false },
-              { href: '/opportunities', label: 'Opportunities', ready: false },
-              { href: '/events', label: 'Events', ready: false },
+              { href: '/me', label: 'Your profile' },
+              { href: '/feed/people', label: 'People at your university' },
+              { href: '/projects', label: 'Projects' },
+              { href: '/ideas', label: 'Ideas' },
+              { href: '/messages', label: 'Messages' },
+              { href: '/goals', label: 'Goals & study log' },
+              { href: '/opportunities', label: 'Opportunities' },
+              { href: '/events', label: 'Events' },
             ].map((item) => (
-              <li key={item.href} className="flex items-center justify-between gap-2">
+              <li key={item.href}>
                 <Link
                   href={item.href}
-                  className="rounded py-1 text-ink-muted underline-offset-2 hover:text-ink hover:underline"
+                  className="block rounded py-1 text-ink-muted underline-offset-2 hover:text-ink hover:underline"
                 >
                   {item.label}
                 </Link>
-                {!item.ready ? <Badge tone="outline">soon</Badge> : null}
               </li>
             ))}
           </ul>
@@ -187,7 +188,7 @@ export default async function FeedPage({ searchParams }: { searchParams: Promise
           <p>
             Quad is unfinished, and the{' '}
             <Link href="/status" className="text-accent-700 underline underline-offset-2">
-              build status page
+              status page
             </Link>{' '}
             lists exactly which parts work.
           </p>

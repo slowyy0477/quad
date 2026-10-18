@@ -1,7 +1,6 @@
 import Link from 'next/link'
 import { formatDistanceToNowStrict } from 'date-fns'
 import { Avatar } from '@/components/ui/avatar'
-import { Surface } from '@/components/ui/surface'
 import { AttachedObject } from '@/features/feed/components/attached-object'
 import { PostActions } from '@/features/feed/components/post-actions'
 import type { FeedPost } from '@/features/feed/queries'
@@ -33,7 +32,7 @@ export function PostCard({
   const detailHref = `/post/${post.id}`
 
   return (
-    <Surface as="article" className="p-4">
+    <article className="border-b border-hairline py-5 first:pt-0 last:border-b-0">
       <div className="flex items-start gap-3">
         <Avatar name={name} src={author?.avatar_url} size="default" />
 
@@ -51,7 +50,12 @@ export function PostCard({
             )}
 
             {author?.headline ? (
-              <span className="truncate text-xs text-ink-faint">{author.headline}</span>
+              <span className="truncate text-xs text-ink-faint">
+                <span aria-hidden className="mr-1">
+                  ·
+                </span>
+                {author.headline}
+              </span>
             ) : null}
 
             <time
@@ -71,7 +75,7 @@ export function PostCard({
           ) : null}
 
           {post.body ? (
-            <p className="mt-1.5 text-sm whitespace-pre-wrap text-ink">{post.body}</p>
+            <p className="mt-2 text-sm whitespace-pre-wrap text-ink">{post.body}</p>
           ) : null}
 
           {post.link_url ? (
@@ -103,6 +107,6 @@ export function PostCard({
           {post.is_edited ? <p className="mt-1 text-xs text-ink-faint">edited</p> : null}
         </div>
       </div>
-    </Surface>
+    </article>
   )
 }
