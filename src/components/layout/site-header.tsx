@@ -1,5 +1,5 @@
 import Link from 'next/link'
-import { Bell, Settings } from 'lucide-react'
+import { Bell, Menu, Settings } from 'lucide-react'
 import { Logo } from '@/components/layout/logo'
 import { Avatar } from '@/components/ui/avatar'
 import { Badge } from '@/components/ui/badge'
@@ -52,16 +52,25 @@ export async function SiteHeader({ unreadNotifications = 0 }: { unreadNotificati
         <nav className="ml-auto flex items-center gap-1" aria-label="Main">
           {user ? (
             <>
-              <Button asChild variant="ghost" size="sm" className="hidden sm:inline-flex">
+              <Button asChild variant="ghost" size="sm" className="hidden lg:inline-flex">
                 <Link href="/feed">Feed</Link>
               </Button>
-              <Button asChild variant="ghost" size="sm" className="hidden sm:inline-flex">
+              <Button asChild variant="ghost" size="sm" className="hidden lg:inline-flex">
                 <Link href="/projects">Projects</Link>
               </Button>
-              <Button asChild variant="ghost" size="sm" className="hidden sm:inline-flex">
+              <Button asChild variant="ghost" size="sm" className="hidden lg:inline-flex">
+                <Link href="/ideas">Ideas</Link>
+              </Button>
+              <Button asChild variant="ghost" size="sm" className="hidden lg:inline-flex">
+                <Link href="/opportunities">Opportunities</Link>
+              </Button>
+              <Button asChild variant="ghost" size="sm" className="hidden lg:inline-flex">
+                <Link href="/events">Events</Link>
+              </Button>
+              <Button asChild variant="ghost" size="sm" className="hidden lg:inline-flex">
                 <Link href="/messages">Messages</Link>
               </Button>
-              <Button asChild variant="ghost" size="sm" className="hidden sm:inline-flex">
+              <Button asChild variant="ghost" size="sm" className="hidden lg:inline-flex">
                 <Link href="/search">Search</Link>
               </Button>
 
@@ -82,6 +91,42 @@ export async function SiteHeader({ unreadNotifications = 0 }: { unreadNotificati
                   </span>
                 ) : null}
               </Link>
+
+              {/* Below `lg` the text links are all hidden, which left a phone with
+                  nothing but the avatar. A <details> menu needs no JavaScript, is
+                  keyboard operable, and closes on Escape in every current browser.
+                  It sits in the same row as the bell so the header stays one line. */}
+              <details className="group relative lg:hidden">
+                <summary
+                  className="flex cursor-pointer list-none items-center rounded p-2 text-ink-muted hover:bg-paper-sunken hover:text-ink [&::-webkit-details-marker]:hidden"
+                  aria-label="Menu"
+                >
+                  <Menu className="size-4" aria-hidden="true" />
+                </summary>
+                <div className="absolute right-0 z-50 mt-2 w-52 rounded border border-hairline bg-paper-raised p-1 shadow-[0_10px_28px_-12px_rgba(20,20,18,0.35)]">
+                  {[
+                    ['/feed', 'Feed'],
+                    ['/projects', 'Projects'],
+                    ['/ideas', 'Ideas'],
+                    ['/opportunities', 'Opportunities'],
+                    ['/events', 'Events'],
+                    ['/messages', 'Messages'],
+                    ['/search', 'Search'],
+                    ['/goals', 'Goals'],
+                    ['/log', 'Study log'],
+                    ['/universities', 'Universities'],
+                    ['/settings', 'Settings'],
+                  ].map(([href, label]) => (
+                    <Link
+                      key={href}
+                      href={href}
+                      className="block rounded px-3 py-2.5 text-sm text-ink-muted hover:bg-paper-sunken hover:text-ink"
+                    >
+                      {label}
+                    </Link>
+                  ))}
+                </div>
+              </details>
 
               <Button asChild variant="ghost" size="icon" className="hidden sm:inline-flex">
                 <Link href="/settings">

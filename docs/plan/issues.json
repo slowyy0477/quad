@@ -374,15 +374,15 @@
       "body": "Society events with attendance exist in the schema with tests and no interface. At COMSATS Attock this is the same feature that would make the pilot useful in week one.\n\n**Do** — list and event page, RSVP with capacity, attendee count from rows, past events separated, add-to-calendar export (a real `.ics`, not an invented link).\n\n**Acceptance**\n- [ ] Capacity is enforced in the database; the UI shows the refusal message.\n- [ ] An `.ics` file opens in the user's calendar app with the right times in PKT.\n- [ ] Attendee lists respect the event's visibility setting."
     },
     {
-      "title": "Search: migration 0018_search and the results page",
+      "title": "Search: migration 0019_search and the results page",
       "milestone": "M6 — Learning and discovery",
       "labels": ["area:db", "area:app", "type:feature"],
       "size": "L",
-      "body": "Trigram indexes exist on names and titles and `/search` is a placeholder, so a user cannot find a person, a project or a post — the single biggest reason a network feels dead. Migration numbering is reserved from **0018** (see the docs issue).\n\n**Do** — migration `0018_search` with the query functions over people, projects, posts, ideas, opportunities and events; ranking with trigram similarity plus real signals; the `/search` page with tabs, cursor pagination and an empty state that suggests rather than shrugs.\n\n**Acceptance**\n- [ ] One query returns a person, a project and a post together, ranked sensibly (assert in a test).\n- [ ] RLS applies: a search never surfaces a private project, a blocked user or a hidden post.\n- [ ] Results return in under 300 ms on a seeded dataset of 5,000 rows."
+      "body": "Trigram indexes exist on names and titles and `/search` is a placeholder, so a user cannot find a person, a project or a post — the single biggest reason a network feels dead. Migration numbering is reserved from **0018** (see the docs issue).\n\n**Do** — migration `0019_search` with the query functions over people, projects, posts, ideas, opportunities and events; ranking with trigram similarity plus real signals; the `/search` page with tabs, cursor pagination and an empty state that suggests rather than shrugs.\n\n**Acceptance**\n- [ ] One query returns a person, a project and a post together, ranked sensibly (assert in a test).\n- [ ] RLS applies: a search never surfaces a private project, a blocked user or a hidden post.\n- [ ] Results return in under 300 ms on a seeded dataset of 5,000 rows."
     },
 
     {
-      "title": "Moderation: migration 0019_reports and the policy floor",
+      "title": "Moderation: migration 0020_reports and the policy floor",
       "milestone": "M7 — Safety and operations",
       "labels": ["area:db", "area:safety", "blocker"],
       "size": "L",
@@ -396,11 +396,11 @@
       "body": "Roles exist, the route is gated and refuses non-admins (M1), and there are no pages. A moderation system nobody can operate is the same as no moderation.\n\n**Do** — queue of open reports newest-first with the reported content inline; actions (hide, remove, warn, suspend, dismiss) each requiring a reason; pending university requests; the audit log; and a plain statement of what admins cannot see, matching SECURITY.md §9.\n\n**Acceptance**\n- [ ] Every action writes an audit row with actor, reason and time.\n- [ ] A moderator cannot act on a report against themselves, nor on an admin.\n- [ ] The 8-line `/report-a-bug` placeholder becomes a real form storing to the same pipeline."
     },
     {
-      "title": "Rate limiting: migration 0020_rate_limits and the action wrapper",
+      "title": "Rate limiting: migration 0021_rate_limits and the action wrapper",
       "milestone": "M7 — Safety and operations",
       "labels": ["area:db", "area:safety", "area:app", "blocker"],
       "size": "L",
-      "body": "Named as a launch blocker. Nothing limits how fast a user can post. ARCHITECTURE §4 already specifies the fix: a Postgres-backed fixed-window limiter and one Server Action wrapper that does parse → auth → account status → rate limit → ownership guard → write → revalidate. The wrapper does not exist, which is why every action hand-rolls the first three steps.\n\n**Do** — `0020_rate_limits` with a window table and a `check_rate_limit(key, limit, window)` function; `lib/rate-limit/`; the wrapper; migrate the existing auth, feed, profile and project actions onto it; a friendly refusal message, never a 500.\n\n**Acceptance**\n- [ ] A script posting 100 times in a minute is refused from the 11th with a clear message.\n- [ ] The limiter is per-user and per-action, and a test pins the window boundary.\n- [ ] Every existing Server Action goes through the wrapper — asserted by a lint rule or a test, not by review."
+      "body": "Named as a launch blocker. Nothing limits how fast a user can post. ARCHITECTURE §4 already specifies the fix: a Postgres-backed fixed-window limiter and one Server Action wrapper that does parse → auth → account status → rate limit → ownership guard → write → revalidate. The wrapper does not exist, which is why every action hand-rolls the first three steps.\n\n**Do** — `0021_rate_limits` with a window table and a `check_rate_limit(key, limit, window)` function; `lib/rate-limit/`; the wrapper; migrate the existing auth, feed, profile and project actions onto it; a friendly refusal message, never a 500.\n\n**Acceptance**\n- [ ] A script posting 100 times in a minute is refused from the 11th with a clear message.\n- [ ] The limiter is per-user and per-action, and a test pins the window boundary.\n- [ ] Every existing Server Action goes through the wrapper — asserted by a lint rule or a test, not by review."
     },
     {
       "title": "Storage buckets and uploads for avatars and project images",

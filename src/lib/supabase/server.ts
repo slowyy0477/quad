@@ -3,6 +3,9 @@ import 'server-only'
 import { createServerClient } from '@supabase/ssr'
 import { cookies } from 'next/headers'
 import { publicEnv } from '@/lib/env'
+import { isLocalMode } from '@/lib/mode'
+import { ensureSeeded } from '@/lib/local/seed'
+import { getLocalUser } from '@/lib/local/session'
 
 /**
  * The server client, for Server Components, Server Actions and Route Handlers.
@@ -24,6 +27,18 @@ import { publicEnv } from '@/lib/env'
  * sign users out an hour after they logged in.
  */
 export async function createClient() {
+  // Local mode has no Supabase to talk to. Failing immediately rather than letting a
+  // DNS lookup hang for thirty seconds turns "the page is broken" into "this domain
+  // has not been ported yet" — the second is true and actionable, the first is not.
+  // Each domain is being moved onto `@/lib/local/db` one at a time; a page that still
+  // reaches this line has not been moved.
+  if (isLocalMode()) {
+    throw new Error(
+      'The Supabase client was requested in local mode. This domain has not been ported ' +
+        'to the local store yet: see docs/plan/LOCAL-MODE.md and `@/lib/local/db`.',
+    )
+  }
+
   const env = publicEnv()
   const cookieStore = await cookies()
 
@@ -54,8 +69,34 @@ export async function createClient() {
  * `getUser()` validates the JWT against the auth server. On a page that decides
  * what someone may see, the difference between "the cookie says Ana" and "Ana"
  * is the whole question.
+ *
+ * In local mode the equivalent question is answered by `getLocalUser`, which
+ * verifies an HMAC over the user id with a key that never leaves the server. It is
+ * a weaker guarantee than a signed JWT checked against an auth server — there is no
+ * revocation, no expiry beyond the cookie's thirty days, and no second factor — and
+ * `src/lib/mode.ts` refuses to run a production build in that mode for exactly that
+ * reason.
  */
-export async function getUser() {
+export type SessionUser = {
+  id: string
+  email?: string | null
+  user_metadata?: Record<string, unknown>
+}
+
+export async function getUser(): Promise<SessionUser | null> {
+  if (isLocalMode()) {
+    // The seed is written on the first read of the session, so a fresh clone has a
+    // demo account to sign in with instead of an empty database and a dead form.
+    await ensureSeeded()
+    const local = await getLocalUser()
+    if (!local) return null
+    return {
+      id: local.id,
+      email: local.email,
+      user_metadata: { display_name: local.profile?.display_name ?? null },
+    }
+  }
+
   const supabase = await createClient()
   const {
     data: { user },

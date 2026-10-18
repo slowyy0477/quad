@@ -51,6 +51,13 @@ export async function proxy(request: NextRequest) {
   const url = request.nextUrl.clone()
   const { pathname } = url
 
+  // Local mode: no Supabase session to refresh and no server-side gate worth
+  // putting in front of a file-backed store. Each page decides for itself and
+  // renders a sign-in prompt, which is the better experience anyway.
+  if (process.env.NEXT_PUBLIC_DATA_MODE === 'local') {
+    return NextResponse.next()
+  }
+
   // With no Supabase configuration there is no session to refresh and no
   // authenticated area to protect. Let everything through so the setup page can
   // explain itself, rather than redirect-looping on a missing environment.

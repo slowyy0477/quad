@@ -1,24 +1,36 @@
 import Link from 'next/link'
 import { formatDistanceToNowStrict } from 'date-fns'
-import { Heart, MessageSquare } from 'lucide-react'
 import { Avatar } from '@/components/ui/avatar'
 import { Surface } from '@/components/ui/surface'
+import { AttachedObject } from '@/features/feed/components/attached-object'
+import { PostActions } from '@/features/feed/components/post-actions'
 import type { FeedPost } from '@/features/feed/queries'
 
 /**
- * A post in the feed.
+ * A post.
  *
  * The like and comment counts are read from the row, where they are maintained by
- * database triggers — they are real numbers, not placeholders. The controls are
- * not wired up yet, so they are rendered as static counts rather than as buttons
- * that look clickable and do nothing.
+ * database triggers — they are real numbers, not placeholders — and the controls
+ * that move them are `PostActions`, which owns the only optimistic state on this
+ * page.
  *
  * The timestamp is rendered inside a `<time>` with the machine-readable value in
- * `dateTime`, so "3h ago" is still recoverable as an exact instant.
+ * `dateTime`, so "3h ago" is still recoverable as an exact instant, and it doubles
+ * as the permalink when the post has no title.
  */
-export function PostCard({ post }: { post: FeedPost }) {
+export function PostCard({
+  post,
+  signedIn,
+  permalink,
+}: {
+  post: FeedPost
+  signedIn: boolean
+  /** Show "Copy link"; the feed omits it because every post there is one click old. */
+  permalink?: string
+}) {
   const author = post.author
   const name = author?.display_name ?? 'Former member'
+  const detailHref = `/post/${post.id}`
 
   return (
     <Surface as="article" className="p-4">
@@ -50,7 +62,13 @@ export function PostCard({ post }: { post: FeedPost }) {
             </time>
           </div>
 
-          {post.title ? <h3 className="mt-2 text-lg">{post.title}</h3> : null}
+          {post.title ? (
+            <h3 className="mt-2 text-lg">
+              <Link href={detailHref} className="underline-offset-2 hover:underline">
+                {post.title}
+              </Link>
+            </h3>
+          ) : null}
 
           {post.body ? (
             <p className="mt-1.5 text-sm whitespace-pre-wrap text-ink">{post.body}</p>
@@ -69,19 +87,20 @@ export function PostCard({ post }: { post: FeedPost }) {
             </a>
           ) : null}
 
-          <div className="mt-3 flex items-center gap-4 text-xs text-ink-faint">
-            <span className="inline-flex items-center gap-1.5">
-              <Heart className="size-3.5" aria-hidden="true" />
-              <span className="tabular">{post.like_count}</span>
-              <span className="sr-only">likes</span>
-            </span>
-            <span className="inline-flex items-center gap-1.5">
-              <MessageSquare className="size-3.5" aria-hidden="true" />
-              <span className="tabular">{post.comment_count}</span>
-              <span className="sr-only">comments</span>
-            </span>
-            {post.is_edited ? <span>edited</span> : null}
-          </div>
+          <AttachedObject project={post.project} goal={post.goal} />
+
+          <PostActions
+            postId={post.id}
+            likeCount={post.like_count}
+            commentCount={post.comment_count}
+            initiallyLiked={post.viewer_has_liked}
+            initiallySaved={post.viewer_has_saved}
+            signedIn={signedIn}
+            commentHref={`${detailHref}#comments`}
+            permalink={permalink}
+          />
+
+          {post.is_edited ? <p className="mt-1 text-xs text-ink-faint">edited</p> : null}
         </div>
       </div>
     </Surface>

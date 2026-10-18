@@ -1,6 +1,8 @@
 import type { Metadata, Viewport } from 'next'
 import { SiteFooter } from '@/components/layout/site-footer'
 import { SiteHeader } from '@/components/layout/site-header'
+import { LocalModeBanner } from '@/components/layout/local-mode-banner'
+import { isLocalMode } from '@/lib/mode'
 import './globals.css'
 
 export const metadata: Metadata = {
@@ -49,6 +51,7 @@ export default function RootLayout({ children }: LayoutProps<'/'>) {
           Skip to content
         </a>
 
+        {isLocalMode() ? <LocalModeBanner /> : null}
         <SiteHeader />
 
         <main id="main" className="flex-1">

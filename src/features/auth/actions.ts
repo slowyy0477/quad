@@ -8,6 +8,8 @@ import { createClient } from '@/lib/supabase/server'
 import { safeRedirect } from '@/features/auth/redirect'
 import { resetRequestSchema, signInSchema, signUpSchema } from '@/features/auth/schemas'
 import type { AuthFormState } from '@/features/auth/form-state'
+import { isLocalMode } from '@/lib/mode'
+import { localSignInAction, localSignOutAction, localSignUpAction } from '@/features/auth/local-actions'
 
 /**
  * Auth Server Actions.
@@ -83,6 +85,10 @@ export async function signInAction(
   _previous: AuthFormState,
   formData: FormData,
 ): Promise<AuthFormState> {
+  // Local mode answers the same form against `data/local.json`. The validation,
+  // the `next` handling and the failure copy are shared; only the store differs.
+  if (isLocalMode()) return localSignInAction(formData)
+
   if (!isSupabaseConfigured()) return UNAVAILABLE
 
   const raw = {
@@ -123,6 +129,8 @@ export async function signUpAction(
   _previous: AuthFormState,
   formData: FormData,
 ): Promise<AuthFormState> {
+  if (isLocalMode()) return localSignUpAction(formData)
+
   if (!isSupabaseConfigured()) return UNAVAILABLE
 
   const raw = {
@@ -250,6 +258,8 @@ export async function signInWithGoogleAction(formData: FormData) {
 // -----------------------------------------------------------------------------
 
 export async function signOutAction() {
+  if (isLocalMode()) return localSignOutAction()
+
   if (isSupabaseConfigured()) {
     const supabase = await createClient()
     // 'local' rather than 'global': signing out on a library computer should not

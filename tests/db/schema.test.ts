@@ -225,10 +225,13 @@ describe('function execute privileges', () => {
 
   /** Functions in `public` that a signed-in user is meant to be able to call. */
   const CLIENT_RPCS = [
+    'check_rate_limit',
     'convert_idea_to_project',
     'create_group_conversation',
     'current_study_streak',
     'mark_conversation_read',
+    'moderate_report',
+    'review_university_request',
     'start_direct_conversation',
     'total_unread_messages',
     'touch_last_active',

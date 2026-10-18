@@ -53,5 +53,37 @@ export const projectEditSchema = projectCreateSchema.extend({
   completedAt: optionalDate('The completion date'),
 })
 
+/** The team-finder form: the flag, the target size and the required skills. */
+export const projectSeekingSchema = z.object({
+  isSeekingMembers: z
+    .string()
+    .optional()
+    .transform((value) => value === 'on' || value === 'true'),
+  teamSizeTarget: optionalInt(1, 50, 'A team target between 1 and 50'),
+  lookingFor: optionalText(1000, 'What you are looking for'),
+})
+
+/** A join request. The note is optional; the applicant is the session, never a field. */
+export const projectJoinSchema = z.object({
+  message: optionalText(2000, 'Your note'),
+  desiredRole: optionalText(80, 'The role you want'),
+})
+
+/** A project update. Non-empty, and bounded by the posts CHECK. */
+export const projectUpdateSchema = z.object({
+  body: requiredText(1, 5000, 'The update'),
+})
+
+/**
+ * A list of skill ids from repeated checkboxes.
+ *
+ * Empty is a legitimate answer -- "this project needs no particular skill" -- and is
+ * distinct from a malformed id, which is rejected.
+ */
+export const skillIdList = z
+  .array(z.string().uuid('That skill could not be identified'))
+  .max(20, 'At most 20 skills')
+
 export type ProjectCreateInput = z.infer<typeof projectCreateSchema>
 export type ProjectEditInput = z.infer<typeof projectEditSchema>
+export type ProjectSeekingInput = z.infer<typeof projectSeekingSchema>

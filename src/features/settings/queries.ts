@@ -1,6 +1,8 @@
 import 'server-only'
 
-import { createClient } from '@/lib/supabase/server'
+import { createClient, getUser } from '@/lib/supabase/server'
+import { isLocalMode } from '@/lib/mode'
+import { readStore } from '@/lib/local/db'
 import type { Database } from '@/lib/db/database.types'
 
 /**
@@ -21,6 +23,33 @@ export async function getOwnSettings(): Promise<{
   profile: PrivacySettings | null
   error: string | null
 }> {
+  if (isLocalMode()) {
+    const user = await getUser()
+    if (!user) {
+      return { profile: null, error: 'Your settings could not be read. Reload the page to try again.' }
+    }
+
+    const db = await readStore()
+    const me = db.profiles.find((profile) => profile.user_id === user.id)
+    if (!me) {
+      return { profile: null, error: 'Your settings could not be read. Reload the page to try again.' }
+    }
+
+    // The two messaging fields are optional on the local row because they were added
+    // to the store after the first accounts existed. The defaults are the ones the
+    // database's own column defaults use, so a profile that predates the columns reads
+    // exactly like a freshly created one.
+    return {
+      profile: {
+        visibility: me.visibility,
+        allow_messages_from: me.allow_messages_from ?? 'everyone',
+        allow_connection_requests: me.allow_connection_requests ?? true,
+        searchable: me.searchable,
+      },
+      error: null,
+    }
+  }
+
   const supabase = await createClient()
 
   const { data, error } = await supabase

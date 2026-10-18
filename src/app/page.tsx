@@ -10,7 +10,6 @@ import {
   Users,
 } from 'lucide-react'
 import { Alert } from '@/components/ui/alert'
-import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
 import { isSupabaseConfigured } from '@/lib/env'
 import { getUser } from '@/lib/supabase/server'
@@ -103,7 +102,7 @@ export default async function HomePage() {
               holds all of it — and a community from your own university attached to it.
             </p>
 
-            <div className="mt-8 flex flex-wrap items-center gap-3">
+            <div className="mt-8 flex flex-col gap-3 sm:flex-row sm:items-center">
               {user ? (
                 <Button asChild variant="primary" size="lg">
                   <Link href="/feed">
@@ -113,10 +112,10 @@ export default async function HomePage() {
                 </Button>
               ) : (
                 <>
-                  <Button asChild variant="primary" size="lg">
+                  <Button asChild variant="primary" size="lg" className="w-full sm:w-auto">
                     <Link href="/signup">Create your profile</Link>
                   </Button>
-                  <Button asChild variant="secondary" size="lg">
+                  <Button asChild variant="secondary" size="lg" className="w-full sm:w-auto">
                     <Link href="/login">Sign in</Link>
                   </Button>
                 </>
@@ -134,21 +133,21 @@ export default async function HomePage() {
               What this is not
             </h2>
             <ul className="mt-4 space-y-4 text-sm text-ink-muted">
-              <li className="border-l-2 border-highlight-400 pl-3">
+              <li>
                 <span className="font-medium text-ink">Not a job board.</span> Nobody is asking you
                 for eight years of experience. Skill levels here are what you say they are, and the
                 interface says so.
               </li>
-              <li className="border-l-2 border-highlight-400 pl-3">
+              <li>
                 <span className="font-medium text-ink">Not an engagement machine.</span> No infinite
                 doomscroll, no notification invented to pull you back, no metric that rewards
                 posting for its own sake.
               </li>
-              <li className="border-l-2 border-highlight-400 pl-3">
+              <li>
                 <span className="font-medium text-ink">Not finished.</span> Quad is being built in
                 the open, and the{' '}
                 <Link href="/status" className="text-accent-700 underline underline-offset-2">
-                  build status page
+                  status page
                 </Link>{' '}
                 lists every feature and whether it works yet.
               </li>
@@ -163,14 +162,16 @@ export default async function HomePage() {
       <section className="py-14 sm:py-16">
         <div className="flex flex-wrap items-baseline justify-between gap-3">
           <h2 className="text-2xl">What is inside</h2>
-          <Badge tone="outline">In active development</Badge>
+          <p className="text-2xs uppercase tracking-[0.14em] text-ink-faint">In active development</p>
         </div>
 
         <div className="mt-8 grid gap-x-10 gap-y-8 sm:grid-cols-2 lg:grid-cols-3">
           {sections.map(({ icon: Icon, title, body }) => (
             <article key={title} className="border-t border-hairline pt-4">
-              <Icon className="size-5 text-accent-600" aria-hidden="true" />
-              <h3 className="mt-3 text-lg">{title}</h3>
+              <div className="flex items-center gap-2">
+                <Icon className="size-4 shrink-0 text-accent-600" aria-hidden="true" />
+                <h3 className="text-lg">{title}</h3>
+              </div>
               <p className="mt-1.5 text-sm text-ink-muted">{body}</p>
             </article>
           ))}

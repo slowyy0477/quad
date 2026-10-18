@@ -66,6 +66,10 @@ yarn-error.log*
 .cache
 tmp/
 
+# scratch space for scripts and one-off probes. Never committed: it is where
+# throwaway files live precisely so they do not end up in the tree by accident.
+.scratch/
+
 # deploy
 .vercel
 
@@ -73,3 +77,6 @@ tmp/
 # files are the source of truth. Regenerate with `npm run db:bundle`.
 supabase/apply-all.sql
 supabase/apply-from-*.sql
+
+# Local data store: accounts, posts, everything, in plain JSON. Never deployed.
+data/

@@ -2,8 +2,10 @@
 
 import { revalidatePath } from 'next/cache'
 import { z } from 'zod'
-import { createClient } from '@/lib/supabase/server'
+import { createClient, getUser } from '@/lib/supabase/server'
 import { isSupabaseConfigured } from '@/lib/env'
+import { isLocalMode } from '@/lib/mode'
+import { mutate } from '@/lib/local/db'
 import type { SettingsFormState } from '@/features/settings/form-state'
 
 /**
@@ -30,10 +32,6 @@ export async function updatePrivacyAction(
   _previous: SettingsFormState,
   formData: FormData,
 ): Promise<SettingsFormState> {
-  if (!isSupabaseConfigured()) {
-    return { status: 'error', message: 'Settings are unavailable: this deployment has no database.' }
-  }
-
   const parsed = privacySchema.safeParse({
     visibility: formData.get('visibility'),
     allow_messages_from: formData.get('allow_messages_from'),
@@ -46,6 +44,36 @@ export async function updatePrivacyAction(
     const fieldErrors: Record<string, string> = {}
     for (const issue of parsed.error.issues) fieldErrors[String(issue.path[0])] = issue.message
     return { status: 'error', message: 'That combination is not valid.', fieldErrors }
+  }
+
+  if (isLocalMode()) {
+    const user = await getUser()
+    if (!user) {
+      return { status: 'error', message: 'You are not signed in.' }
+    }
+
+    const found = await mutate((db) => {
+      const me = db.profiles.find((profile) => profile.user_id === user.id)
+      if (!me) return false
+
+      me.visibility = parsed.data.visibility
+      me.searchable = parsed.data.searchable
+      me.allow_messages_from = parsed.data.allow_messages_from
+      me.allow_connection_requests = parsed.data.allow_connection_requests
+      return true
+    })
+
+    if (!found) {
+      return { status: 'error', message: 'Your settings could not be saved. Please try again.' }
+    }
+
+    revalidatePath('/settings')
+    revalidatePath('/me')
+    return { status: 'saved', message: 'Privacy settings saved.' }
+  }
+
+  if (!isSupabaseConfigured()) {
+    return { status: 'error', message: 'Settings are unavailable: this deployment has no database.' }
   }
 
   const supabase = await createClient()

@@ -3,8 +3,12 @@ import { redirect } from 'next/navigation'
 import type { Metadata } from 'next'
 import { Alert } from '@/components/ui/alert'
 import { Button } from '@/components/ui/button'
+import { EmptyState } from '@/components/ui/surface'
 import { ProfileView } from '@/features/profiles/components/profile-view'
 import { getMyProfile } from '@/features/profiles/queries'
+import { InterestTags } from '@/features/skills/components/interest-tags'
+import { SkillList } from '@/features/skills/components/skill-list'
+import { listProfileInterests, listProfileSkills } from '@/features/skills/queries'
 import { isSupabaseConfigured } from '@/lib/env'
 
 export const metadata: Metadata = { title: 'Your profile' }
@@ -58,15 +62,26 @@ export default async function MyProfilePage() {
 
   const { profile } = result
 
+  const [skills, interests] = await Promise.all([
+    listProfileSkills(profile.id),
+    listProfileInterests(profile.id),
+  ])
+
   return (
     <div className="mx-auto w-full max-w-2xl px-4 py-10 sm:px-6">
       <div className="mb-6 flex flex-wrap items-center justify-between gap-3">
         <p className="font-sans text-2xs font-semibold tracking-[0.12em] text-ink-faint uppercase">
           Your profile
         </p>
-        <div className="flex gap-2">
+        <div className="flex flex-wrap gap-2">
           <Button asChild variant="secondary" size="sm">
             <Link href="/me/edit">Edit profile</Link>
+          </Button>
+          <Button asChild variant="secondary" size="sm">
+            <Link href="/me/skills">Skills &amp; interests</Link>
+          </Button>
+          <Button asChild variant="secondary" size="sm">
+            <Link href="/connections">Connections</Link>
           </Button>
           <Button asChild variant="ghost" size="sm">
             <Link href={`/u/${profile.username}`}>View as public</Link>
@@ -88,7 +103,30 @@ export default async function MyProfilePage() {
         </Alert>
       ) : null}
 
-      <ProfileView profile={profile} isSelf />
+      <ProfileView
+        profile={profile}
+        isSelf
+        skills={
+          skills.length > 0 ? (
+            <SkillList skills={skills} isSelf />
+          ) : (
+            <EmptyState title="No skills on your profile yet" className="px-4 py-6 text-left">
+              <p>
+                Skills are how people find you for the thing you are good at. Levels are
+                self-declared, so there is no wrong answer.
+              </p>
+              <p className="mt-2">
+                <Link href="/me/skills" className="text-accent-700 underline underline-offset-2">
+                  Add a skill
+                </Link>
+              </p>
+            </EmptyState>
+          )
+        }
+        interests={
+          interests.length > 0 ? <InterestTags interests={interests} isSelf /> : undefined
+        }
+      />
     </div>
   )
 }

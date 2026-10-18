@@ -4,7 +4,7 @@
  *   npm run db:types:local     # regenerate from supabase/migrations (no network, no Docker)
  *   npm run db:types           # regenerate from a linked Supabase project (preferred)
  *
- * Derived from 17 migrations by scripts/db/schema.mjs, applying the real
+ * Derived from 21 migrations by scripts/db/schema.mjs, applying the real
  * SQL to PostgreSQL 18 in-process — the same path the permission suite takes, so the
  * types and the tests cannot disagree about what the schema is.
  *
@@ -99,6 +99,47 @@ export type Database = {
           {
             foreignKeyName: "blocks_blocker_id_fkey"
             columns: ["blocker_id"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      bug_reports: {
+        Row: {
+          "id": string
+          "reporter_id": string
+          "title": string
+          "body": string
+          "page_url": string | null
+          "status": string
+          "created_at": string
+          "updated_at": string
+        }
+        Insert: {
+          "id"?: string
+          "reporter_id": string
+          "title": string
+          "body": string
+          "page_url"?: string | null
+          "status"?: string
+          "created_at"?: string
+          "updated_at"?: string
+        }
+        Update: {
+          "id"?: string
+          "reporter_id"?: string
+          "title"?: string
+          "body"?: string
+          "page_url"?: string | null
+          "status"?: string
+          "created_at"?: string
+          "updated_at"?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "bug_reports_reporter_id_fkey"
+            columns: ["reporter_id"]
             isOneToOne: false
             referencedRelation: "profiles"
             referencedColumns: ["id"]
@@ -1191,6 +1232,128 @@ export type Database = {
             columns: ["sender_id"]
             isOneToOne: false
             referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      moderation_actions: {
+        Row: {
+          "id": string
+          "actor_id": string
+          "action": string
+          "reason": string
+          "report_id": string | null
+          "university_id": string | null
+          "target_profile_id": string | null
+          "post_id": string | null
+          "comment_id": string | null
+          "project_id": string | null
+          "idea_id": string | null
+          "message_id": string | null
+          "supersedes_id": string | null
+          "created_at": string
+        }
+        Insert: {
+          "id"?: string
+          "actor_id": string
+          "action": string
+          "reason": string
+          "report_id"?: string | null
+          "university_id"?: string | null
+          "target_profile_id"?: string | null
+          "post_id"?: string | null
+          "comment_id"?: string | null
+          "project_id"?: string | null
+          "idea_id"?: string | null
+          "message_id"?: string | null
+          "supersedes_id"?: string | null
+          "created_at"?: string
+        }
+        Update: {
+          "id"?: string
+          "actor_id"?: string
+          "action"?: string
+          "reason"?: string
+          "report_id"?: string | null
+          "university_id"?: string | null
+          "target_profile_id"?: string | null
+          "post_id"?: string | null
+          "comment_id"?: string | null
+          "project_id"?: string | null
+          "idea_id"?: string | null
+          "message_id"?: string | null
+          "supersedes_id"?: string | null
+          "created_at"?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "moderation_actions_actor_id_fkey"
+            columns: ["actor_id"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "moderation_actions_comment_id_fkey"
+            columns: ["comment_id"]
+            isOneToOne: false
+            referencedRelation: "comments"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "moderation_actions_idea_id_fkey"
+            columns: ["idea_id"]
+            isOneToOne: false
+            referencedRelation: "ideas"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "moderation_actions_message_id_fkey"
+            columns: ["message_id"]
+            isOneToOne: false
+            referencedRelation: "messages"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "moderation_actions_post_id_fkey"
+            columns: ["post_id"]
+            isOneToOne: false
+            referencedRelation: "posts"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "moderation_actions_project_id_fkey"
+            columns: ["project_id"]
+            isOneToOne: false
+            referencedRelation: "projects"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "moderation_actions_report_id_fkey"
+            columns: ["report_id"]
+            isOneToOne: false
+            referencedRelation: "reports"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "moderation_actions_supersedes_id_fkey"
+            columns: ["supersedes_id"]
+            isOneToOne: false
+            referencedRelation: "moderation_actions"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "moderation_actions_target_profile_id_fkey"
+            columns: ["target_profile_id"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "moderation_actions_university_id_fkey"
+            columns: ["university_id"]
+            isOneToOne: false
+            referencedRelation: "universities"
             referencedColumns: ["id"]
           },
         ]
@@ -2601,6 +2764,120 @@ export type Database = {
           },
         ]
       }
+      reports: {
+        Row: {
+          "id": string
+          "reporter_id": string
+          "kind": string
+          "reason": string
+          "detail": string | null
+          "post_id": string | null
+          "comment_id": string | null
+          "project_id": string | null
+          "idea_id": string | null
+          "message_id": string | null
+          "user_id": string | null
+          "status": string
+          "reviewed_by": string | null
+          "reviewed_at": string | null
+          "created_at": string
+          "updated_at": string
+        }
+        Insert: {
+          "id"?: string
+          "reporter_id": string
+          "kind": string
+          "reason": string
+          "detail"?: string | null
+          "post_id"?: string | null
+          "comment_id"?: string | null
+          "project_id"?: string | null
+          "idea_id"?: string | null
+          "message_id"?: string | null
+          "user_id"?: string | null
+          "status"?: string
+          "reviewed_by"?: string | null
+          "reviewed_at"?: string | null
+          "created_at"?: string
+          "updated_at"?: string
+        }
+        Update: {
+          "id"?: string
+          "reporter_id"?: string
+          "kind"?: string
+          "reason"?: string
+          "detail"?: string | null
+          "post_id"?: string | null
+          "comment_id"?: string | null
+          "project_id"?: string | null
+          "idea_id"?: string | null
+          "message_id"?: string | null
+          "user_id"?: string | null
+          "status"?: string
+          "reviewed_by"?: string | null
+          "reviewed_at"?: string | null
+          "created_at"?: string
+          "updated_at"?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "reports_comment_id_fkey"
+            columns: ["comment_id"]
+            isOneToOne: false
+            referencedRelation: "comments"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "reports_idea_id_fkey"
+            columns: ["idea_id"]
+            isOneToOne: false
+            referencedRelation: "ideas"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "reports_message_id_fkey"
+            columns: ["message_id"]
+            isOneToOne: false
+            referencedRelation: "messages"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "reports_post_id_fkey"
+            columns: ["post_id"]
+            isOneToOne: false
+            referencedRelation: "posts"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "reports_project_id_fkey"
+            columns: ["project_id"]
+            isOneToOne: false
+            referencedRelation: "projects"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "reports_reporter_id_fkey"
+            columns: ["reporter_id"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "reports_reviewed_by_fkey"
+            columns: ["reviewed_by"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "reports_user_id_fkey"
+            columns: ["user_id"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       reserved_usernames: {
         Row: {
           "username": string
@@ -2888,9 +3165,79 @@ export type Database = {
       }
     }
     Views: {
-      [_ in never]: never
+      following_feed: {
+        Row: {
+          "id": string | null
+          "author_id": string | null
+          "type": string | null
+          "title": string | null
+          "body": string | null
+          "link_url": string | null
+          "project_id": string | null
+          "goal_id": string | null
+          "opportunity_id": string | null
+          "university_id": string | null
+          "like_count": number | null
+          "comment_count": number | null
+          "save_count": number | null
+          "is_edited": boolean | null
+          "created_at": string | null
+          "author_username": string | null
+          "author_display_name": string | null
+          "author_avatar_url": string | null
+          "author_headline": string | null
+          "project_slug": string | null
+          "project_title": string | null
+          "project_tagline": string | null
+          "project_status": string | null
+          "goal_title": string | null
+          "goal_status": string | null
+          "goal_progress_percent": number | null
+        }
+        Relationships: []
+      }
+      ranked_feed: {
+        Row: {
+          "id": string | null
+          "author_id": string | null
+          "type": string | null
+          "title": string | null
+          "body": string | null
+          "link_url": string | null
+          "project_id": string | null
+          "goal_id": string | null
+          "opportunity_id": string | null
+          "university_id": string | null
+          "like_count": number | null
+          "comment_count": number | null
+          "save_count": number | null
+          "is_edited": boolean | null
+          "created_at": string | null
+          "author_username": string | null
+          "author_display_name": string | null
+          "author_avatar_url": string | null
+          "author_headline": string | null
+          "project_slug": string | null
+          "project_title": string | null
+          "project_tagline": string | null
+          "project_status": string | null
+          "goal_title": string | null
+          "goal_status": string | null
+          "goal_progress_percent": number | null
+          "feed_score": number | null
+        }
+        Relationships: []
+      }
     }
     Functions: {
+      check_rate_limit: {
+        Args: {
+          "p_bucket": string
+          "p_limit": number
+          "p_window_seconds": number
+        }
+        Returns: boolean
+      }
       convert_idea_to_project: {
         Args: {
           "p_idea_id": string
@@ -2922,6 +3269,33 @@ export type Database = {
           "p_conversation_id": string
         }
         Returns: undefined
+      }
+      moderate_report: {
+        Args: {
+          "p_report_id": string
+          "p_action": string
+          "p_reason": string
+          "p_days": number
+          "p_supersedes": string
+        }
+        Returns: string
+      }
+      review_university_request: {
+        Args: {
+          "p_university_id": string
+          "p_decision": string
+          "p_reason": string
+        }
+        Returns: undefined
+      }
+      search_all: {
+        Args: {
+          "p_query": string
+          "p_kind": string
+          "p_after_id": string
+          "p_limit": number
+        }
+        Returns: Record<string, unknown>[]
       }
       start_direct_conversation: {
         Args: {

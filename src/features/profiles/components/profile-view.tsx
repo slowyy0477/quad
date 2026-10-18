@@ -13,10 +13,15 @@ import type { FullProfile } from '@/features/profiles/queries'
  * from the rows they describe and they are not computed in the page. A count that
  * is zero is shown as zero.
  *
- * What is deliberately absent: follow and message buttons. Both features exist in
- * the database with working policies, and neither has a server action yet. A button
- * that looks live and does nothing is worse than its absence, so the sections that
- * would hold them say what is missing instead.
+ * The sections this file does not own arrive as slots: the connection controls,
+ * the skills and the interests are rendered by the features that own those tables
+ * and passed in by the page that composes them. That keeps this component free of
+ * cross-feature imports, and it means a change to what a skill row looks like is a
+ * change in one place rather than two.
+ *
+ * Order is deliberate and follows the interface contract: capabilities before
+ * biography. Name, where they study, what they can do, then what they say about
+ * themselves.
  */
 
 function Stat({ label, value }: { label: string; value: number }) {
@@ -37,6 +42,15 @@ function MetaLine({ icon: Icon, children }: { icon: typeof MapPin; children: Rea
   )
 }
 
+function Section({ title, children }: { title: string; children: React.ReactNode }) {
+  return (
+    <section>
+      <h2 className="text-2xs font-semibold tracking-[0.12em] text-ink-faint uppercase">{title}</h2>
+      <div className="mt-2.5">{children}</div>
+    </section>
+  )
+}
+
 const VISIBILITY_NOTE: Record<string, string> = {
   public: 'Anyone can see this profile, including people who are not signed in.',
   university: 'Only people at your university can see this profile.',
@@ -47,9 +61,18 @@ const VISIBILITY_NOTE: Record<string, string> = {
 export function ProfileView({
   profile,
   isSelf = false,
+  actions,
+  skills,
+  interests,
 }: {
   profile: FullProfile
   isSelf?: boolean
+  /** Connection and follow controls, built by the page that knows the reader's standing. */
+  actions?: React.ReactNode
+  /** The skills section, built by features/skills. */
+  skills?: React.ReactNode
+  /** The interests section, built by features/skills. */
+  interests?: React.ReactNode
 }) {
   const joined = new Date(profile.created_at).toLocaleDateString(undefined, {
     month: 'long',
@@ -82,6 +105,8 @@ export function ProfileView({
               ) : null}
             </div>
           ) : null}
+
+          {actions ? <div className="mt-4">{actions}</div> : null}
         </div>
       </header>
 
@@ -93,16 +118,8 @@ export function ProfileView({
         <Stat label="Connections" value={profile.connection_count} />
       </div>
 
-      {profile.bio ? (
-        <section>
-          <h2 className="text-2xs font-semibold tracking-[0.12em] text-ink-faint uppercase">About</h2>
-          <p className="mt-2 max-w-prose whitespace-pre-line text-ink">{profile.bio}</p>
-        </section>
-      ) : null}
-
-      <section>
-        <h2 className="text-2xs font-semibold tracking-[0.12em] text-ink-faint uppercase">Details</h2>
-        <ul className="mt-2.5 space-y-2">
+      <Section title="Details">
+        <ul className="space-y-2">
           {profile.university ? (
             <MetaLine icon={GraduationCap}>
               {profile.university.name}
@@ -149,7 +166,17 @@ export function ProfileView({
 
           <MetaLine icon={CalendarDays}>Joined {joined}</MetaLine>
         </ul>
-      </section>
+      </Section>
+
+      {skills ? <Section title="Skills">{skills}</Section> : null}
+
+      {interests ? <Section title="Interests">{interests}</Section> : null}
+
+      {profile.bio ? (
+        <Section title="About">
+          <p className="max-w-prose whitespace-pre-line text-ink">{profile.bio}</p>
+        </Section>
+      ) : null}
 
       {isSelf ? (
         <p className="border-t border-hairline pt-4 text-xs text-ink-faint">
@@ -159,15 +186,7 @@ export function ProfileView({
           </Link>
           .
         </p>
-      ) : (
-        <p className="border-t border-hairline pt-4 text-xs text-ink-faint">
-          Following and messaging are not built yet, so there is nothing to press here. The{' '}
-          <Link href="/status" className="text-accent-700 underline underline-offset-2">
-            build status page
-          </Link>{' '}
-          lists what does work.
-        </p>
-      )}
+      ) : null}
     </div>
   )
 }
