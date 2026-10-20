@@ -41,6 +41,7 @@ export function AdminNav({
 
   if (role === 'admin') {
     items.push({ href: '/admin/bug-reports', label: 'Bug reports', count: openBugs })
+    items.push({ href: '/admin/data', label: 'All data' })
   }
 
   items.push({ href: '/admin/audit', label: 'Audit log' })

@@ -1,6 +1,8 @@
 import 'server-only'
 
 import { createClient, getUser } from '@/lib/supabase/server'
+import { isLocalMode } from '@/lib/mode'
+import { readStore } from '@/lib/local/db'
 
 /**
  * Site operations reads.
@@ -41,6 +43,14 @@ export type StaffRole = 'admin' | 'moderator'
 export async function getStaffRole(): Promise<StaffRole | null> {
   const user = await getUser()
   if (!user) return null
+
+  if (isLocalMode()) {
+    const db = await readStore()
+    const roles = db.user_roles.filter((row) => row.user_id === user.id).map((row) => row.role)
+    if (roles.includes('admin')) return 'admin'
+    if (roles.includes('moderator')) return 'moderator'
+    return null
+  }
 
   const supabase = await createClient()
   const { data, error } = await supabase

@@ -83,6 +83,16 @@ export type ScopedFilter = string & { readonly [scoped]: true }
 const SCOPED = /^[a-z_]+=eq\.[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i
 
 /**
+ * The shape a local id has (`id('<prefix>')` in `@/lib/local/db`).
+ *
+ * A scoped filter in local mode is still a scoped filter — one conversation, named
+ * exactly — it simply names a store id instead of a uuid. It is accepted only when
+ * the build is in local mode, so a malformed uuid cannot slip through in the mode
+ * where the filter really is handed to a socket.
+ */
+const LOCAL_SCOPED = /^[a-z_]+=eq\.[a-z]+_[a-z0-9]{1,64}$/
+
+/**
  * Build the row filter for a subscription, or throw.
  *
  * A blank id, a placeholder, or a wrong shape is a bug in the caller, and the
@@ -95,17 +105,18 @@ export function scopedFilter(
   id: string,
 ): ScopedFilter {
   const value = `${column}=eq.${id}`
-  if (!SCOPED.test(value)) {
+  const valid = SCOPED.test(value) || (isLocalMode() && LOCAL_SCOPED.test(value))
+  if (!valid) {
     throw new Error(
       `Refusing to subscribe with the filter "${value}": a realtime subscription must be ` +
-        'scoped to one conversation or one recipient, by uuid.',
+        'scoped to one conversation or one recipient, by id.',
     )
   }
   return value as ScopedFilter
 }
 
 export function isScopedFilter(filter: string): boolean {
-  return SCOPED.test(filter)
+  return SCOPED.test(filter) || (isLocalMode() && LOCAL_SCOPED.test(filter))
 }
 
 /** Supabase's raw status strings, mapped. Unknown strings are "still connecting". */
@@ -180,6 +191,15 @@ export function subscribeToRows({
     )
   }
 
+  // Local mode has no websocket to open. Reporting `offline` here rather than
+  // pretending to be `live` is the whole point: `ConnectionState` shows "Not
+  // connected" and a working Refresh, and nothing claims a message will arrive by
+  // itself when it cannot. See the header note on why this is preferred to polling.
+  if (isLocalMode()) {
+    onStatus('offline')
+    return { unsubscribe: () => {} }
+  }
+
   const supabase = createClient()
 
   const channel = supabase
@@ -219,7 +239,9 @@ export function useRowSubscription({
   events = 'INSERT',
   onEvent,
 }: Omit<RowSubscription, 'onStatus'>): ChannelStatus {
-  const [status, setStatus] = useState<ChannelStatus>('connecting')
+  // Local mode starts — and stays — `offline`: there is no socket, and a spinner
+  // for one that will never open is the failure this file is written against.
+  const [status, setStatus] = useState<ChannelStatus>(isLocalMode() ? 'offline' : 'connecting')
   const handler = useRef(onEvent)
 
   // Not setState-in-an-effect: this assigns a ref to the newest callback after
@@ -229,6 +251,10 @@ export function useRowSubscription({
   })
 
   useEffect(() => {
+    // Local mode: nothing to connect to, and the status is already `offline`. Skipped
+    // here as well as inside `subscribeToRows` so no client is constructed at all.
+    if (isLocalMode()) return
+
     const subscription = subscribeToRows({
       channelName,
       table,

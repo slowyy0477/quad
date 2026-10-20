@@ -763,6 +763,8 @@ function localMatches(
               // trigger maintains it in this mode.
               member_count: db.project_members.filter((member) => member.project_id === project.id)
                 .length,
+              // `star_count` stays null: the store has no `project_stars` table, so
+              // zero is the true number and the mapper's `?? 0` is where it is said.
             },
             profileOf(project.owner_id),
             viewer,

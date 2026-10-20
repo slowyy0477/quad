@@ -64,6 +64,21 @@ export type Tables = {
   events: LocalEvent[]
   event_attendees: LocalAttendee[]
   reports: LocalReport[]
+  user_roles: LocalUserRole[]
+}
+
+/**
+ * A staff role.
+ *
+ * Mirrors `public.user_roles`: readable by its owner, writable by nobody through
+ * the app. Locally the only writer is the seed, which is the equivalent of the
+ * migration that grants the first administrator.
+ */
+export type LocalUserRole = {
+  id: string
+  user_id: string
+  role: 'admin' | 'moderator'
+  created_at: string
 }
 
 export type LocalUser = {
@@ -370,6 +385,7 @@ const EMPTY: Tables = {
   events: [],
   event_attendees: [],
   reports: [],
+  user_roles: [],
 }
 
 let cache: Tables | null = null

@@ -1,6 +1,7 @@
 import 'server-only'
 
 import { createClient } from '@/lib/supabase/server'
+import { isLocalMode } from '@/lib/mode'
 import type { BugStatus } from '@/features/bugs/schemas'
 
 /**
@@ -147,6 +148,10 @@ export async function getBugReports({
  * failure path logs and the number still comes from the database either way.
  */
 export async function countOpenBugReports(): Promise<number> {
+  // Local mode has no bug_reports table. Zero is the honest answer: no report has
+  // been filed, because there is nowhere to file one.
+  if (isLocalMode()) return 0
+
   const supabase = await createClient()
 
   const { count, error } = await supabase

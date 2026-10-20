@@ -14,6 +14,32 @@ no rate limiting and no verified identity.
 
 ---
 
+## The administrator
+
+```
+node scripts/local/make-admin.mjs            # create or report the existing one
+node scripts/local/make-admin.mjs --reset    # rotate the password
+```
+
+It writes a scrypt hash into the store and the plaintext into
+`D:\Quad\credentials\quad-admin.txt` (or `QUAD_CREDENTIALS_DIR`). The role lives in the
+store's `user_roles` table, mirroring `public.user_roles`, and `/admin` reads it on every
+request. `/admin/data` shows every table with its row count and a masked preview.
+
+## The real database on drive D:
+
+There is a PostgreSQL 17.6 cluster at `D:\Quad` with the project's own 21 migrations
+applied — 55 tables, 190 policies, every table under RLS. It was bootstrapped with
+`supabase/tests/bootstrap.sql`, which is the shim that supplies the Supabase roles,
+`auth` schema and `auth.uid()` the migrations expect.
+
+The site does not read it yet. Doing so needs PostgREST and an auth server, which is a
+separate piece of work; until then the JSON store is the runtime and the cluster is the
+schema of record. `D:\Quad\README-DB.txt` has the connection details and the maintenance
+scripts.
+
+---
+
 ## The demo account
 
 ```

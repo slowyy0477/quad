@@ -1,6 +1,8 @@
 import 'server-only'
 
 import { createClient } from '@/lib/supabase/server'
+import { isLocalMode } from '@/lib/mode'
+import { readStore } from '@/lib/local/db'
 import type { ReportKind } from '@/features/moderation/schemas'
 
 /**
@@ -181,6 +183,15 @@ export async function getOpenReports({
   page = 1,
   perPage = ADMIN_PAGE_SIZE,
 }: { page?: number; perPage?: number } = {}): Promise<ReadResult<QueueReport[]>> {
+  if (isLocalMode()) {
+    // The store has a `reports` table, but nothing in local mode writes to it: the
+    // report flow, the moderation decisions and the append-only audit log are one
+    // unit and none of them is ported. Returning the real rows here without the
+    // decision machinery would offer a queue whose buttons cannot work, so this
+    // says "nothing is waiting" — which is true — rather than half-building it.
+    return { rows: [], total: 0, error: null }
+  }
+
   const supabase = await createClient()
   const from = Math.max(0, page - 1) * perPage
 
@@ -508,6 +519,16 @@ export type ModerationCounts = {
  * partial index on open reports makes the count cheap.
  */
 export async function getModerationCounts(): Promise<ModerationCounts> {
+  if (isLocalMode()) {
+    const db = await readStore()
+    // `reports` exists in the store; `universities.status` does not (the local
+    // university rows have no review state), so there is never a pending one.
+    return {
+      openReports: db.reports.filter((report) => report.status === 'open').length,
+      pendingUniversities: 0,
+    }
+  }
+
   const supabase = await createClient()
 
   const [reports, universities] = await Promise.all([

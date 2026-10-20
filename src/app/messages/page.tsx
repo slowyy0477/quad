@@ -6,6 +6,7 @@ import { EmptyState } from '@/components/ui/surface'
 import { cursorHref } from '@/components/ui/pagination'
 import { encodeCursor } from '@/lib/cursor'
 import { isSupabaseConfigured } from '@/lib/env'
+import { isLocalMode } from '@/lib/mode'
 import { getUser } from '@/lib/supabase/server'
 import { cn } from '@/lib/utils'
 import { ConversationList } from '@/features/messages/components/conversation-list'
@@ -24,7 +25,8 @@ export const metadata: Metadata = { title: 'Messages' }
 
 type SearchParams = Record<string, string | string[] | undefined>
 
-const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i
+/** Either an account id (uuid) or a locally minted conversation id. */
+const OPENABLE_ID = /^(?:[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}|cnv_[a-z0-9]+)$/i
 
 function first(value: string | string[] | undefined): string | null {
   const raw = Array.isArray(value) ? value[0] : value
@@ -63,7 +65,7 @@ export default async function MessagesPage({
 }: {
   searchParams: Promise<SearchParams>
 }) {
-  if (!isSupabaseConfigured()) {
+  if (!isLocalMode() && !isSupabaseConfigured()) {
     return (
       <div className="mx-auto w-full max-w-2xl px-4 py-12">
         <h1 className="text-2xl">Messages</h1>
@@ -88,7 +90,10 @@ export default async function MessagesPage({
 
   const [list, pane] = await Promise.all([
     listConversations({ meId: user.id, cursor: params.cursor }),
-    selectedId && UUID.test(selectedId)
+    // The gate is "does this look like an id this build mints", not "is it a uuid".
+    // Local conversations are `cnv_…`, so a uuid-only check silently ignored the
+    // selection and the thread never opened.
+    selectedId && OPENABLE_ID.test(selectedId)
       ? getConversationPane(selectedId, user.id)
       : Promise.resolve(null),
   ])

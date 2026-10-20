@@ -54,7 +54,7 @@ import { redirect } from 'next/navigation'
 import { ActionError, action, formInput, requireActiveAccount, toFormState } from '@/lib/action'
 import type { FormState } from '@/lib/form-state'
 import { isLocalMode } from '@/lib/mode'
-import { id, mutate, now, readStore, type LocalProfile, type Tables } from '@/lib/local/db'
+import { id, mutate, now, type LocalProfile, type Tables } from '@/lib/local/db'
 import { getUser } from '@/lib/supabase/server'
 import {
   findMessagingTarget,
