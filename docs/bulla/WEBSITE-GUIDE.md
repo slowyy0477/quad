@@ -1,9 +1,15 @@
 # Bulla — website guide
 
-Updated 2 November 2026, Asia/Karachi. These destinations describe current
+Updated 3 November 2026, Asia/Karachi. These destinations describe current
 source. [STATUS.md](STATUS.md) distinguishes tested local journeys from
 unfinished hosted/device/capacity acceptance. The private preview is
 `http://127.0.0.1:3000`; it is not a public student website.
+
+The separate hosted preview is
+[bulla-tau.vercel.app](https://bulla-tau.vercel.app). Existing local accounts
+were not copied there. Before account testing, complete the actual sender,
+confirmation and redirect checks in [FREE-HOSTING.md](FREE-HOSTING.md).
+Public-page acceptance is not evidence that signed-in features/MFA/mail passed.
 
 ## Join and choose your audience
 

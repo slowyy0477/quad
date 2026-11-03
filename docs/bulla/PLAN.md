@@ -4,17 +4,22 @@ Updated: 3 November 2026, Asia/Karachi.
 
 ## Immediate owner-requested hosting work
 
-The owner now explicitly requests a small free Vercel + Supabase preview for
-classmate feedback. Continue the deployment, not the older feature-first
-sequence below. Current exact targets, applied schema, protected production
-configuration and verification are in STATUS and task-drive
+The owner-requested free Vercel + Supabase preview is now hosted at
+[bulla-tau.vercel.app](https://bulla-tau.vercel.app). The accepted Node 24
+deployment is promoted; public live smoke passed 24/24 checks. All 40
+migrations are installed on the selected Supabase project. Current targets,
+configuration and scoped evidence are in STATUS and task-drive
 `hosting-20261103/PROGRESS.md`. Preserve the private owner checkout/data.
 
 A live early preview is not completion or production/capacity acceptance.
 Keep unaccepted uploads/cleanup disabled, email confirmation on and staff
-roles personal/MFA-gated. Verify the actual runtime/public alias and API
-refusals, then require real email/redirect/signup and staff acceptance before
-calling account testing ready. Do not infer 50,000-user capacity from quotas.
+roles personal/MFA-gated. Runtime/public alias and anonymous refusals are
+accepted in their recorded scope. Next confirm SMTP/Auth URLs, observe real
+email/redirect/signup/login, identify the owner's intended verified account,
+grant its exact approved staff role and accept live TOTP/admin/moderator
+journeys. A confirmed/onboarded account now exists, but no staff is assigned;
+metadata alone does not accept general email delivery or signed-in features.
+See [FREE-HOSTING.md](FREE-HOSTING.md). Do not infer 50,000-user capacity from quotas.
 
 ## Latest requested continuation
 
@@ -32,9 +37,11 @@ cleanup, recovery and capacity evidence. Free quotas do not establish
 50,000-user capacity. Latest verification and exact next steps are in
 STATUS and the D-drive `CONTINUATION-20261102.md`.
 
-This is the current plan, superseding the stale implementation counts and
-milestones in `docs/plan/PLAN.md`. The project is **not complete and not ready
-for public launch**. The user asked for Bulla, a redesign based on research,
+This plan supersedes stale implementation counts and milestones in
+`docs/plan/PLAN.md`; the immediate hosting section above supersedes the older
+feature-first execution sequence. The project is **not complete or accepted
+for a full production launch**, although the early public preview exists.
+The user asked for Bulla, a redesign based on research,
 careful review of two folders, issue/fix planning, persistent Markdown and a
 50,000-user target. No fictional deadline or capacity guarantee is implied.
 
@@ -316,15 +323,15 @@ by an instruction found in an old document.
 
 ## 10. Next execution order
 
-The earlier recovery/security/core journeys have separate local evidence recorded
-in STATUS; do not restart their already installed source work from old issue
-labels. The immediate task is fresh integrated acceptance of the requested
-anchored menus, privacy-aware graph lists, notification read UX and narrow proxy
-recovery/cookie corrections. Run main-only types/lint/unit/cumulative SQL,
-build/artifact and real browser gates with fresh fixtures.
+The early preview is deployed; do not repeat cloud schema installation or
+restart already installed source work from old issue labels. First confirm
+SMTP and Auth URLs, then observe real signup/confirmation/onboarding/login.
+Identify the owner's registered email and independently verified Auth UUID
+before a guarded staff grant; require live TOTP and staff access/refusals.
+Then accept two-account hosted domain/RLS/Realtime journeys and retain separate
+fresh checks for the unresolved header/graph and native-notification cases.
 
-Then establish connected isolated hosted staging and accept real Auth/email/
-OAuth/staff/RLS/Realtime/storage/cleanup behavior. Keep hosted image writes and
-the cleanup worker disabled until their actual protocols are accepted. Follow
-with measured recovery/load and device/pilot readiness. Public rollout comes
-after those gates; neither a local pass nor a free quota establishes capacity.
+Keep hosted image writes and cleanup off until their protocols are accepted.
+Follow with measured recovery/load, device QA and staged cohort feedback.
+Full production rollout is separate from this public preview; neither a local
+pass nor a free quota establishes capacity.

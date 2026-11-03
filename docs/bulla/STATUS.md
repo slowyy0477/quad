@@ -1,14 +1,15 @@
 # Bulla — current status and resume record
 
-Updated: 3 November 2026, Asia/Karachi. The application and public launch remain
-unfinished. This compact record supersedes old running/next-step snapshots.
+Updated: 3 November 2026, Asia/Karachi. The early public preview is hosted;
+the application and full launch acceptance remain unfinished. This record
+supersedes old running/next-step snapshots.
 The complete previous record is preserved in [STATUS-HISTORY-20261102.md](STATUS-HISTORY-20261102.md).
 
 ## Resume first
 
 - Active source: `E:\Uni-Social-Network`; `E:\Bulla` is only the workspace entry.
 - Read AGENTS, this file, [PLAN.md](PLAN.md) and the D-drive checkpoint.
-- Preserve the extensively dirty Git checkout, existing accounts/media and
+- Preserve pre-existing Git changes, existing accounts/media and
   owner preview. Do not replace it with either August prototype.
 - Task drive: `D:\All tasks + Automations\Bulla-Recovery`.
 - Update this record and `CHECKPOINT.md` after every meaningful completion:
@@ -18,7 +19,89 @@ The complete previous record is preserved in [STATUS-HISTORY-20261102.md](STATUS
 
 ## Current hosting request — 3 November 2026
 
-### Recovered deployment continuation — 3 November 2026
+### Public preview — promoted and verified
+
+Public site: [bulla-tau.vercel.app](https://bulla-tau.vercel.app).
+Vercel's stable alias points to the accepted production deployment
+`dpl_A5VfS8LL8XhY5hnZcYckX4v9c3ER`, source commit
+`5b01a7d3fe17bbc50f65796d2e8883040a91f4d2`, actual **Node 24.x / arn1**.
+Fresh scoped CLI inspection confirms READY/production and a signed-out HTTPS
+request returns **200** at the same public address.
+
+Only Bulla's protection was changed to Standard Protection
+(`prod_deployment_urls_and_all_previews`): the stable production address is
+public; preview/unique deployment protection remains configured. The first
+Node-26 build was never promoted. No paid upgrade or domain purchase occurred.
+
+Actual live smoke: **24 passed / 0 failed**, exit 0, public HTTP/Chrome/API
+scope only. Report:
+`hosting-20261103/live-smoke-2026-11-03T11-43-06-434Z-a1e0bdb9/REPORT.md`.
+Verified public pages, TLS/CSP fresh nonces, PWA assets, signed-out protected
+route refusals, cross-origin refusal, anonymous RPC/role denials, real Chrome
+hydration, four-width light/dark reflow, signup validation and nonexistent
+account login refusal. Public desktop-light and 390px-dark screenshots were
+visually reviewed without observed clipping. No real signup/email/staff
+journey was performed by these checks.
+
+Hosted database: all **40** source migrations installed and history aligned;
+**59** public tables, all RLS-enabled; exact **47** public RPCs (32 client /
+15 service-only), zero service-only client grants. Anonymous and authenticated
+staff-role INSERT remain denied. Image bucket is private; hosted image writes
+and incomplete cleanup rollout remain off.
+
+Account state changed after smoke, without an agent account mutation:
+the latest read-only recheck reports **1 Auth account / 1 profile**, with
+email confirmed, onboarding complete and profile active; **0 staff roles**.
+The smoke's earlier zero-account state remains its historical scope. Do not
+assume that the account is the owner's or grant it staff without confirming
+the owner's intended personal email and exact Auth UUID.
+
+The immutable source snapshot contains **434 files / 2,899,629 bytes**, with
+matching upload hashes and no ignored/private files. Owner JSON, local
+accounts/passwords/media and `.env.local` were not imported or uploaded.
+Five encrypted production variables are configured; no service-role key,
+admin password or local-production override is installed.
+
+Separate evidence: runtime correction TypeScript/lint and **5/5 tests** passed
+in `hosting-20261103/runtime-pin-tests.json`; earlier release checks passed
+**3,118 tests / 2 explicit native-only skips / 0 failures**. Do not combine
+these counts with live smoke or infer signed-in, recovery or capacity acceptance.
+Production-only npm audit has zero vulnerabilities; 16 moderate
+development-inclusive provider-install notices remain recorded.
+
+Required owner handoff: [FREE-HOSTING.md](FREE-HOSTING.md),
+[ADMIN-GUIDE.md](ADMIN-GUIDE.md), [MODERATOR-GUIDE.md](MODERATOR-GUIDE.md) and
+[WEBSITE-GUIDE.md](WEBSITE-GUIDE.md). SMTP and Auth redirects could not be
+inspected/configured with the available connected tools. Public Auth reports
+email enabled, confirmation on and Google off. The confirmed account metadata
+does not prove mail delivery to arbitrary classmates or correct email redirects.
+Confirm the exact Site URL/redirects and an approved sender, then observe a real
+signup → delivered confirmation → onboarding → sign-out/login journey before
+calling classmate account testing ready. Keep confirmation enabled.
+
+No hosted admin/moderator has been provisioned. Both use personal accounts at
+`/login`, exact verified-UUID owner grants, TOTP at `/settings/security` and
+`/admin`; fresh staff assurance expires after five minutes. Admin also has
+`/admin/bug-reports`. No in-app staff appointment UI exists.
+
+Automatic Git deployment still needs the owner's Vercel GitHub Login
+Connection; scoped CLI deployment works. The following older snapshots retain
+their original evidence, but their running states and next steps are superseded.
+
+Handoff documentation QA: all seven current guides/records checked, **32
+relative Markdown links / zero missing targets**; whitespace check exit 0.
+Only known documentation changes are included; no application rebuild or
+new live-account mutation was needed for this handoff.
+
+### Earlier hosting checkpoints — superseded
+
+**Pinned cloud replacement is READY:** deployment
+`dpl_A5VfS8LL8XhY5hnZcYckX4v9c3ER`, actual Node 24.x / arn1, source commit
+`5b01a7d`, no aliases yet. Project protection is currently
+`all_except_custom_domains`. Next change only Bulla to Standard Protection,
+preserving unique/preview protection, promote this exact ready deployment and
+run live anonymous HTTP/Chrome/API checks. The public URL is not accepted
+until an unauthenticated request succeeds.
 
 **Latest actual state:** all 40 Supabase migrations are installed, 59 public
 tables all have RLS, public Auth/profile/staff counts are zero, client staff
@@ -40,6 +123,14 @@ zero-warning/error lint and **5/5 tests**, zero failures/skips, actual exit 0.
 Evidence: `hosting-20261103/runtime-pin-tests.json`. Root dependency versions
 were not changed. Next commit/push these reviewed deployment corrections and
 make a fresh pinned cloud snapshot; first Node-26 deployment remains unpromoted.
+
+Hosting corrections are pushed as `5b01a7d3fe17bbc50f65796d2e8883040a91f4d2`.
+New pinned snapshot `source-20261103-162408-11f5b92af24b45578d5a5d8000c65876`
+passes actual dry-run paths/digests/private-file checks: 434 files/
+2,899,629 bytes, zero ignored/private files, root manifest/lock `24.x`.
+The production RPC catalog also matches all 47 source functions (32 client/
+15 service-only), with zero service-only client grants. Next upload this
+snapshot with alias assignment withheld; verify actual runtime before promotion.
 
 Next: finish the focused runtime checks, create/verify the pinned immutable
 snapshot, build it on actual Node 24, promote the stable alias and run live
@@ -598,31 +689,35 @@ no runtime migration, hosted setup or public deployment is inferred.
 
 ## Remaining launch gates
 
-- Finish prior local acceptance, then implement/verify the prepared menu/graph
-  slice and fresh integrated types/lint/affected tests/build/artifact/browser QA.
-- Real hosted Auth/signup/recovery/email/OAuth, publication, staff MFA/permissions,
-  PostgREST/RLS and Realtime acceptance.
+- Confirm owner-controlled SMTP and exact Auth URLs, then real email/signup/
+  confirmation/onboarding/login and one-time recovery acceptance. Google is off.
+- Identify the owner's intended verified account, grant only its approved staff
+  role, enroll TOTP and accept live admin/moderator/refusal journeys.
+- Real two-account publication/privacy, signed-in PostgREST and Realtime
+  acceptance. Public anonymous checks do not accept these domains.
+- Retained failed header/graph and native-notification browser journeys need
+  their own fresh acceptance; prior static passes do not erase those failures.
 - Exact-identity hosted image publication/cleanup and protected deletion worker.
   Hosted images remain disabled until accepted; no unrestricted uploads.
-- Eligible no-payment host and approved free sender/DNS; actual staging,
-  recovery/restore, quotas and measured capacity. Free MAU quotas are not proof
+- Actual staging recovery/restore, quotas and measured capacity. Free MAU quotas are not proof
   of 50,000-user capacity.
 - Real-device/accessibility, pilot/operator readiness and incident response.
 - Legacy arbitrary-pair `app` SQL helper grants remain a separately inventoried
   direct-SQL caveat, not a claim of a reachable public REST RPC or closure.
 
-No public deployment, hosted migration, payment, owner-data reset/deletion,
-credential exposure, unrelated-chat message or recurring schedule occurred.
+The owner-authorized public deployment and 40 hosted migrations occurred on
+3 November. No payment, owner-data reset/deletion, credential exposure,
+unrelated-chat message or recurring schedule occurred.
 The user specified task storage, not a schedule.
 
 ## Exact next action
 
-The prior learning/event journey, integrated local/static/build gates and fresh
-smoke have passed in their separate recorded scopes. Rerun only installed
-`header-graph` through the sole isolated Chrome runner, a new fixture, one
-worker, zero retries and no owner-preview reuse; its first run was startup-only
-infrastructure failure. Resolve any actual browser failure without weakening
-privacy/outcome assertions. Then review the frozen bulk-notification proposal,
-reconcile issue/completion/CI notes and adopt the current staging-guide changes.
-Ask for the exact empty staging target and required owner login/sender setup
-before hosted changes. Never publish or tunnel the private JSON backend.
+In Supabase project `nqnfuomyalbhbwapgots`, confirm Site URL
+`https://bulla-tau.vercel.app`, the exact callback/recovery destinations and
+an owner-controlled SMTP sender using FREE-HOSTING. Observe actual email and
+login acceptance. Ask the owner which registered personal email should receive
+admin; independently match its verified, active, onboarded Auth UUID, rehearse
+the guarded existing-account grant, then apply only that approved role.
+Require live TOTP and `/admin` access/refusal checks before handing over staff
+operation. Do not infer account ownership from the current one-account count,
+disable confirmation, reset accounts or expose the private JSON backend.

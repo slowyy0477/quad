@@ -1,9 +1,35 @@
 # Bulla — owner and administrator guide
 
-Updated 2 November 2026, Asia/Karachi. Read [STATUS.md](STATUS.md) for actual
+Updated 3 November 2026, Asia/Karachi. Read [STATUS.md](STATUS.md) for actual
 verification and [FREE-HOSTING.md](FREE-HOSTING.md) for deployment progress.
 The local preview is not a public deployment. Accounts and roles were not
 changed when writing this guide.
+
+The separate hosted preview is
+[bulla-tau.vercel.app](https://bulla-tau.vercel.app). Its database started
+without local accounts and currently has no assigned staff. Complete real
+hosted confirmation/onboarding, then use the exact existing-account grant
+below; do not reuse or expose local demo credentials. Required sender/redirect
+setup is in [FREE-HOSTING.md](FREE-HOSTING.md).
+
+## Hosted access — where to go
+
+1. Sign in with your personal email at
+   [Bulla login](https://bulla-tau.vercel.app/login).
+2. The authorized infrastructure owner independently verifies your account
+   and grants its exact Auth UUID `admin` or `moderator`, using the guarded
+   existing-account SQL workflow below. No default staff account exists.
+3. Enroll/verify an authenticator at
+   [Security settings](https://bulla-tau.vercel.app/settings/security).
+4. Open [Staff workspace](https://bulla-tau.vercel.app/admin).
+   Administrators also have
+   [Bug reports](https://bulla-tau.vercel.app/admin/bug-reports).
+
+Latest hosted metadata shows one confirmed, onboarded, active account and no
+staff roles. That is not authority to promote an unidentified account. The
+owner must identify the intended registered email; passwords/codes stay private.
+Hosted role, MFA and signed-in workspace journeys have not yet been accepted.
+The private-preview instructions below do not grant access to the public site.
 
 ## Your accounts are separate
 
@@ -11,7 +37,7 @@ changed when writing this guide.
 | --- | --- |
 | Bulla `admin` | Moderator tools, administrator bug triage and the private-local data viewer. |
 | Bulla `moderator` | Reports, university-request review and audit reading. |
-| Supabase/Netlify project owner | Infrastructure, configuration and authorized database role changes. Not granted by a Bulla staff role. |
+| Supabase/Vercel project owner | Infrastructure, configuration and authorized database role changes. Not granted by a Bulla staff role. |
 | Project owner/maintainer or conversation admin | That project's/group's controls only; not site staff. |
 
 Staff use their own personal account at `/login`. There is no separate admin
@@ -81,7 +107,10 @@ Only the authorized infrastructure owner/privileged database operator performs
 this. A Bulla admin session, profile field, student JWT or public key cannot.
 Do not run these examples against an unconfirmed or nonempty unrelated target.
 
-1. Confirm the exact Supabase project and accepted forward schema.
+1. Confirm [Supabase project `bulla`](https://supabase.com/dashboard/project/nqnfuomyalbhbwapgots),
+   ref `nqnfuomyalbhbwapgots`, and its installed forward schema. Use that
+   project's **Authentication → Users** and **SQL Editor**; never a different
+   project or the local data viewer.
 2. Find the person's verified Auth account and exact UUID. In hosted mode,
    `profiles.id = auth.users.id`; local `usr_…`/`prf_…` IDs do not apply.
 3. Verify email, profile completion, active/deletion state and existing roles.
@@ -198,5 +227,5 @@ private-content or complete nested-secret masking.
 
 For report decisions, conflicts, suspensions and correction limitations, read
 [MODERATOR-GUIDE.md](MODERATOR-GUIDE.md). For safe publication and later updates,
-read [FREE-HOSTING.md](FREE-HOSTING.md). No public URL, production staff account
-or 50,000-user capacity has been handed over yet.
+read [FREE-HOSTING.md](FREE-HOSTING.md). The hosted pilot address now exists;
+no hosted staff account or measured 50,000-user capacity has been handed over.

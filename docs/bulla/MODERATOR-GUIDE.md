@@ -1,13 +1,19 @@
 # Bulla — moderator guide
 
-Updated 2 November 2026, Asia/Karachi. Source-backed instructions; actual hosted
+Updated 3 November 2026, Asia/Karachi. Source-backed instructions; actual hosted
 acceptance is tracked in [STATUS.md](STATUS.md).
+
+Hosted login: [bulla-tau.vercel.app/login](https://bulla-tau.vercel.app/login).
+Workspace: [bulla-tau.vercel.app/admin](https://bulla-tau.vercel.app/admin).
+There is no automatically created moderator account. Real email/redirect
+acceptance and a personal verified-account grant are required; see
+[FREE-HOSTING.md](FREE-HOSTING.md).
 
 ## Get access
 
-Register your personal account at `/signup`, finish `/onboarding`, and complete
-real hosted email confirmation. Ask the verified infrastructure owner to grant
-only `moderator`; use [ADMIN-GUIDE.md](ADMIN-GUIDE.md). No in-app appointment
+Register your personal account at `/signup`, complete real hosted email
+confirmation, then finish `/onboarding`. Ask the verified infrastructure owner
+to grant only `moderator`; use [ADMIN-GUIDE.md](ADMIN-GUIDE.md). No in-app appointment
 control exists. Project ownership and conversation-admin roles are separate.
 Never share an administrator's login or ask for anybody's password.
 

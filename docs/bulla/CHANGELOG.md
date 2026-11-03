@@ -4,6 +4,43 @@ Each entry records source changes, verification, remaining work and the next
 concrete action. Source work is not deployment, security clearance or a measured
 capacity claim.
 
+## 3 November 2026 — hosted early preview and staff handoff
+
+Published [bulla-tau.vercel.app](https://bulla-tau.vercel.app) on Vercel Hobby
+with Supabase Free. Accepted deployment `dpl_A5VfS8LL8XhY5hnZcYckX4v9c3ER`
+uses pushed source `5b01a7d`, actual Node 24.x/arn1 and Standard Protection
+for previews/unique deployments while the stable production address is public.
+The first Node-26 build remains unpromoted.
+
+Installed and hash-verified all 40 forward migrations; history-only alignment
+did not replay SQL. Hosted schema has 59 public RLS tables and the exact 47
+public RPC inventory, with zero service-only client grants and denied client
+staff-role INSERT. Uploaded only a verified 434-file/2,899,629-byte source
+snapshot, never local JSON/accounts/media/environment or private fixtures.
+
+Verification: runtime TypeScript/scoped lint and 5/5 focused tests passed;
+earlier release checks passed 3,118 tests with two explicit native-only skips.
+Actual public HTTP/Chrome/API smoke passed **24/24**, exit 0; reviewed public
+desktop-light/390px-dark screenshots without observed clipping. Fresh public
+HTTPS returns 200 and scoped Vercel inspection confirms READY/production.
+Evidence: task-drive `hosting-20261103/PROGRESS.md` and
+`live-smoke-2026-11-03T11-43-06-434Z-a1e0bdb9/REPORT.md`.
+Do not combine these runs or call them signed-in/security/capacity acceptance.
+
+No account was created by the live checks. A later read-only recheck shows one
+confirmed, onboarded, active hosted account and zero staff roles; it was
+preserved without assuming ownership. Added/updated hosting, website and staff
+guides and reconciled current STATUS, PLAN and D-drive checkpoints.
+
+Remaining: inspect/configure SMTP/Auth URLs and observe real mail/login;
+identify the owner's intended verified account before an exact approved staff
+grant, then accept live TOTP/workspace/refusals and two-account hosted domains.
+Hosted images/cleanup stay off; recovery, unresolved browser cases, real
+Realtime, devices and measured capacity remain separate.
+Next: owner confirms Auth/sender setup and intended registered admin email.
+No paid upgrade, local-data reset, credential disclosure, unrelated-chat
+message or recurring automation occurred.
+
 ## 2 November 2026 — feed guard and native acceptance
 
 Corrected the real local like/save refusal: cloud configuration is now required
