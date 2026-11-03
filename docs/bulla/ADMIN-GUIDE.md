@@ -2,33 +2,38 @@
 
 Updated 3 November 2026, Asia/Karachi. Read [STATUS.md](STATUS.md) for actual
 verification and [FREE-HOSTING.md](FREE-HOSTING.md) for deployment progress.
-The local preview is not a public deployment. Accounts and roles were not
-changed when writing this guide.
+The local preview is not the hosted database; accounts remain separate.
 
 The separate hosted preview is
 [bulla-tau.vercel.app](https://bulla-tau.vercel.app). Its database started
-without local accounts and currently has no assigned staff. Complete real
-hosted confirmation/onboarding, then use the exact existing-account grant
-below; do not reuse or expose local demo credentials. Required sender/redirect
-setup is in [FREE-HOSTING.md](FREE-HOSTING.md).
+without importing local accounts. The owner's selected existing hosted account
+now holds **admin, including all moderator powers**. Its exact verified-account
+grant and read-back are complete; no extra moderator row or password change is
+needed. The private approval/target record is on the task drive in
+`access-privacy-20261103/PROGRESS.md`. Do not repeat the owner grant or expose
+local/demo credentials. Sender/redirect acceptance is separate; see
+[FREE-HOSTING.md](FREE-HOSTING.md).
 
 ## Hosted access — where to go
 
 1. Sign in with your personal email at
    [Bulla login](https://bulla-tau.vercel.app/login).
-2. The authorized infrastructure owner independently verifies your account
-   and grants its exact Auth UUID `admin` or `moderator`, using the guarded
-   existing-account SQL workflow below. No default staff account exists.
-3. Enroll/verify an authenticator at
+2. The selected owner account is already assigned. Future staff require their
+   own independently verified, approved exact-UUID grant using the workflow
+   below; no default/shared staff account exists.
+3. Personally enroll/verify an authenticator at
    [Security settings](https://bulla-tau.vercel.app/settings/security).
 4. Open [Staff workspace](https://bulla-tau.vercel.app/admin).
    Administrators also have
    [Bug reports](https://bulla-tau.vercel.app/admin/bug-reports).
 
-Latest hosted metadata shows one confirmed, onboarded, active account and no
-staff roles. That is not authority to promote an unidentified account. The
-owner must identify the intended registered email; passwords/codes stay private.
-Hosted role, MFA and signed-in workspace journeys have not yet been accepted.
+Latest exact-account read-back confirms the owner's held admin role and
+confirmed/active/onboarded state, with **zero verified MFA factors**.
+Effective staff checks require that user's own fresh MFA-assured session;
+an infrastructure SQL inspection is not such a session. Assignment is
+verified, but personally enrolled MFA and signed-in staff workspace acceptance
+remain. Passwords, QR images and codes stay private; no operator-controlled
+authenticator or MFA bypass is used.
 The private-preview instructions below do not grant access to the public site.
 
 ## Your accounts are separate
@@ -228,4 +233,5 @@ private-content or complete nested-secret masking.
 For report decisions, conflicts, suspensions and correction limitations, read
 [MODERATOR-GUIDE.md](MODERATOR-GUIDE.md). For safe publication and later updates,
 read [FREE-HOSTING.md](FREE-HOSTING.md). The hosted pilot address now exists;
-no hosted staff account or measured 50,000-user capacity has been handed over.
+the owner staff role is assigned, but live personal MFA/staff operation and
+measured 50,000-user capacity have not been accepted.

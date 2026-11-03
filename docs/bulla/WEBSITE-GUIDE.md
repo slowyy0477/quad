@@ -10,6 +10,11 @@ The separate hosted preview is
 were not copied there. Before account testing, complete the actual sender,
 confirmation and redirect checks in [FREE-HOSTING.md](FREE-HOSTING.md).
 Public-page acceptance is not evidence that signed-in features/MFA/mail passed.
+Public build/configuration diagnostic routes and links are now hidden, with
+live404/no-disclosure checks accepted. Use Help or Report a bug for feedback,
+not `/status` or `/setup`. The owner's existing account is assigned admin
+including moderator powers; staff use their personal login, their own
+authenticator at `/settings/security`, then `/admin`.
 
 ## Join and choose your audience
 

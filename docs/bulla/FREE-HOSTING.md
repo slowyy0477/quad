@@ -5,10 +5,13 @@ Updated 3 November 2026, Asia/Karachi.
 ## Public address and actual state
 
 Main address: [bulla-tau.vercel.app](https://bulla-tau.vercel.app).
-The Node 24 replacement is promoted on Vercel. Public HTML opens without a
-Vercel account. Live smoke passed **24 checks / 0 failures**, covering public
-HTTP/Chrome pages and anonymous API refusals only; see STATUS and task-drive
-`hosting-20261103/PROGRESS.md`. No paid upgrade or purchased domain is required
+The corrected Node24 deployment `dpl_3yWziyCbUhbiwHaWZJ1bdZ7TNJo5` is
+promoted on Vercel. Public HTML opens without a Vercel account. Final privacy
+verification passed **29 checks / 0 failures**, covering diagnostic404/
+no-disclosure, public HTTP/Chrome pages and anonymous staff refusals only.
+Earlier24/24 API/PWA smoke retains its separate earlier-source scope.
+See STATUS and task-drive `access-privacy-20261103/PROGRESS.md`.
+No paid upgrade or purchased domain is required
 to open this provider address.
 
 This is an early preview, not production/security/recovery/50,000-user
@@ -17,13 +20,14 @@ Real email delivery, confirmation redirects and signed-in/staff journeys
 still need acceptance.
 
 - Vercel Hobby project: `bulla`, scope `thor14899-2509`.
-- Live source: pushed commit `5b01a7d`; actual Node 24.x / `arn1`.
+- Live source: pushed commit `831691a`; actual Node24.x functions / `arn1`.
 - Supabase Free project: `bulla`, ref `nqnfuomyalbhbwapgots`.
 - All source migrations 0001–0040 are installed and their history aligned.
 - All 59 public tables have RLS; client staff-role writes are refused.
 - No local accounts, passwords, media or owner data were imported.
-- Latest read-only recheck: one active, confirmed, onboarded hosted account;
-  no staff roles. Its ownership was not assumed and it was not modified.
+- Latest exact-account read-back: selected owner account confirmed/active/
+  onboarded and holding admin, which includes moderator powers. Its guarded
+  grant is complete; personal MFA has zero verified factors and remains required.
 - Hosted image writes and incomplete cleanup-worker rollout remain off.
 - Google is off; one-time email recovery configuration is not accepted.
 - No purchased domain, paid upgrade or recurring schedule was created.
@@ -77,16 +81,21 @@ the same protocol.
 
 There is no separate/shared staff password. Sign in at
 [the normal login](https://bulla-tau.vercel.app/login), using a personal
-hosted account. The infrastructure owner grants `admin` or `moderator` to
-that account's exact verified Auth UUID through the guarded SQL workflow in
-[ADMIN-GUIDE.md](ADMIN-GUIDE.md).
+hosted account. The selected owner account is already granted `admin`, including
+moderator powers; no owner SQL step remains. Future staff require their own
+verified, approved exact-UUID grant through [ADMIN-GUIDE.md](ADMIN-GUIDE.md).
 
 Then enroll/verify your authenticator at
 [Security settings](https://bulla-tau.vercel.app/settings/security), and open
 [the staff workspace](https://bulla-tau.vercel.app/admin).
-Fresh MFA assurance expires after five minutes. No hosted staff account has
-been provisioned by this deployment; existing local credentials do not
-automatically become hosted accounts.
+Fresh MFA assurance expires after five minutes. Enrollment must be performed
+personally with an authenticator the account owner controls; no password reset,
+forced confirmation or MFA bypass was used. The selected existing hosted
+account received its approved role; local credentials were not imported.
+
+Public `/status` and `/setup`, including prefetch/data variants, now return404
+with neutral text. Internal implementation/configuration links and details are
+not public navigation. This does not claim that every feature is finished.
 
 Admin includes moderator powers plus bug triage; moderators have reports,
 university requests and audit reading. Neither role grants Vercel/Supabase

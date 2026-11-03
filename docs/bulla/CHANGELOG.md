@@ -4,6 +4,43 @@ Each entry records source changes, verification, remaining work and the next
 concrete action. Source work is not deployment, security clearance or a measured
 capacity claim.
 
+## 3 November 2026 — owner staff assignment and public diagnostic privacy
+
+Granted the owner's selected existing confirmed/active/onboarded account
+`admin`, which includes moderator powers. Exact UUID/email preflight and a
+rolled-back one-row rehearsal preceded the committed grant; repeated read-back
+confirms the held role and denied client role INSERT. Private target/approval:
+task-drive `access-privacy-20261103/PROGRESS.md`. No redundant moderator row,
+password/profile/email-confirmation change, account reset or MFA bypass.
+
+Removed public build/setup links and internal ledger details. Diagnostic pages
+remain development-only; Proxy now returns a neutral hard404 before rendering/
+provider reads for page and data/prefetch/segment transports. Truthful preview
+and unavailable-feature notices remain. Corrected Vitest discovery for the
+diagnostic TSX test and require every requested file in actual test results.
+The initial388 passes covered nine files, not the ten listed; that scope is
+corrected in STATUS. The retained first live18/4 failure is not acceptance.
+
+Fresh TypeScript/scoped zero-warning lint and **479/479 tests**, zero skips/
+failures, **13/13 actual requested files**, passed exit0. Pushed source
+`831691a60de96088b932b1b42a64aaa04909909d`; reviewed435-file/2,900,152-byte
+snapshot, full manifest/upload hashes, zero ignored/private files. Promoted
+READY deployment `dpl_3yWziyCbUhbiwHaWZJ1bdZ7TNJo5`; actual Node24/arn1 and
+stable alias were independently inspected.
+
+Final live **29/29 passed**, exit0:
+`access-privacy-20261103/live-2026-11-03T13-33-27-107Z-94a2db7f/REPORT.md`.
+Public diagnostics404/no-disclosure/navigation, anonymous staff refusals,
+TLS/CSP, real Chrome hydration and four-width light/dark reflow only. Reviewed
+fresh top-of-document desktop/mobile/neutral404 screenshots without clipping.
+Do not combine local/live counts or claim signed-in/security/capacity acceptance.
+
+Updated current guides and checkpoints so they no longer tell the owner to
+identify/regrant their already-approved account. Remaining: owner personally
+enrolls/verifies TOTP at `/settings/security`, then `/admin`; SMTP/Auth URLs,
+real classmate mail/login and broader hosted feature/recovery/capacity gates
+remain. No paid upgrade, private-data upload, schedule or unrelated-chat message.
+
 ## 3 November 2026 — hosted early preview and staff handoff
 
 Published [bulla-tau.vercel.app](https://bulla-tau.vercel.app) on Vercel Hobby

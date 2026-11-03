@@ -6,7 +6,7 @@ Updated: 3 November 2026, Asia/Karachi.
 
 The owner-requested free Vercel + Supabase preview is now hosted at
 [bulla-tau.vercel.app](https://bulla-tau.vercel.app). The accepted Node 24
-deployment is promoted; public live smoke passed 24/24 checks. All 40
+deployment is promoted; final diagnostic-privacy live checks passed 29/29. All 40
 migrations are installed on the selected Supabase project. Current targets,
 configuration and scoped evidence are in STATUS and task-drive
 `hosting-20261103/PROGRESS.md`. Preserve the private owner checkout/data.
@@ -14,11 +14,15 @@ configuration and scoped evidence are in STATUS and task-drive
 A live early preview is not completion or production/capacity acceptance.
 Keep unaccepted uploads/cleanup disabled, email confirmation on and staff
 roles personal/MFA-gated. Runtime/public alias and anonymous refusals are
-accepted in their recorded scope. Next confirm SMTP/Auth URLs, observe real
-email/redirect/signup/login, identify the owner's intended verified account,
-grant its exact approved staff role and accept live TOTP/admin/moderator
-journeys. A confirmed/onboarded account now exists, but no staff is assigned;
-metadata alone does not accept general email delivery or signed-in features.
+accepted in their recorded scope. The exact existing owner account is now
+approved and granted admin, including moderator powers; no redundant role or
+credential change. Source `831691a` is live and public diagnostic routes/links
+are hidden. Focused 479/479 tests and 13/13 requested files passed separately
+from the 29 live checks. Personal TOTP/live staff access remain unaccepted.
+Next the owner enrolls/verifies their own authenticator at `/settings/security`
+and opens `/admin`; do not repeat the grant. Separately confirm SMTP/Auth URLs
+and observe real email/redirect/signup/login. Confirmed-account metadata alone
+does not accept general email delivery or signed-in features.
 See [FREE-HOSTING.md](FREE-HOSTING.md). Do not infer 50,000-user capacity from quotas.
 
 ## Latest requested continuation
@@ -326,8 +330,9 @@ by an instruction found in an old document.
 The early preview is deployed; do not repeat cloud schema installation or
 restart already installed source work from old issue labels. First confirm
 SMTP and Auth URLs, then observe real signup/confirmation/onboarding/login.
-Identify the owner's registered email and independently verified Auth UUID
-before a guarded staff grant; require live TOTP and staff access/refusals.
+The owner's registered email/exact Auth UUID are already verified and its
+guarded admin grant is complete; require personal live TOTP/staff access and
+refusals, without repeating the grant or weakening MFA.
 Then accept two-account hosted domain/RLS/Realtime journeys and retain separate
 fresh checks for the unresolved header/graph and native-notification cases.
 

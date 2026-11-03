@@ -19,7 +19,7 @@ The complete previous record is preserved in [STATUS-HISTORY-20261102.md](STATUS
 
 ## Current hosting request — 3 November 2026
 
-### Owner staff grant and diagnostic privacy — current continuation
+### Owner staff assignment and diagnostic privacy — completed; personal MFA pending
 
 The owner explicitly selected their existing personal account for admin and
 moderator powers. Exact verified Auth UUID/email preflight passed: active,
@@ -54,28 +54,59 @@ provider or rendering work. Fresh main-only verification
 `access-privacy-20261103/verify-2026-11-03T13-09-23-767Z-8c46e833/REPORT.md`
 **passed**, actual exit0: non-incremental TypeScript, scoped zero-warning lint,
 **479/479 tests**, zero failures/skips and **13/13 requested files executed**.
-No authenticated hosted MFA journey was performed. The corrected source now
-needs its own pushed, hash-verified snapshot/build and fresh live acceptance.
-The correction is pushed as `327df38` and its secret-free 435-file snapshot
-was built on actual Node24/arn1. Deployment `dpl_CNKgcFNztZhRdqZpcyC8QjeproTd`
-is READY/production and promoted; the provider-confirmed stable alias now
-resolves to that exact deployment. The first live privacy attempt is retained
+No authenticated hosted MFA journey was performed.
+
+Final live application source is pushed commit
+`831691a60de96088b932b1b42a64aaa04909909d`. Immutable snapshot
+`hosting-20261103/source-20261103-181735-1d4163c900e643528356e40f0afc1352`
+passed manifest/SHA256/uploadSHA1 checks: **435 files / 2,900,152 bytes**,
+zero ignored/private files. Final deployment
+`dpl_3yWziyCbUhbiwHaWZJ1bdZ7TNJo5` is READY/production, and its actual
+functions are **nodejs24.x / arn1**. Promotion succeeded; fresh scoped provider
+read-back matches [bulla-tau.vercel.app](https://bulla-tau.vercel.app) to this
+exact deployment/project. Standard Protection still protects unique/preview
+URLs; Git linking remains absent. No paid upgrade or private-data upload.
+
+Final live privacy verification **passed 29/29**, actual exit0:
+`access-privacy-20261103/live-2026-11-03T13-33-27-107Z-94a2db7f/REPORT.md`.
+Verified ordinary/query/trailing/Flight/prefetch/segment/HEAD diagnostic404,
+no public ledger links/inventory, anonymous staff/security refusals, TLS/CSP
+fresh nonces, actual Chrome theme-control hydration and four-width light/dark
+reflow. Fresh top-of-document desktop-light,390px-dark and neutral404
+screenshots were visually reviewed without observed clipping/disclosures.
+This is public HTTPS/Chrome/refusal evidence only, not signed-in MFA/domain,
+SMTP, recovery, Realtime, security-audit or capacity acceptance.
+
+The initial `327df38` privacy deployment was promoted but is superseded.
+Its first live privacy attempt is retained
 at `access-privacy-20261103/live-2026-11-03T12-52-35-606Z-fe43ecf6/REPORT.md`:
 **18 passed / 4 failed**, actual exit1. Ordinary diagnostic visits return404;
 Flight/prefetch returned200 (a bounded recheck found no diagnostic inventory).
 Both Chrome checks timed out at network-idle. These failures are not accepted.
-The pre-render guard is now installed and focused-verified. Chrome diagnosis
-found a loaded page and a still-open background prefetch; the live verifier
-uses document load plus actual hydration controls, preserving the30s navigation
-budget and all privacy/reflow assertions. Next push/hash-verify/build this
-corrected source, confirm actualNode24, promote and rerun live acceptance.
+Chrome diagnosis found a loaded page and a still-open background prefetch.
+The final verifier uses document load plus actual hydration controls, preserving
+the30s navigation budget and all privacy/reflow assertions. An earlier29/29
+pass is also retained; the final run corrects only full-page screenshot scroll
+position, not application behavior or privacy assertions.
 A fresh role-only read-back confirms the held admin role. Effective
 `app.is_admin`/`app.is_moderator` require the caller's own live MFA-assured
 session and correctly returnfalse in an unauthenticated SQL inspection.
 Do not confuse role assignment with accepted authenticated staff access.
 Earlier zero-staff snapshots below are historical and superseded by this grant.
 
-### Public preview — promoted and verified
+Next: owner signs in with the already-approved account, personally enrolls/
+verifies TOTP at `/settings/security`, then opens `/admin` (admin includes
+moderation) and `/admin/bug-reports`. Do not ask for the email again, repeat
+the grant, reset credentials or bypass MFA. Separately confirm SMTP/Auth URLs
+and observe actual classmate email/signup/login before wider account testing.
+
+Current handoff QA passed: seven guides/records,32relative Markdown links,
+zero missing targets, no stale unassigned-owner statements in current guides
+and no personal owner email published in those documents. Whitespace check
+exited0. Receipt: `access-privacy-20261103/handoff-2026-11-03T13-53-13-326Z-2dffc37b.json`.
+These last changes are documentation only; they do not require an app rebuild.
+
+### Initial public preview and handoff — retained, superseded by the section above
 
 Public site: [bulla-tau.vercel.app](https://bulla-tau.vercel.app).
 Vercel's stable alias points to the accepted production deployment
@@ -747,8 +778,9 @@ no runtime migration, hosted setup or public deployment is inferred.
 
 - Confirm owner-controlled SMTP and exact Auth URLs, then real email/signup/
   confirmation/onboarding/login and one-time recovery acceptance. Google is off.
-- Identify the owner's intended verified account, grant only its approved staff
-  role, enroll TOTP and accept live admin/moderator/refusal journeys.
+- The owner's exact approved account already holds admin including moderator
+  powers. Personal TOTP and live admin/moderator/refusal acceptance remain;
+  do not repeat the grant or replace their factor.
 - Real two-account publication/privacy, signed-in PostgREST and Realtime
   acceptance. Public anonymous checks do not accept these domains.
 - Retained failed header/graph and native-notification browser journeys need
@@ -771,9 +803,8 @@ The user specified task storage, not a schedule.
 In Supabase project `nqnfuomyalbhbwapgots`, confirm Site URL
 `https://bulla-tau.vercel.app`, the exact callback/recovery destinations and
 an owner-controlled SMTP sender using FREE-HOSTING. Observe actual email and
-login acceptance. Ask the owner which registered personal email should receive
-admin; independently match its verified, active, onboarded Auth UUID, rehearse
-the guarded existing-account grant, then apply only that approved role.
-Require live TOTP and `/admin` access/refusal checks before handing over staff
-operation. Do not infer account ownership from the current one-account count,
-disable confirmation, reset accounts or expose the private JSON backend.
+login acceptance. The identified existing owner account already holds admin,
+including moderator powers; its exact-account grant/read-back is recorded.
+The owner must personally enroll/verify TOTP and require fresh live `/admin`
+assurance before staff operation. Do not repeat the grant, disable confirmation,
+reset accounts, control their authenticator or expose the private JSON backend.

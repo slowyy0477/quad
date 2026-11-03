@@ -8,6 +8,9 @@ Workspace: [bulla-tau.vercel.app/admin](https://bulla-tau.vercel.app/admin).
 There is no automatically created moderator account. Real email/redirect
 acceptance and a personal verified-account grant are required; see
 [FREE-HOSTING.md](FREE-HOSTING.md).
+The owner's selected existing account is already granted **admin**, which
+includes these moderator tools. No second login, duplicate moderator role or
+another owner grant is needed. Personal authenticator verification still is.
 
 ## Get access
 
