@@ -1,0 +1,18 @@
+# Never upload owner environments, accounts, media or private task artifacts.
+.env
+.env.*
+/data/
+/credentials/
+.scratch
+.claude
+.git
+.next
+.next-*
+node_modules
+coverage
+test-results
+playwright-report
+blob-report
+*.log
+*.pem
+*.key

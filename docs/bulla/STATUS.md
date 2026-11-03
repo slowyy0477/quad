@@ -18,6 +18,80 @@ The complete previous record is preserved in [STATUS-HISTORY-20261102.md](STATUS
 
 ## Current hosting request — 3 November 2026
 
+### Recovered deployment continuation — 3 November 2026
+
+**Latest actual state:** all 40 Supabase migrations are installed, 59 public
+tables all have RLS, public Auth/profile/staff counts are zero, client staff
+role INSERT is denied and the image bucket is private. The migration catalog
+was guardedly aligned with source versions 0001–0040 without replaying SQL or
+changing account data. See task-drive `hosting-20261103/CLOUD-SCHEMA-BUILD.md`
+and `MIGRATION-HISTORY-REPAIR.md`.
+
+First Vercel deployment `dpl_ActLMQ9sx1YGiiistdhLqw6SGPVB` is READY, with no
+public alias assigned. Actual provider compilation/types/output passed and
+functions are in `arn1`. Production-only dependency audit has zero findings;
+the install's 16 moderate development-inclusive notices remain recorded.
+Actual runtime was Node 26 despite the dashboard's 24 setting. Root manifest/
+lockfile now pin `24.x`; runtime/configuration regression and a fresh cloud
+build must pass before promotion. No hosted staff account was created.
+
+Runtime-pin correction is now verified: non-incremental TypeScript, scoped
+zero-warning/error lint and **5/5 tests**, zero failures/skips, actual exit 0.
+Evidence: `hosting-20261103/runtime-pin-tests.json`. Root dependency versions
+were not changed. Next commit/push these reviewed deployment corrections and
+make a fresh pinned cloud snapshot; first Node-26 deployment remains unpromoted.
+
+Next: finish the focused runtime checks, create/verify the pinned immutable
+snapshot, build it on actual Node 24, promote the stable alias and run live
+HTTP/browser/API refusal checks. SMTP, Auth redirects, real account/staff
+journeys and capacity remain separate acceptance. Do not disable email
+confirmation or invent delivery success to make signup appear complete.
+
+Read the recent project chat `Plan Bulla redesign and scaling` and inspected
+the actual providers, not only the older handoff. Commit
+`2d310c2f4f77512ffeacb952365df91b582c386d` (`feat: rebuild Bulla for hosted
+pilot`) is on `main` and `origin/main`; the checkout was clean at this resume.
+Supabase actually has migrations **0001–0012** installed, zero Auth accounts
+and 43 public tables with RLS enabled. Earlier statements below that no hosted
+SQL or push occurred are historical and are superseded by this recovery.
+
+The Vercel CLI confirms the intended project/scope and Node 24 configuration,
+with **zero deployments**. Vercel MCP has a scope-authorization refusal, while
+the separately authenticated CLI can inspect the selected project. Resume
+through the CLI rather than changing the destination.
+
+Configured the five reviewed production variables as encrypted Vercel
+settings, using the provider-confirmed canonical origin
+`https://bulla-tau.vercel.app` and the selected project's modern publishable
+key. No service-role, admin-password or local-production override is set.
+The first top-level-array API attempt was rejected without creating variables;
+five individual-object writes subsequently succeeded. Both dashboard-control
+runtimes are unavailable. Public Auth settings report email confirmation on,
+email signup enabled and Google off; SMTP and redirect configuration are not
+accepted merely by those settings.
+
+Added explicit `.vercelignore` and single-region Vercel configuration. The
+allowlisted deployment snapshot has 434 hash-verified source files; Vercel's
+dry run detects Next.js and 433 upload files. It contains no owner environment,
+datastore/media, Git internals, credentials or test fixtures. Snapshot receipt:
+`hosting-20261103/source-20261103-155338-f97351706d8a42ce896e5034d86a553a-MANIFEST.json`.
+Migrations 0013–0024 have now succeeded in order with pinned-file hashes.
+
+Final input acceptance supersedes the first snapshot: corrected an unanchored
+ignore rule that omitted `src/app/admin/data/page.tsx`. The new immutable
+`source-20261103-160109-39e10c94e98840b6873de4c38b4d5941` matches all **434
+files / 2,899,637 bytes**, every upload digest matches, no source is ignored
+and zero private/test/environment files match. See task-drive
+`hosting-20261103/DEPLOYMENT-INPUTS.md`. Migrations are now through 0031.
+Next start the provider build with public-domain assignment withheld, finish
+0032–0040 and inspect final security before promotion.
+
+Next: apply only migrations 0013–0040 from the pinned reviewed commit, inspect
+the final schema/grants/advisors, configure the exact public HTTPS origin and
+Auth policy, deploy a secret-free source snapshot, then verify the live pilot.
+Email delivery, staff enrollment and measured production capacity remain
+separate acceptance; no local accounts/data are migrated or published.
+
 The owner now asks to publish a small free pilot for feedback through
 **Vercel + Supabase**, not to wait for the entire 50,000-user roadmap. Resume deployment work from
 `D:\All tasks + Automations\Bulla-Recovery\hosting-20261103\PROGRESS.md`.

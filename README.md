@@ -46,10 +46,11 @@ release gates. See
 
 ## Install and run privately
 
-Requirements: Node.js `>=22.0.0` (as declared in [package.json](package.json)) and
+Requirements: Node.js `24.x` (as declared in [package.json](package.json)) and
 npm. The app uses Next.js 16, React 19, TypeScript and Tailwind 4.
-The pinned Supabase SDK also requires Node 22+. Current local verification
-and CI use Node 24; the selected host must provide a compatible runtime.
+The pinned Supabase SDK requires Node 22+. Bulla deliberately pins the tested
+Node 24 major for local, CI and hosting: an open-ended engine range overrides
+the Vercel project setting and can silently select a newer, untested major.
 The private JSON adapter needs neither Supabase nor Docker.
 
 From the existing checkout, in PowerShell:

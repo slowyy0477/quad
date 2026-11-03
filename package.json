@@ -4,7 +4,7 @@
   "private": true,
   "description": "Bulla — a campus community for people, projects, collaboration and learning.",
   "engines": {
-    "node": ">=22.0.0"
+    "node": "24.x"
   },
   "scripts": {
     "dev": "next dev",

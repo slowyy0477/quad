@@ -1,6 +1,20 @@
 # Bulla — recovery, redesign and production plan
 
-Updated: 2 November 2026, Asia/Karachi.
+Updated: 3 November 2026, Asia/Karachi.
+
+## Immediate owner-requested hosting work
+
+The owner now explicitly requests a small free Vercel + Supabase preview for
+classmate feedback. Continue the deployment, not the older feature-first
+sequence below. Current exact targets, applied schema, protected production
+configuration and verification are in STATUS and task-drive
+`hosting-20261103/PROGRESS.md`. Preserve the private owner checkout/data.
+
+A live early preview is not completion or production/capacity acceptance.
+Keep unaccepted uploads/cleanup disabled, email confirmation on and staff
+roles personal/MFA-gated. Verify the actual runtime/public alias and API
+refusals, then require real email/redirect/signup and staff acceptance before
+calling account testing ready. Do not infer 50,000-user capacity from quotas.
 
 ## Latest requested continuation
 
