@@ -50,7 +50,7 @@ export default defineConfig({
         test: {
           name: 'unit',
           environment: 'jsdom',
-          include: ['src/**/*.test.ts', 'src/**/*.test.tsx'],
+          include: ['src/**/*.test.ts', 'src/**/*.test.tsx', 'tests/security/**/*.test.tsx'],
         },
       },
     ],

@@ -6,6 +6,28 @@ import { assertNotDeployedInLocalMode } from './lib/mode'
 
 const PRIVATE_PREFIXES = ['/feed', '/messages', '/notifications', '/settings', '/onboarding', '/admin', '/goals', '/semester', '/saved', '/log', '/me']
 const AUTH_ONLY_PREFIXES = ['/login', '/signup']
+const DIAGNOSTIC_PREFIXES = [
+  '/status', '/setup', '/status.rsc', '/setup.rsc',
+  '/status.segments', '/setup.segments',
+]
+// A standalone, non-sensitive fallback avoids starting a streamed page/Flight
+// response. Do not interpolate configuration, request data or inventory here.
+const DIAGNOSTIC_NOT_FOUND = `<!doctype html>
+<html lang="en"><head><meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="robots" content="noindex, nofollow"><title>Page not found | Bulla</title>
+<style>
+:root{color-scheme:light dark}
+body{margin:0;font-family:system-ui,sans-serif;background:Canvas;color:CanvasText}
+main{max-width:32rem;margin:5rem auto;padding:1.5rem}
+h1{font-size:1.5rem;line-height:1.3}p{line-height:1.6}
+nav{display:flex;flex-wrap:wrap;gap:1rem;margin-top:2rem}
+a{color:inherit;min-height:2.75rem;display:inline-flex;align-items:center}
+</style></head><body><main><p>404</p>
+<h1>There is nothing at this address</h1>
+<p>The page may have moved or the address may be incorrect. Return to Bulla or visit Help.</p>
+<nav aria-label="Return to Bulla"><a href="/">Go to the homepage</a><a href="/help">Help</a></nav>
+</main></body></html>`
 function matches(pathname: string, prefixes: string[]) {
   return prefixes.some((prefix) => pathname === prefix || pathname.startsWith(`${prefix}/`))
 }
@@ -54,6 +76,18 @@ export async function proxy(request: NextRequest) {
     return response
   }
   const next = () => NextResponse.next({ request: { headers: requestHeaders } })
+  // Next strips internal Flight headers from Proxy, and streamed notFound()
+  // can retain HTTP 200. Deny every diagnostic transport before rendering or
+  // provider reads instead of treating HTML and prefetch differently.
+  if (process.env.NODE_ENV !== 'development' && matches(url.pathname, DIAGNOSTIC_PREFIXES)) {
+    return finish(new NextResponse(request.method === 'HEAD' ? null : DIAGNOSTIC_NOT_FOUND, {
+      status: 404,
+      headers: {
+        'Content-Type': 'text/html; charset=utf-8',
+        'X-Robots-Tag': 'noindex, nofollow',
+      },
+    }))
+  }
   const origin = request.headers.get('origin')
   const expectedOrigin = browserOrigin(request)
   const configuredOrigin = process.env.NEXT_PUBLIC_SITE_URL

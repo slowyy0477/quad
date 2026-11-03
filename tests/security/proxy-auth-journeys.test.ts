@@ -434,12 +434,12 @@ describe('canonical HTTPS origin is required only for configured production clou
     { providerUrl: undefined, publicKey: PUBLIC_KEY },
     { providerUrl: PROVIDER_URL, publicKey: undefined },
     { providerUrl: undefined, publicKey: undefined },
-  ])('does not apply the cloud-serving gate to unconfigured setup $providerUrl/$publicKey', async ({ providerUrl, publicKey }) => {
+  ])('does not apply the cloud-serving gate to unconfigured public pages $providerUrl/$publicKey', async ({ providerUrl, publicKey }) => {
     vi.stubEnv('NODE_ENV', 'production')
     vi.stubEnv('NEXT_PUBLIC_SITE_URL', undefined)
     vi.stubEnv('NEXT_PUBLIC_SUPABASE_URL', providerUrl)
     vi.stubEnv('NEXT_PUBLIC_SUPABASE_ANON_KEY', publicKey)
-    passesThrough(await proxy(request('/setup', {}, 'http://127.0.0.1:3301')))
+    passesThrough(await proxy(request('/help', {}, 'http://127.0.0.1:3301')))
     expect(provider.createServerClient).not.toHaveBeenCalled()
   })
 

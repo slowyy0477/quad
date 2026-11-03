@@ -41,15 +41,38 @@ only explicit development. Production/test/unknown environments are denied.
 Removed public ledger links/details and redirected public configuration-error
 links to Help. Truthful feature-unavailable notices and all staff guards remain.
 
-Focused verification **passed**, actual exit 0: non-incremental TypeScript,
-changed-file zero-warning lint and **388/388 tests**, zero failures/skips in
-ten listed files. Includes diagnostic denial-before-read, no public ledger
-links, metadata and staff-security regressions. Report:
+Prior focused verification passed TypeScript/lint and **388/388 tests**,
+zero failures/skips, actual exit0. Report:
 `access-privacy-20261103/verify-2026-11-03T12-31-27-742Z-b066ec68/REPORT.md`.
-This is local focused evidence, not an authenticated hosted MFA journey.
-The correction is **not promoted yet**. Next commit/push this reviewed source,
-verify a secret-free snapshot, build on actual Node24, promote and require live
-404/no-disclosure/navigation checks.
+Result-file inspection now confirms **nine executed files**, not ten:
+the listed diagnostic TSX regression was excluded by Vitest's project include
+patterns. The 388 passes remain valid for their actual files, not diagnostic
+regression acceptance. Discovery is now corrected and the focused runner
+requires every listed file to appear in the actual results. A new pre-render
+neutral404 denies diagnostics and their data/segment transports before any
+provider or rendering work. Fresh main-only verification
+`access-privacy-20261103/verify-2026-11-03T13-09-23-767Z-8c46e833/REPORT.md`
+**passed**, actual exit0: non-incremental TypeScript, scoped zero-warning lint,
+**479/479 tests**, zero failures/skips and **13/13 requested files executed**.
+No authenticated hosted MFA journey was performed. The corrected source now
+needs its own pushed, hash-verified snapshot/build and fresh live acceptance.
+The correction is pushed as `327df38` and its secret-free 435-file snapshot
+was built on actual Node24/arn1. Deployment `dpl_CNKgcFNztZhRdqZpcyC8QjeproTd`
+is READY/production and promoted; the provider-confirmed stable alias now
+resolves to that exact deployment. The first live privacy attempt is retained
+at `access-privacy-20261103/live-2026-11-03T12-52-35-606Z-fe43ecf6/REPORT.md`:
+**18 passed / 4 failed**, actual exit1. Ordinary diagnostic visits return404;
+Flight/prefetch returned200 (a bounded recheck found no diagnostic inventory).
+Both Chrome checks timed out at network-idle. These failures are not accepted.
+The pre-render guard is now installed and focused-verified. Chrome diagnosis
+found a loaded page and a still-open background prefetch; the live verifier
+uses document load plus actual hydration controls, preserving the30s navigation
+budget and all privacy/reflow assertions. Next push/hash-verify/build this
+corrected source, confirm actualNode24, promote and rerun live acceptance.
+A fresh role-only read-back confirms the held admin role. Effective
+`app.is_admin`/`app.is_moderator` require the caller's own live MFA-assured
+session and correctly returnfalse in an unauthenticated SQL inspection.
+Do not confuse role assignment with accepted authenticated staff access.
 Earlier zero-staff snapshots below are historical and superseded by this grant.
 
 ### Public preview — promoted and verified
