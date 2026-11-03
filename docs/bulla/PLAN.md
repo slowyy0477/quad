@@ -16,11 +16,16 @@ Keep unaccepted uploads/cleanup disabled, email confirmation on and staff
 roles personal/MFA-gated. Runtime/public alias and anonymous refusals are
 accepted in their recorded scope. The exact existing owner account is now
 approved and granted admin, including moderator powers; no redundant role or
-credential change. Source `831691a` is live and public diagnostic routes/links
-are hidden. Focused 479/479 tests and 13/13 requested files passed separately
-from the 29 live checks. Personal TOTP/live staff access remain unaccepted.
-Next the owner enrolls/verifies their own authenticator at `/settings/security`
-and opens `/admin`; do not repeat the grant. Separately confirm SMTP/Auth URLs
+credential change. Source `bfcc78f` is now live, including the provider-sized
+MFA QR correction; public diagnostic routes/links remain hidden. Fresh focused
+483/483 tests in all 13 requested files, 12 synthetic Chrome QR decodes and
+29 live public privacy checks passed in their separate scopes. Actual app
+functions are Node 24 / arn1; the proxy retains its prior platform distribution.
+Personal TOTP/live staff access remain unaccepted.
+Next the owner refreshes `/settings/security`, creates a private QR with a
+distinct unused name, personally scans/verifies it and opens `/admin`; do not
+repeat the grant or remove unfinished factors. Codes come from the owner's
+authenticator app, not Gmail. Separately confirm SMTP/Auth URLs
 and observe real email/redirect/signup/login. Confirmed-account metadata alone
 does not accept general email delivery or signed-in features.
 See [FREE-HOSTING.md](FREE-HOSTING.md). Do not infer 50,000-user capacity from quotas.

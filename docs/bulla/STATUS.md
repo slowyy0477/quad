@@ -19,7 +19,7 @@ The complete previous record is preserved in [STATUS-HISTORY-20261102.md](STATUS
 
 ## Current hosting request — 3 November 2026
 
-### MFA setup QR compatibility repair — locally verified; deployment next
+### MFA setup QR compatibility repair — deployed; personal MFA pending
 
 The owner reports the safe-setup-QR rejection during personal enrollment.
 The provider's per-cell SVG format independently reproduces the rejection:
@@ -40,13 +40,43 @@ Fresh main-only focused verification passed, actual exit 0: non-incremental
 TypeScript, scoped zero-warning lint, **483/483 tests**, zero failures/skips
 and **13/13 requested files actually executed**. Report:
 `access-privacy-20261103/verify-2026-11-03T15-03-49-024Z-e07830de/REPORT.md`.
-Current source correction is not yet deployed. Next: reviewed commit/snapshot
-and cloud build with alias assignment withheld, exact-deployment inspection/
-promotion and public privacy recheck. Do not advise repeated setup attempts
-until the correction is live.
-Latest read-only preflight reports zero verified/three unfinished TOTP setups;
-no factor details, keys, codes or sessions were read. Earlier one-setup
-guidance below retains its historical observation only.
+Correction is pushed as `bfcc78fc1cd3612e84b419514200a9c76d882858`.
+Immutable snapshot
+`hosting-20261103/source-20261103-201456-604be277e81a4b6d92dfc3d41f742f67`
+passed **435 files / 2,900,311 bytes**, complete manifest/upload hashes and
+zero ignored/private files. Deployment `dpl_5v9jLBDH9vtruB4uJDhXcR238Anx`
+was built with aliases withheld, inspected READY/production, then promoted.
+Independent alias read-back matches the public address to this exact source/
+deployment/project. All 146 actual function outputs use nodejs24.x:
+145 app outputs are arn1; the declared proxy retains the prior accepted
+eight-region platform distribution. Standard Protection remains unchanged;
+Git linking remains absent. Pre/post receipts are in `mfa-qr-20261103`.
+
+Fresh live public privacy verification **passed 29/29**, actual exit 0:
+`access-privacy-20261103/live-2026-11-03T15-54-55-725Z-ab9fb5dc/REPORT.md`.
+Diagnostic page/data/prefetch/segment/HEAD requests remain neutral404,
+public ledger links/inventory are absent, anonymous staff/security is refused,
+TLS/CSP fresh nonces and real Chrome hydration/four-width light/dark reflow
+passed. Fresh desktop/mobile/neutral404 screenshots were visually reviewed
+without observed clipping/disclosure. The first deployment checker failed
+because it misclassified the global proxy as an app function; that receipt
+is retained, and the corrected checker requires both the exact prior proxy
+distribution and every app function's arn1 placement. No project/app region
+or protection was changed to satisfy it.
+
+Latest exact-account read-only check confirms held admin including moderation,
+confirmed/active/onboarded state, **zero verified / two unfinished TOTP setups**
+and denied client role INSERT. Earlier three-setup/one-setup observations
+retain their historical scope; no factor was enrolled, verified or removed by
+this repair and the external count change is not attributed to an agent action.
+No owner QR, key, code, password or session was read.
+
+Next: owner refreshes `/settings/security`, uses a distinct authenticator name,
+creates a new private QR and personally scans/verifies it, then `/admin`.
+Codes come from the owner's authenticator app, not Gmail. Existing unfinished
+setups were not removed. Actual personal scanning/live staff assurance,
+SMTP, signed-in domains, recovery and capacity remain separate acceptance.
+The older application deployment snapshots below are superseded by this repair.
 
 ### Owner staff assignment and diagnostic privacy — completed; personal MFA pending
 
@@ -841,11 +871,10 @@ The user specified task storage, not a schedule.
 
 ## Exact next action
 
-First finish the verified MFA QR correction's source snapshot/cloud build,
-inspect the exact deployment/runtime, promote it and run fresh live public
-privacy checks. Do not request further owner setup retries until it is live.
-Then the owner personally creates/scans/verifies their own authenticator;
-existing unfinished setups are not removed by this repair.
+The MFA QR correction is deployed and public privacy reverified. Owner refreshes
+`/settings/security`, enters a distinct unused authenticator name, creates/scans
+their private QR and verifies their app's current six-digit code, then `/admin`.
+Do not repeat the role grant, remove unfinished setups or inspect their material.
 
 In Supabase project `nqnfuomyalbhbwapgots`, confirm Site URL
 `https://bulla-tau.vercel.app`, the exact callback/recovery destinations and

@@ -4,7 +4,7 @@ Each entry records source changes, verification, remaining work and the next
 concrete action. Source work is not deployment, security clearance or a measured
 capacity claim.
 
-## 3 November 2026 — MFA setup QR compatibility, locally verified
+## 3 November 2026 — MFA setup QR compatibility, deployed
 
 Reproduced the owner's setup error using an independent synthetic QR in
 Supabase's actual per-cell SVG format: 283,047 characters exceeded Bulla's
@@ -21,12 +21,28 @@ passed exact synthetic-URI equality; Chrome **12/12** cases cover three widths,
 light/dark and DPR 1/2. Three failed fractional librsvg probes remain retained;
 no production display style or payload assertion was weakened.
 
-The correction is not yet deployed. Next: commit/push reviewed source,
-hash-verified private-data-free snapshot, cloud build with alias withheld,
-inspect/promote and rerun public privacy checks. No owner's QR, setup key,
-code, session or password was read; no factor was enrolled, verified or removed.
-Personal scanning/verification, authenticated staff access, SMTP, recovery
-and capacity acceptance remain separate.
+Pushed source `bfcc78fc1cd3612e84b419514200a9c76d882858` and deployed the
+435-file / 2,900,311-byte hash-verified, private-data-free snapshot with alias
+assignment withheld. Inspected and promoted READY production deployment
+`dpl_5v9jLBDH9vtruB4uJDhXcR238Anx`; independent read-back matches the public
+alias. All actual outputs are nodejs24.x; app functions are arn1 and the declared
+proxy retains its prior platform distribution. Standard Protection is unchanged.
+The failed first checker receipt is retained; its proxy classification was
+corrected without changing app/project placement or weakening runtime checks.
+
+Fresh live public **29/29 passed**, actual exit 0:
+`access-privacy-20261103/live-2026-11-03T15-54-55-725Z-ab9fb5dc/REPORT.md`.
+Public diagnostics remain hidden, anonymous staff is refused and TLS/CSP/
+Chrome hydration/reflow passed. Fresh desktop/mobile/neutral404 screenshots
+were visually reviewed. Latest exact-account read-only check confirms held
+admin/moderation, zero verified/two unfinished TOTP setups and denied client
+staff-role INSERT. No owner's QR, setup key, code, session or password was read;
+no factor was enrolled, verified or removed by the repair.
+
+Next: owner refreshes Security, creates a QR with a distinct unused name,
+personally scans/verifies it and opens `/admin`. Codes come from their
+authenticator app, not email. Personal scanning/verification, authenticated
+staff access, SMTP, recovery and capacity acceptance remain separate.
 
 ## 3 November 2026 — owner staff assignment and public diagnostic privacy
 
