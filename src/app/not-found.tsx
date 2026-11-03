@@ -7,15 +7,14 @@ export default function NotFound() {
       <p className="font-display text-5xl text-ink-faint tabular">404</p>
       <h1 className="mt-4 text-2xl">There is nothing at this address</h1>
       <p className="mt-3 text-ink-muted">
-        The page may have moved, or it may be a part of Bulla that has not been built yet — the build
-        status page lists which is which.
+        The page may have moved or the address may be incorrect. Return to Bulla or visit Help.
       </p>
       <div className="mt-8 flex flex-wrap justify-center gap-3">
         <Button asChild variant="primary">
           <Link href="/">Go to the homepage</Link>
         </Button>
         <Button asChild variant="secondary">
-          <Link href="/status">Build status</Link>
+          <Link href="/help">Help</Link>
         </Button>
       </div>
     </div>

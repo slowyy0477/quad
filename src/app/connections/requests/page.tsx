@@ -41,7 +41,7 @@ export default async function ConnectionRequestsPage({
       <Alert tone="warning" title="No database connected">
         <p>
           Requests are rows in Postgres. Without Supabase credentials there is nothing to answer.{' '}
-          <Link href="/setup">Configuration steps</Link>.
+          <Link href="/help">Get help</Link>.
         </p>
       </Alert>
     )

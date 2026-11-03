@@ -61,7 +61,7 @@ export default async function SearchPage({ searchParams }: { searchParams: Promi
         <Alert tone="warning" title="No database connected" className="mt-5">
           <p>
             Search needs a configured data provider. No profiles or results are invented.{' '}
-            <Link href="/setup">Configuration steps</Link>.
+            <Link href="/help">Get help</Link>.
           </p>
         </Alert>
       </div>
@@ -201,11 +201,7 @@ export default async function SearchPage({ searchParams }: { searchParams: Promi
       <p className="mt-8 text-xs text-ink-faint">
         Each item keeps its own permissions. People discovery excludes blocked, unavailable and
         unlisted profiles, and does not return private profile totals. Skill labels are the
-        person&apos;s own claims, not verified qualifications.{' '}
-        <Link href="/status" className="text-accent-700 underline underline-offset-2">
-          Build status
-        </Link>
-        .
+        person&apos;s own claims, not verified qualifications.
       </p>
     </div>
   )

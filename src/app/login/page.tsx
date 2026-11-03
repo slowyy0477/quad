@@ -27,7 +27,7 @@ export default async function LoginPage({ searchParams }: PageProps<'/login'>) {
       footer={<>New to Bulla? <Link href="/signup" className="inline-flex min-h-11 items-center font-semibold text-accent-700 underline underline-offset-4">Create an account</Link></>}>
       <h2 className="text-xl">Sign in with email</h2>
       <p className="mt-1 mb-6 text-sm text-ink-muted">Use the email address on your account.</p>
-      {!configured ? <Alert tone="warning" title="Sign-in is unavailable" className="mb-5"><p>No account service is connected. <Link href="/setup">View configuration steps</Link>.</p></Alert> : null}
+      {!configured ? <Alert tone="warning" title="Sign-in is unavailable" className="mb-5"><p>The account service is unavailable. <Link href="/help">Get help</Link>.</p></Alert> : null}
       {errorCode ? <Alert tone="danger" className="mb-5">{callbackMessages[errorCode] ?? 'Sign-in did not complete. Please try again.'}</Alert> : null}
       <SignInForm next={next} disabled={!configured} />
       {!local && configured ? <>

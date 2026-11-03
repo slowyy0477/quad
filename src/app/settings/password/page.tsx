@@ -26,7 +26,7 @@ export default async function PasswordPage({
       <div className="mx-auto w-full max-w-lg px-4 py-12">
         <h1 className="text-3xl">Change your password</h1>
         <Alert tone="warning" className="mt-6">
-          No account service is configured. <Link href="/setup">View configuration steps</Link>.
+          The account service is unavailable. <Link href="/help">Get help</Link>.
         </Alert>
       </div>
     )

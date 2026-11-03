@@ -38,7 +38,7 @@ export default async function EventsPage({ searchParams }: { searchParams: Promi
         <Alert tone="warning" title="No database connected" className="mt-5">
           <p>
             The calendar is read from Postgres. Without Supabase credentials there is nothing to read, and
-            this page will not show invented events in their place. <Link href="/setup">Configuration steps</Link>.
+            this page will not show invented events in their place. <Link href="/help">Get help</Link>.
           </p>
         </Alert>
       </div>

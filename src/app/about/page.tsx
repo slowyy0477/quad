@@ -47,15 +47,14 @@ export default function AboutPage() {
           </li>
         </ul>
 
-        <h2 className="pt-4 text-xl text-ink">Built in the open, and unfinished</h2>
+        <h2 className="pt-4 text-xl text-ink">An early campus preview</h2>
         <p>
-          Bulla is in active development. Large parts of it exist as a database with enforced
-          permissions and no interface yet. Rather than hide that, the{' '}
-          <Link href="/status" className="text-accent-700 underline underline-offset-2">
-            build status page
+          Bulla is in active development. Features may change, and tools that are unavailable
+          are labelled on their own pages. If something does not work as expected,{' '}
+          <Link href="/report-a-bug" className="text-accent-700 underline underline-offset-2">
+            report a bug
           </Link>{' '}
-          lists every feature and its actual state, and pages for unbuilt features say plainly that
-          they are unbuilt.
+          with the steps that led to it.
         </p>
 
         <h2 className="pt-4 text-xl text-ink">Affiliation</h2>

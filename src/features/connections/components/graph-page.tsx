@@ -122,7 +122,7 @@ export async function OwnGraphPage({
   direction, searchParams,
 }: { direction: GraphDirection; searchParams: SearchParams }) {
   const path = listHref('/connections', direction, true)
-  if (!isDataConfigured()) return <Alert tone="warning">A backend is not configured. <Link href="/setup">Setup steps</Link>.</Alert>
+  if (!isDataConfigured()) return <Alert tone="warning">Relationships are temporarily unavailable. <Link href="/help">Get help</Link>.</Alert>
   if (!await getUser()) redirect(`/login?next=${encodeURIComponent(path)}`)
   const query = await searchParams
   const page = await getOwnGraphPage(direction, { cursor: query.cursor })

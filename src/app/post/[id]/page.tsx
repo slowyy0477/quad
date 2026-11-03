@@ -84,7 +84,7 @@ export default async function PostPage({
         <Alert tone="warning" title="No database connected" className="mt-5">
           <p>
             A post is a row in Postgres. Without Supabase credentials there is nothing to show, and
-            this page will not render an invented one. <Link href="/setup">Configuration steps</Link>
+            this page will not render an invented one. <Link href="/help">Get help</Link>
             .
           </p>
         </Alert>

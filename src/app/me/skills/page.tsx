@@ -39,7 +39,7 @@ export default async function SkillsPage() {
         <Alert tone="warning" title="No database connected" className="mt-6">
           <p>
             Skills are rows in a catalogue table. Without Supabase credentials there is nowhere to
-            save one. <Link href="/setup">Configuration steps</Link>.
+            save one. <Link href="/help">Get help</Link>.
           </p>
         </Alert>
       </div>

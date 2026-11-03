@@ -29,7 +29,7 @@ export default async function OnboardingPage() {
         <Alert tone="warning" title="No database connected" className="mt-6">
           <p>
             A profile is a row in Postgres. Without Supabase credentials there is nowhere to save
-            one. <Link href="/setup">Configuration steps</Link>.
+            one. <Link href="/help">Get help</Link>.
           </p>
         </Alert>
       </div>

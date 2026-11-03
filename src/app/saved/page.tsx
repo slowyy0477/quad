@@ -18,7 +18,7 @@ export default async function SavedPage({
   if (!isDataConfigured()) return (
     <div className="mx-auto max-w-2xl px-4 py-8">
       <h1 className="text-3xl">Saved posts</h1>
-      <Alert tone="warning" className="mt-6">Data setup is needed. <Link href="/setup">View setup</Link>.</Alert>
+      <Alert tone="warning" className="mt-6">Saved posts are temporarily unavailable. <Link href="/help">Get help</Link>.</Alert>
     </div>
   )
   const user = await getUser()

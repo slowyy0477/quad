@@ -17,7 +17,7 @@ export default function SignUpPage() {
       footer={<>Already have an account? <Link href="/login" className="inline-flex min-h-11 items-center font-semibold text-accent-700 underline underline-offset-4">Sign in</Link></>}>
       <h2 className="text-xl">Create your account</h2>
       <p className="mt-1 mb-6 text-sm text-ink-muted">Just the essentials. Your profile comes next.</p>
-      {!configured ? <Alert tone="warning" title="Accounts are unavailable" className="mb-5"><p>No account service is connected. <Link href="/setup">View configuration steps</Link>.</p></Alert> : null}
+      {!configured ? <Alert tone="warning" title="Accounts are unavailable" className="mb-5"><p>The account service is unavailable. <Link href="/help">Get help</Link>.</p></Alert> : null}
       <SignUpForm disabled={!configured} />
       {!local && configured ? <>
         <div className="my-5 flex items-center gap-3" aria-hidden="true"><span className="h-px flex-1 bg-hairline" /><span className="text-xs text-ink-faint">or</span><span className="h-px flex-1 bg-hairline" /></div>

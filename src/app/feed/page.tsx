@@ -50,7 +50,7 @@ export default async function FeedPage({ searchParams }: { searchParams: Promise
           <p>
             The feed reads real posts from Postgres. Without Supabase credentials there is nothing
             to read, and this page will not show made-up posts in their place.{' '}
-            <Link href="/setup">Configuration steps</Link>.
+            <Link href="/help">Get help</Link>.
           </p>
         </Alert>
       </div>

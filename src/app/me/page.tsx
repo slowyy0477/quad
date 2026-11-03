@@ -36,7 +36,7 @@ export default async function MyProfilePage({
         <Alert tone="warning" title="No database connected" className="mt-6">
           <p>
             A profile is read from Postgres. Without Supabase credentials there is nothing to read.{' '}
-            <Link href="/setup">Configuration steps</Link>.
+            <Link href="/help">Get help</Link>.
           </p>
         </Alert>
       </div>

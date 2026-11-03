@@ -17,6 +17,7 @@ const hostedConfiguration = {
 
 beforeEach(() => {
   vi.resetModules()
+  vi.stubEnv('NODE_ENV', 'development')
   vi.stubEnv('NEXT_PUBLIC_DATA_MODE', 'supabase')
   vi.stubEnv('NEXT_PUBLIC_SUPABASE_URL', '')
   vi.stubEnv('NEXT_PUBLIC_SUPABASE_ANON_KEY', '')

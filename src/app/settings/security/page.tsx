@@ -21,7 +21,7 @@ export default async function SecurityPage() {
       {settings.state === 'unavailable' ? (
         <Alert tone="warning" className="mt-6">
           The account service or staff permissions could not be verified. MFA controls and staff assurance are unavailable.
-          No authenticator was created by opening this page. <Link href="/setup">View configuration information</Link>.
+          No authenticator was created by opening this page. <Link href="/help">Get help</Link>.
         </Alert>
       ) : isLocalMode() || settings.state === 'local_unsupported' ? (
         <Alert tone="info" className="mt-6">

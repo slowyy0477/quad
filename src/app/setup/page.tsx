@@ -5,12 +5,14 @@ import { Alert } from '@/components/ui/alert'
 import { SectionHeading, Surface } from '@/components/ui/surface'
 import { describeEnvProblems, hasServiceRoleKey, isSupabaseConfigured } from '@/lib/env'
 import { isLocalMode } from '@/lib/mode'
+import { requireDevelopmentDiagnostics } from '@/lib/diagnostics'
 
-export const metadata: Metadata = { title: 'Setup' }
+export const metadata: Metadata = { robots: { index: false, follow: false } }
 
 /**
  * Setup / configuration status.
  *
+ * Development-only. Production returns not-found before reading configuration.
  * Reports the selected provider and configuration presence, not service health
  * or release readiness. Public settings are captured when Next.js builds them.
  *
@@ -54,6 +56,7 @@ function Row({
 }
 
 export default function SetupPage() {
+  requireDevelopmentDiagnostics()
   const local = isLocalMode()
   const configured = isSupabaseConfigured()
   const problems = describeEnvProblems()

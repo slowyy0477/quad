@@ -10,7 +10,7 @@ export default function ProviderUnavailablePage() {
       <h1 className="text-3xl">Google sign-in is unavailable</h1>
       <Alert tone="warning" className="mt-6">
         Google is not enabled or its configuration could not be checked. No provider sign-in was
-        started. You can <Link href="/login">try email sign-in</Link> or <Link href="/setup">view setup information</Link>.
+        started. You can <Link href="/login">try email sign-in</Link> or <Link href="/help">get help</Link>.
       </Alert>
     </div>
   )

@@ -25,7 +25,7 @@ export default async function FeedPeoplePage({
         <Alert tone="warning" title="No database connected" className="mt-5">
           <p>
             People discovery needs a configured data provider. No profiles are invented.{' '}
-            <Link href="/setup">Configuration steps</Link>.
+            <Link href="/help">Get help</Link>.
           </p>
         </Alert>
       </div>

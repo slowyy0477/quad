@@ -60,7 +60,7 @@ export default async function UniversitiesPage({
           <p>
             The directory is rows in Postgres. Without Supabase credentials there is nothing to
             list, and this page will not invent institutions in their place.{' '}
-            <Link href="/setup">Configuration steps</Link>.
+            <Link href="/help">Get help</Link>.
           </p>
         </Alert>
       </div>
@@ -210,11 +210,7 @@ export default async function UniversitiesPage({
       </section>
 
       <p className="mt-8 border-t border-hairline pt-4 text-xs text-ink-faint">
-        This is a growing directory, not a complete register of institutions. The{' '}
-        <Link href="/status" className="text-accent-700 underline underline-offset-2">
-          build status page
-        </Link>{' '}
-        says what else is not built.
+        This is a growing directory, not a complete register of institutions.
       </p>
     </div>
   )

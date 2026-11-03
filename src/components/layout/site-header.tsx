@@ -48,7 +48,7 @@ export function SiteHeader({ user, unreadNotifications = 0, staffRole = null }: 
       <div className="mx-auto flex min-h-16 min-w-0 w-full max-w-[1440px] flex-wrap items-center gap-1.5 gap-y-2 px-4 py-2 sm:gap-3 sm:px-6">
         <Link href={user ? '/feed' : '/'} className="flex min-h-11 shrink-0 items-center rounded-md" aria-label="Bulla home"><Logo /></Link>
         {isLocalMode() ? <LocalModeBanner /> : null}
-        {!configured ? <Link href="/setup" className="hidden sm:block"><Badge tone="highlight">Setup required</Badge></Link> : null}
+        {!configured ? <Link href="/help" className="hidden sm:block"><Badge tone="highlight">Service unavailable</Badge></Link> : null}
         {user ? <form action="/search" className="relative mx-auto hidden min-w-0 w-full max-w-sm md:block" role="search" aria-label="Search Bulla">
           <Search className="pointer-events-none absolute top-3.5 left-3 size-4 text-ink-faint" aria-hidden="true" />
           <label htmlFor="header-search" className="sr-only">Search Bulla</label>

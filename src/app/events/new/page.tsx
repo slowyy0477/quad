@@ -21,7 +21,7 @@ export default async function NewEventPage() {
         <Alert tone="warning" title="No database connected" className="mt-5">
           <p>
             An event is stored in Postgres, so there is nothing to create without Supabase credentials.{' '}
-            <Link href="/setup">Configuration steps</Link>.
+            <Link href="/help">Get help</Link>.
           </p>
         </Alert>
       </div>

@@ -23,7 +23,7 @@ export default async function SettingsPage() {
         <h1 className="text-3xl">Settings</h1>
         <Alert tone="warning" title="Setup required" className="mt-6">
           This deployment has no database, so there are no settings to store.{' '}
-          <Link href="/setup">See what is missing</Link>.
+          <Link href="/help">Get help</Link>.
         </Alert>
       </div>
     )

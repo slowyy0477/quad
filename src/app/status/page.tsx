@@ -1,6 +1,7 @@
 import Link from 'next/link'
 import type { Metadata } from 'next'
 import { Badge } from '@/components/ui/badge'
+import { requireDevelopmentDiagnostics } from '@/lib/diagnostics'
 import {
   FEATURES,
   LAST_REVIEWED,
@@ -11,8 +12,7 @@ import {
 } from '@/lib/build-status'
 
 export const metadata: Metadata = {
-  title: 'Build status',
-  description: 'Which parts of Bulla work, which are database-only, and which are not built yet.',
+  robots: { index: false, follow: false },
 }
 
 const tones: Record<FeatureStatus, 'success' | 'highlight' | 'accent' | 'neutral'> = {
@@ -25,12 +25,11 @@ const tones: Record<FeatureStatus, 'success' | 'highlight' | 'accent' | 'neutral
 /**
  * Build status.
  *
- * A public page rather than a note in a README, because the people most likely to
- * be misled by a half-built interface are the ones using it, not the ones reading
- * the repository. Anything described here as "database only" has no interface, and
- * no page in the app implies otherwise.
+ * Private development ledger. Hosted builds refuse this route before reading
+ * the inventory. Product pages retain their own clear unavailable states.
  */
 export default function StatusPage() {
+  requireDevelopmentDiagnostics()
   const counts = statusCounts()
 
   return (

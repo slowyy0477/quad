@@ -27,7 +27,7 @@ export default async function ResetPasswordPage({
         <Alert tone="warning" title="Password reset is unavailable here" className="mt-6">
           <p>
             {capabilities.recoveryUnavailableReason}{' '}
-            <Link href="/setup">Configuration steps</Link>.
+            <Link href="/help">Get help</Link>.
           </p>
         </Alert>
       ) : null}

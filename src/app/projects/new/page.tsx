@@ -33,7 +33,7 @@ export default async function NewProjectPage() {
         <h1 className="text-2xl">Create a project</h1>
         <Alert tone="warning" title="No database connected" className="mt-5">
           A project is stored in Postgres. Without Supabase credentials there is nowhere to save it.{' '}
-          <Link href="/setup">Configuration steps</Link>.
+          <Link href="/help">Get help</Link>.
         </Alert>
       </div>
     )

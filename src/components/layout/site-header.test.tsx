@@ -211,7 +211,7 @@ describe('server header wiring — boundary unit coverage, not Flight/hosted acc
     deployment.configured = false
     deployment.local = true
     render(<SiteHeader user={null} />)
-    expect(screen.getByRole('link', { name: 'Setup required' })).toHaveAttribute('href', '/setup')
+    expect(screen.getByRole('link', { name: 'Service unavailable' })).toHaveAttribute('href', '/help')
     expect(screen.getByRole('link', { name: 'Local mode: private preview on this computer. View configuration.' }))
       .toHaveAttribute('href', '/setup')
   })

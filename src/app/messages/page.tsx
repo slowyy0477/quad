@@ -72,7 +72,7 @@ export default async function MessagesPage({
           <p>
             Conversations are rows in Postgres. Without Supabase credentials there is nothing to
             read, and this page will not show invented ones.{' '}
-            <Link href="/setup">Configuration steps</Link>.
+            <Link href="/help">Get help</Link>.
           </p>
         </Alert>
       </div>

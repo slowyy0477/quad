@@ -17,7 +17,6 @@ const links = [
   { href: '/report-a-bug', label: 'Report a bug' },
   { href: '/terms', label: 'Terms' },
   { href: '/privacy', label: 'Privacy' },
-  { href: '/status', label: 'Build status' },
 ]
 
 export function SiteFooter({ compact = false }: { compact?: boolean }) {

@@ -20,7 +20,7 @@ export default async function HomePage() {
   const user = configured ? await getUser() : null
   return (
     <div className="page-enter mx-auto w-full max-w-7xl px-4 sm:px-6">
-      {!configured ? <Alert tone="warning" title="Account service is not connected" className="mt-6"><p>Accounts and student content are unavailable on this deployment. <Link href="/setup">View configuration steps</Link>.</p></Alert> : null}
+      {!configured ? <Alert tone="warning" title="Account service unavailable" className="mt-6"><p>Accounts and student content are temporarily unavailable. <Link href="/help">Get help</Link>.</p></Alert> : null}
       <section className="landing-hero">
         <div className="min-w-0">
           <p className="commons-note">The campus commons, online</p>

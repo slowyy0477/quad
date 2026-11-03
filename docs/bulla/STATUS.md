@@ -19,6 +19,39 @@ The complete previous record is preserved in [STATUS-HISTORY-20261102.md](STATUS
 
 ## Current hosting request — 3 November 2026
 
+### Owner staff grant and diagnostic privacy — current continuation
+
+The owner explicitly selected their existing personal account for admin and
+moderator powers. Exact verified Auth UUID/email preflight passed: active,
+confirmed, onboarded, not banned/deleted and no deletion pending.
+The guarded one-row grant was rehearsed and rolled back, then committed.
+Read-back confirms `admin`; admin includes every moderator capability, so no
+redundant moderator row was added. Client staff-role INSERT remains denied.
+Private approval/target evidence: task-drive
+`access-privacy-20261103/PROGRESS.md`.
+
+No password, email-verification state, profile data or MFA policy was changed.
+The account has no verified authenticator yet. Personal TOTP enrollment at
+`/settings/security` and live `/admin` assurance remain required; they cannot
+be completed by storing an operator-controlled factor or bypassing MFA.
+
+The owner also asks to hide the publicly linked internal build ledger.
+Source now guards `/status` and `/setup` before diagnostic reads, allowing
+only explicit development. Production/test/unknown environments are denied.
+Removed public ledger links/details and redirected public configuration-error
+links to Help. Truthful feature-unavailable notices and all staff guards remain.
+
+Focused verification **passed**, actual exit 0: non-incremental TypeScript,
+changed-file zero-warning lint and **388/388 tests**, zero failures/skips in
+ten listed files. Includes diagnostic denial-before-read, no public ledger
+links, metadata and staff-security regressions. Report:
+`access-privacy-20261103/verify-2026-11-03T12-31-27-742Z-b066ec68/REPORT.md`.
+This is local focused evidence, not an authenticated hosted MFA journey.
+The correction is **not promoted yet**. Next commit/push this reviewed source,
+verify a secret-free snapshot, build on actual Node24, promote and require live
+404/no-disclosure/navigation checks.
+Earlier zero-staff snapshots below are historical and superseded by this grant.
+
 ### Public preview — promoted and verified
 
 Public site: [bulla-tau.vercel.app](https://bulla-tau.vercel.app).

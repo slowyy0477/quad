@@ -24,7 +24,7 @@ export default async function NewOpportunityPage() {
         <Alert tone="warning" title="No database connected" className="mt-5">
           <p>
             A listing is stored in Postgres, so there is nothing to post into without Supabase
-            credentials. <Link href="/setup">Configuration steps</Link>.
+            credentials. <Link href="/help">Get help</Link>.
           </p>
         </Alert>
       </div>

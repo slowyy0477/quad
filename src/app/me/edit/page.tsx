@@ -19,7 +19,7 @@ export default async function EditProfilePage() {
         <Alert tone="warning" title="No database connected" className="mt-6">
           <p>
             Nothing typed here could be saved, so the form is not shown.{' '}
-            <Link href="/setup">Configuration steps</Link>.
+            <Link href="/help">Get help</Link>.
           </p>
         </Alert>
       </div>

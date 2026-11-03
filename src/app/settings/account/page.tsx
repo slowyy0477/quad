@@ -15,7 +15,7 @@ export default async function AccountSettingsPage() {
   if (!isDataConfigured()) return (
     <div className="mx-auto max-w-2xl px-4 py-10 sm:px-6">
       <h1 className="text-3xl">Account data and deletion</h1>
-      <Alert tone="warning" title="Setup required" className="mt-6">Account controls need a configured data store. <Link href="/setup">Review setup</Link>.</Alert>
+      <Alert tone="warning" title="Account controls unavailable" className="mt-6">The account service is unavailable. <Link href="/help">Get help</Link>.</Alert>
     </div>
   )
   if (!await getUser()) redirect('/login?next=/settings/account')

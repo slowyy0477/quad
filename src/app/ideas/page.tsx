@@ -38,7 +38,7 @@ export default async function IdeasPage({ searchParams }: { searchParams: Promis
         <Alert tone="warning" title="No database connected" className="mt-5">
           <p>
             Ideas live in Postgres. Without Supabase credentials there is nothing to show, and this page
-            will not invent ideas in their place. <Link href="/setup">Configuration steps</Link>.
+            will not invent ideas in their place. <Link href="/help">Get help</Link>.
           </p>
         </Alert>
       </div>

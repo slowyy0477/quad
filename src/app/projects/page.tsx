@@ -44,7 +44,7 @@ export default async function ProjectsPage({ searchParams }: { searchParams: Pro
         <Alert tone="warning" title="No database connected" className="mt-5">
           <p>
             Projects are read from Postgres. Without Supabase credentials there is nothing to read, and
-            this page will not show made-up projects in their place. <Link href="/setup">Configuration steps</Link>.
+            this page will not show made-up projects in their place. <Link href="/help">Get help</Link>.
           </p>
         </Alert>
       </div>

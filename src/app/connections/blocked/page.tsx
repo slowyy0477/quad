@@ -40,7 +40,7 @@ export default async function BlockedPage({
       <Alert tone="warning" title="No database connected">
         <p>
           Blocks are rows in Postgres. Without Supabase credentials there is nothing to list.{' '}
-          <Link href="/setup">Configuration steps</Link>.
+          <Link href="/help">Get help</Link>.
         </p>
       </Alert>
     )
