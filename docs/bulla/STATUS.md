@@ -19,6 +19,35 @@ The complete previous record is preserved in [STATUS-HISTORY-20261102.md](STATUS
 
 ## Current hosting request — 3 November 2026
 
+### MFA setup QR compatibility repair — locally verified; deployment next
+
+The owner reports the safe-setup-QR rejection during personal enrollment.
+The provider's per-cell SVG format independently reproduces the rejection:
+61 cells / 3,721 rectangles / 283,047 characters exceeded Bulla's 256,000-character
+cap. Raised only the bounded input cap to 1,048,576 characters; SVG/content,
+ownership, cookie persistence, role and fresh-MFA guards are unchanged.
+Added realistic 61/97-cell positives and large malicious/oversized negatives.
+No authenticator, account, password or role was changed or removed.
+
+Independent native/integer raster decoding and isolated Chrome's actual form
+image/white wrapper passed exact synthetic-URI equality. Chrome's 12/12 cases
+cover 320/390/1440 widths, light/dark and DPR 1/2; this is synthetic image evidence,
+not personal scanning or hosted staff access. Three earlier fractional
+librsvg raster failures are retained, not accepted or erased. Task record:
+`mfa-qr-20261103/PROGRESS.md` on the task drive.
+
+Fresh main-only focused verification passed, actual exit 0: non-incremental
+TypeScript, scoped zero-warning lint, **483/483 tests**, zero failures/skips
+and **13/13 requested files actually executed**. Report:
+`access-privacy-20261103/verify-2026-11-03T15-03-49-024Z-e07830de/REPORT.md`.
+Current source correction is not yet deployed. Next: reviewed commit/snapshot
+and cloud build with alias assignment withheld, exact-deployment inspection/
+promotion and public privacy recheck. Do not advise repeated setup attempts
+until the correction is live.
+Latest read-only preflight reports zero verified/three unfinished TOTP setups;
+no factor details, keys, codes or sessions were read. Earlier one-setup
+guidance below retains its historical observation only.
+
 ### Owner staff assignment and diagnostic privacy — completed; personal MFA pending
 
 The owner explicitly selected their existing personal account for admin and
@@ -34,6 +63,18 @@ No password, email-verification state, profile data or MFA policy was changed.
 The account has no verified authenticator yet. Personal TOTP enrollment at
 `/settings/security` and live `/admin` assurance remain required; they cannot
 be completed by storing an operator-controlled factor or bypassing MFA.
+
+Read-only owner follow-up on 3 November confirms admin is still held,
+**zero verified TOTP factors / one unfinished TOTP setup**. The owner asks
+where the six-digit code comes from. Source inspection confirms the existing
+setup/verification controls; the code is generated in the owner's authenticator
+app after scanning Bulla's private QR, not sent by Gmail. An already-scanned
+setup can use its app code; an unscanned setup whose QR was hidden requires
+a fresh owner-created QR with a distinct authenticator name. No setup key,
+code, password or session was read, and no factor/provider change occurred.
+Next: owner finishes QR/app-code verification, then uses the resulting
+`Continue to staff tools` link or `/admin`. Live staff access remains unaccepted.
+Only continuity records changed in this follow-up; no redeployment is needed.
 
 The owner also asks to hide the publicly linked internal build ledger.
 Source now guards `/status` and `/setup` before diagnostic reads, allowing
@@ -799,6 +840,12 @@ unrelated-chat message or recurring schedule occurred.
 The user specified task storage, not a schedule.
 
 ## Exact next action
+
+First finish the verified MFA QR correction's source snapshot/cloud build,
+inspect the exact deployment/runtime, promote it and run fresh live public
+privacy checks. Do not request further owner setup retries until it is live.
+Then the owner personally creates/scans/verifies their own authenticator;
+existing unfinished setups are not removed by this repair.
 
 In Supabase project `nqnfuomyalbhbwapgots`, confirm Site URL
 `https://bulla-tau.vercel.app`, the exact callback/recovery destinations and

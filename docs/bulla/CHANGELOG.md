@@ -4,6 +4,30 @@ Each entry records source changes, verification, remaining work and the next
 concrete action. Source work is not deployment, security clearance or a measured
 capacity claim.
 
+## 3 November 2026 — MFA setup QR compatibility, locally verified
+
+Reproduced the owner's setup error using an independent synthetic QR in
+Supabase's actual per-cell SVG format: 283,047 characters exceeded Bulla's
+256,000-character input limit. Raised only that limit to a bounded 1,048,576
+characters. Kept inert data-image rendering, malicious-content rejection,
+factor ownership, cookie persistence, role checks and fresh MFA unchanged.
+Added 61/97-cell acceptance and large malicious/oversized refusal regressions.
+
+Fresh non-incremental TypeScript, zero-warning scoped lint and **483/483 tests
+in all 13 requested files** passed, zero failures/skips, actual exit 0:
+`access-privacy-20261103/verify-2026-11-03T15-03-49-024Z-e07830de/REPORT.md`.
+Independent native/integer decoding and isolated Chrome's actual image/wrapper
+passed exact synthetic-URI equality; Chrome **12/12** cases cover three widths,
+light/dark and DPR 1/2. Three failed fractional librsvg probes remain retained;
+no production display style or payload assertion was weakened.
+
+The correction is not yet deployed. Next: commit/push reviewed source,
+hash-verified private-data-free snapshot, cloud build with alias withheld,
+inspect/promote and rerun public privacy checks. No owner's QR, setup key,
+code, session or password was read; no factor was enrolled, verified or removed.
+Personal scanning/verification, authenticated staff access, SMTP, recovery
+and capacity acceptance remain separate.
+
 ## 3 November 2026 — owner staff assignment and public diagnostic privacy
 
 Granted the owner's selected existing confirmed/active/onboarded account

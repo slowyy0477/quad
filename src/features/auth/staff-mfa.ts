@@ -278,7 +278,9 @@ export async function getStaffMfaSettings(): Promise<StaffMfaSettings> {
 
 /** Render provider SVG as a bounded, inert data image, never injected HTML or a remote URL. */
 function qrImage(value: unknown): string | null {
-  if (typeof value !== 'string' || value.length > 256_000) return null
+  // SVGo emits a styled rectangle for every QR cell, including white cells.
+  // A normal 61-cell TOTP QR is ~283 KB. Keep a hard cap without rejecting it.
+  if (typeof value !== 'string' || value.length > 1_048_576) return null
   const prefix = 'data:image/svg+xml;utf-8,'
   const svg = (value.startsWith(prefix) ? value.slice(prefix.length) : value)
     .replace(/^\s*<\?xml[^?]*\?>\s*/i, '')
