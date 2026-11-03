@@ -1,7 +1,7 @@
 'use client'
 
 import { useActionState } from 'react'
-import { Alert } from '@/components/ui/alert'
+import { FormErrorSummary } from '@/components/ui/form-error-summary'
 import { Checkbox } from '@/components/ui/checkbox'
 import { Field } from '@/components/ui/field'
 import { Input, Select, Textarea } from '@/components/ui/input'
@@ -32,11 +32,20 @@ export function NewOpportunityForm({ skills }: { skills: SkillOption[] }) {
 
   return (
     <form action={action} className="space-y-5">
-      {state.status === 'error' && state.message ? (
-        <Alert tone="danger" title="The listing was not saved">
-          {state.message}
-        </Alert>
-      ) : null}
+      <FormErrorSummary state={state} title="The listing was not saved" fields={{
+        title: { id: 'opportunity-title', label: 'Title' },
+        organisation: { id: 'opportunity-organisation', label: 'Organisation' },
+        description: { id: 'opportunity-description', label: 'Description' },
+        type: { id: 'opportunity-type', label: 'Type' },
+        workMode: { id: 'opportunity-mode', label: 'Where' },
+        location: { id: 'opportunity-location', label: 'Location' },
+        compensation: { id: 'opportunity-compensation', label: 'Compensation' },
+        deadline: { id: 'opportunity-deadline', label: 'Closing date' },
+        startsOn: { id: 'opportunity-start', label: 'Starts on' },
+        applyUrl: { id: 'opportunity-apply-url', label: 'Application link' },
+        applyEmail: { id: 'opportunity-apply-email', label: 'Application email' },
+        visibility: { id: 'opportunity-visibility', label: 'Who can see it' },
+      }} />
 
       <Field
         id="opportunity-title"
@@ -161,7 +170,7 @@ export function NewOpportunityForm({ skills }: { skills: SkillOption[] }) {
       <fieldset className="space-y-4 rounded border border-hairline p-4">
         <legend className="px-1 text-sm font-medium text-ink">How to apply</legend>
         <p className="text-xs text-ink-muted">
-          Quad does not take applications and does not record who applied — the organisation does. One of
+          Bulla does not take applications and does not record who applied — the organisation does. One of
           these two is required.
         </p>
 

@@ -11,6 +11,7 @@ import {
 } from '@/lib/local/db'
 import { addDays, opportunityIsClosed, todayInPakistan } from '@/features/opportunities/board'
 import { deadlineWindowDays } from '@/features/opportunities/constants'
+import { canReadContent, canReadProfile } from '@/lib/local/access'
 import {
   UNDATED_SENTINEL,
   afterDeadlineFilter,
@@ -251,15 +252,7 @@ export function canViewOpportunity(
   opportunity: LocalOpportunity,
   viewer: LocalProfile | null,
 ): boolean {
-  if (viewer && opportunity.posted_by === viewer.id) return true
-  if (opportunity.deleted_at !== null) return false
-  if (opportunity.visibility === 'public') return true
-  if (opportunity.visibility !== 'university') return false
-
-  const poster = db.profiles.find((profile) => profile.id === opportunity.posted_by)
-  return Boolean(
-    viewer?.university_id && poster?.university_id && viewer.university_id === poster.university_id,
-  )
+  return canReadContent(db, opportunity, opportunity.posted_by, viewer, 'opportunity')
 }
 
 /** The reader's profile and the store, resolved once per request. */
@@ -380,9 +373,9 @@ function localListRow(db: Tables, row: LocalOpportunity, slug: string): Opportun
   }
 }
 
-function localPoster(db: Tables, profileId: string): OpportunityDetail['poster'] {
+function localPoster(db: Tables, profileId: string, viewer: LocalProfile | null): OpportunityDetail['poster'] {
   const profile = db.profiles.find((entry) => entry.id === profileId)
-  if (!profile) return null
+  if (!profile || !canReadProfile(db, profile, viewer)) return null
   return {
     id: profile.id,
     username: profile.username,
@@ -393,7 +386,7 @@ function localPoster(db: Tables, profileId: string): OpportunityDetail['poster']
   }
 }
 
-function localDetailRow(db: Tables, row: LocalOpportunity, slug: string): OpportunityDetail {
+function localDetailRow(db: Tables, row: LocalOpportunity, slug: string, viewer: LocalProfile | null): OpportunityDetail {
   return {
     ...localListRow(db, row, slug),
     description: row.description,
@@ -406,7 +399,7 @@ function localDetailRow(db: Tables, row: LocalOpportunity, slug: string): Opport
     source: 'user_submitted',
     // No `updated_at` column: created_at is the only instant the store records.
     updated_at: row.created_at,
-    poster: localPoster(db, row.posted_by),
+    poster: localPoster(db, row.posted_by, viewer),
     // No `skills` or `opportunity_skills` table in the store, so no listing here
     // asks for a skill. The detail page says so in its own words.
     opportunity_skills: [],
@@ -665,7 +658,7 @@ export async function getOpportunityBySlug(slug: string): Promise<OpportunityDet
     )
     if (!row || !canViewOpportunity(db, row, viewer)) return null
 
-    return localDetailRow(db, row, derived.get(row.id) ?? row.id)
+    return localDetailRow(db, row, derived.get(row.id) ?? row.id, viewer)
   }
 
   const supabase = await createClient()

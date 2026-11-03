@@ -1,5 +1,5 @@
 import Link from 'next/link'
-import { Star, Users } from 'lucide-react'
+import { Star } from 'lucide-react'
 import { Avatar } from '@/components/ui/avatar'
 import { Badge } from '@/components/ui/badge'
 import { Surface } from '@/components/ui/surface'
@@ -42,10 +42,10 @@ export function ProjectRow({ project }: { project: ProjectListRow }) {
         : `Seeking ${slots} more`
 
   return (
-    <Surface as="article" className="p-4 transition-colors hover:border-rule">
+    <Surface as="article" className="interactive-card p-5">
       <div className="flex items-start justify-between gap-3">
         <div className="min-w-0">
-          <h3 className="text-base leading-snug">
+          <h3 className="text-lg leading-snug">
             <Link href={`/projects/${project.slug}`} className="text-ink underline-offset-2 hover:underline">
               {project.title}
             </Link>
@@ -74,7 +74,7 @@ export function ProjectRow({ project }: { project: ProjectListRow }) {
       ) : null}
 
       <div className="mt-3 flex flex-wrap items-center gap-2">
-        <Badge tone="neutral">{categoryLabel(project.category)}</Badge>
+        <span className="text-xs text-ink-muted">{categoryLabel(project.category)}</span>
         <Badge tone={STATUS_TONE[project.status] ?? 'neutral'}>{projectStatusLabel(project.status)}</Badge>
         {project.visibility !== 'public' ? <Badge tone="outline">{project.visibility}</Badge> : null}
       </div>
@@ -107,11 +107,6 @@ export function ProjectRow({ project }: { project: ProjectListRow }) {
             <Star className="size-3.5" aria-hidden="true" />
             {project.star_count}
             <span className="sr-only"> stars</span>
-          </span>
-          <span className="flex items-center gap-1">
-            <Users className="size-3.5" aria-hidden="true" />
-            {project.member_count}
-            <span className="sr-only"> members</span>
           </span>
         </div>
       </div>

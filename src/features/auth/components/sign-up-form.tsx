@@ -5,6 +5,7 @@ import Link from 'next/link'
 import { Alert } from '@/components/ui/alert'
 import { Field } from '@/components/ui/field'
 import { Input } from '@/components/ui/input'
+import { PasswordInput } from '@/features/auth/components/password-input'
 import { SubmitButton } from '@/components/ui/submit-button'
 import { signUpAction } from '@/features/auth/actions'
 import { emptyAuthState } from '@/features/auth/form-state'
@@ -41,7 +42,7 @@ export function SignUpForm({ disabled }: { disabled?: boolean }) {
             autoComplete="name"
             defaultValue={state.values?.displayName}
             disabled={disabled}
-            autoFocus
+
           />
         )}
       </Field>
@@ -49,7 +50,7 @@ export function SignUpForm({ disabled }: { disabled?: boolean }) {
       <Field
         id="email"
         label="Email address"
-        hint="Use your university address if you have one — it's how universities get verified."
+        hint="Use an email you can access. It won't be shown on your profile."
         error={state.fieldErrors?.email}
         required
       >
@@ -59,6 +60,9 @@ export function SignUpForm({ disabled }: { disabled?: boolean }) {
             name="email"
             type="email"
             autoComplete="email"
+            inputMode="email"
+            autoCapitalize="none"
+            spellCheck={false}
             defaultValue={state.values?.email}
             disabled={disabled}
           />
@@ -68,15 +72,14 @@ export function SignUpForm({ disabled }: { disabled?: boolean }) {
       <Field
         id="password"
         label="Password"
-        hint="At least 12 characters. A short phrase is easier to remember and harder to guess."
+        hint="At least 15 characters. A short phrase is easier to remember and harder to guess."
         error={state.fieldErrors?.password}
         required
       >
         {(field) => (
-          <Input
+          <PasswordInput
             {...field}
             name="password"
-            type="password"
             autoComplete="new-password"
             disabled={disabled}
           />
@@ -84,11 +87,11 @@ export function SignUpForm({ disabled }: { disabled?: boolean }) {
       </Field>
 
       <div className="space-y-1.5">
-        <label className="flex items-start gap-2.5 text-sm text-ink-muted">
+        <label className="flex min-h-11 items-start gap-3 py-2 text-sm text-ink-muted">
           <input
             type="checkbox"
             name="acceptTerms"
-            className="mt-0.5 size-4 shrink-0 rounded-xs border-rule accent-accent-600"
+            className="mt-0.5 size-5 shrink-0 rounded-xs border-rule accent-accent-600"
             aria-invalid={state.fieldErrors?.acceptTerms ? true : undefined}
             aria-describedby={state.fieldErrors?.acceptTerms ? 'acceptTerms-error' : undefined}
             disabled={disabled}

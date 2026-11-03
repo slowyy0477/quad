@@ -2,18 +2,18 @@ import 'server-only'
 
 import { revalidatePath } from 'next/cache'
 import { redirect } from 'next/navigation'
-import { safeRedirect } from '@/features/auth/redirect'
+import { headers } from 'next/headers'
 import { signInSchema, signUpSchema } from '@/features/auth/schemas'
 import type { AuthFormState } from '@/features/auth/form-state'
-import { ensureSeeded } from '@/lib/local/seed'
-import { checkCredentials, createAccount, endSession, startSession } from '@/lib/local/session'
+import { authAttemptSource, consumeAuthAttempt, safeLocalRedirect, throttledAuthState } from '@/lib/local/auth-security'
+import { checkCredentials, createAccount, endSession, LocalCredentialsChangedError, startSession } from '@/lib/local/session'
 
 /**
  * Auth in local mode.
  *
- * The same validation schemas, the same `next` handling and the same form state as
- * the Supabase path — because a form should not behave differently depending on
- * which store is behind it. What differs is only the store.
+ * Server validation, bounded abuse budgets, private database transactions and
+ * opaque sessions form the authentication boundary. Never return database users,
+ * password hashes or bearer tokens in serialized form state.
  *
  * Sign-in failure says the same thing whichever part was wrong ("that email or
  * password is incorrect"), for the same reason the Supabase path does: naming the
@@ -30,7 +30,8 @@ function fieldErrorsOf(error: { issues: { path: PropertyKey[]; message: string }
 }
 
 export async function localSignInAction(formData: FormData): Promise<AuthFormState> {
-  await ensureSeeded()
+  const attempt = consumeAuthAttempt('login', String(formData.get('email') ?? ''), authAttemptSource(await headers()))
+  if (!attempt.allowed) return throttledAuthState(attempt.retryAfterSeconds)
 
   const raw = {
     email: String(formData.get('email') ?? ''),
@@ -55,13 +56,21 @@ export async function localSignInAction(formData: FormData): Promise<AuthFormSta
     }
   }
 
-  await startSession(user.id)
+  try {
+    await startSession(user.id, { expectedPasswordHash: user.password_hash })
+  } catch (error) {
+    if (error instanceof LocalCredentialsChangedError) {
+      return { status: 'error', message: 'That email or password is incorrect.', values: { email: raw.email } }
+    }
+    return { status: 'error', message: 'Sign-in could not be completed in the local store. Please try again.', values: { email: raw.email } }
+  }
   revalidatePath('/', 'layout')
-  redirect(safeRedirect(String(formData.get('next') ?? '')))
+  redirect(safeLocalRedirect(String(formData.get('next') ?? '')))
 }
 
 export async function localSignUpAction(formData: FormData): Promise<AuthFormState> {
-  await ensureSeeded()
+  const attempt = consumeAuthAttempt('signup', String(formData.get('email') ?? ''), authAttemptSource(await headers()))
+  if (!attempt.allowed) return throttledAuthState(attempt.retryAfterSeconds)
 
   const raw = {
     email: String(formData.get('email') ?? ''),

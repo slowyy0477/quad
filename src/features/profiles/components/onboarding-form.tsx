@@ -6,9 +6,11 @@ import { Alert } from '@/components/ui/alert'
 import { Field } from '@/components/ui/field'
 import { Input, Select, Textarea } from '@/components/ui/input'
 import { SubmitButton } from '@/components/ui/submit-button'
+import { useRetainedForm } from '@/components/ui/use-retained-form'
 import { completeOnboardingAction } from '@/features/profiles/actions'
 import { emptyProfileState } from '@/features/profiles/form-state'
 import type { UniversityOption } from '@/features/profiles/queries'
+import { UniversityDepartmentFields } from './university-department-fields'
 
 /**
  * Onboarding.
@@ -18,9 +20,8 @@ import type { UniversityOption } from '@/features/profiles/queries'
  * server is the username -- so a wizard would mean either re-validating at the end
  * anyway or losing what was typed.
  *
- * Only the first two fields are required. Everything else is genuinely optional and
- * labelled as such: someone between institutions, or who would rather not say where
- * they study, gets a usable profile rather than a form they cannot finish.
+ * Identity and the publication choice are required. Campus details are genuinely
+ * optional. Publication starts at private, not an already-selected public option.
  */
 export function OnboardingForm({
   universities,
@@ -32,15 +33,16 @@ export function OnboardingForm({
   suggestedUsername: string
 }) {
   const [state, action] = useActionState(completeOnboardingAction, emptyProfileState)
+  const formRef = useRetainedForm()
 
   return (
-    <form action={action} className="space-y-5" noValidate>
+    <form ref={formRef} action={action} className="space-y-5" noValidate>
       {state.message ? <Alert tone="danger">{state.message}</Alert> : null}
 
       <Field
         id="username"
         label="Choose a username"
-        hint="Letters, numbers and underscores. This is your address on Quad — quad.app/u/yourname."
+        hint="Letters, numbers and underscores. Your Bulla profile will be at /u/yourname."
         error={state.fieldErrors?.username}
         required
       >
@@ -90,28 +92,7 @@ export function OnboardingForm({
         </p>
 
         <div className="mt-4 space-y-4">
-          <Field
-            id="universityId"
-            label="University"
-            error={state.fieldErrors?.universityId}
-            hint={
-              universities.length === 0
-                ? 'No universities have been added to this deployment yet.'
-                : 'The list is not exhaustive — it grows as people submit institutions and a moderator approves them.'
-            }
-          >
-            {(field) => (
-              <Select {...field} name="universityId" defaultValue={state.values?.universityId ?? ''}>
-                <option value="">Not saying</option>
-                {universities.map((university) => (
-                  <option key={university.id} value={university.id}>
-                    {university.name}
-                    {university.country ? ` — ${university.country}` : ''}
-                  </option>
-                ))}
-              </Select>
-            )}
-          </Field>
+          <UniversityDepartmentFields universities={universities} state={state} />
 
           <Field
             id="degree"
@@ -168,6 +149,29 @@ export function OnboardingForm({
         >
           {(field) => <Textarea {...field} name="bio" rows={5} defaultValue={state.values?.bio} />}
         </Field>
+      </div>
+
+      <div className="border-t border-hairline pt-5">
+        <Field
+          id="visibility"
+          label="Who can see your profile?"
+          hint="Private keeps your profile visible only to you. Choose a wider audience only when you want to publish it. You can change this later."
+          error={state.fieldErrors?.visibility}
+          required
+        >
+          {(field) => (
+            <Select {...field} name="visibility" defaultValue={state.values?.visibility ?? 'private'}>
+              <option value="private">Private — only me</option>
+              <option value="connections">My accepted connections</option>
+              <option value="university">People at my university</option>
+              <option value="public">Public — everyone, including signed-out visitors</option>
+            </Select>
+          )}
+        </Field>
+        <p className="mt-2 text-xs text-ink-muted">
+          Your university and department are self-declared, not verified. This choice does not change your separate
+          people-search, messaging or connection-request preferences.
+        </p>
       </div>
 
       <div className="flex flex-wrap items-center gap-3 border-t border-hairline pt-5">

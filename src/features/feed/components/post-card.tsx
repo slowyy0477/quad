@@ -32,7 +32,7 @@ export function PostCard({
   const detailHref = `/post/${post.id}`
 
   return (
-    <article className="border-b border-hairline py-5 first:pt-0 last:border-b-0">
+    <article className="rounded-lg border border-hairline bg-paper-raised p-4 shadow-raised sm:p-5">
       <div className="flex items-start gap-3">
         <Avatar name={name} src={author?.avatar_url} size="default" />
 
@@ -82,7 +82,7 @@ export function PostCard({
             <a
               href={post.link_url}
               // noreferrer as well as noopener: a student's link should not tell
-              // the destination which page on Quad they came from.
+              // the destination which page on Bulla they came from.
               rel="noopener noreferrer nofollow"
               target="_blank"
               className="mt-2 inline-block max-w-full truncate text-sm text-accent-700 underline underline-offset-2"

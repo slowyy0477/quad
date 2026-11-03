@@ -7,7 +7,7 @@ import { EmptyState, SectionHeading } from '@/components/ui/surface'
 import { IdeaCard } from '@/features/ideas/components/idea-card'
 import { IdeaForm } from '@/features/ideas/components/idea-form'
 import { listIdeas } from '@/features/ideas/queries'
-import { isSupabaseConfigured } from '@/lib/env'
+import { isDataConfigured } from '@/lib/env'
 import { encodeCursor } from '@/lib/cursor'
 import { getUser } from '@/lib/supabase/server'
 
@@ -31,7 +31,7 @@ type SearchParams = Record<string, string | string[] | undefined>
  * columns; nothing here is estimated.
  */
 export default async function IdeasPage({ searchParams }: { searchParams: Promise<SearchParams> }) {
-  if (!isSupabaseConfigured()) {
+  if (!isDataConfigured()) {
     return (
       <div className="mx-auto w-full max-w-3xl px-4 py-12">
         <h1 className="text-2xl">Ideas</h1>
@@ -50,14 +50,15 @@ export default async function IdeasPage({ searchParams }: { searchParams: Promis
   const page = await listIdeas({ cursor: params.cursor })
 
   return (
-    <div className="mx-auto w-full max-w-3xl px-4 py-8 sm:px-6">
+    <div className="page-enter mx-auto w-full max-w-3xl px-4 py-8 sm:px-6">
       <SectionHeading
+        level={1}
         title="Ideas"
         description="A pitch, and the people who would help build it. Ideas become projects when someone is ready."
       />
 
       {user ? (
-        <details className="mt-5 rounded-md border border-hairline bg-paper-raised">
+        <details className="quiet-disclosure mt-5">
           <summary className="cursor-pointer px-4 py-3 text-sm font-medium text-ink">
             Post an idea
           </summary>

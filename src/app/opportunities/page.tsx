@@ -13,7 +13,7 @@ import {
   listOpenOpportunities,
   type OpportunityPage,
 } from '@/features/opportunities/queries'
-import { isSupabaseConfigured } from '@/lib/env'
+import { isDataConfigured } from '@/lib/env'
 import { getUser } from '@/lib/supabase/server'
 
 export const metadata: Metadata = { title: 'Opportunities' }
@@ -44,7 +44,7 @@ export default async function OpportunitiesPage({
 }: {
   searchParams: Promise<SearchParams>
 }) {
-  if (!isSupabaseConfigured()) {
+  if (!isDataConfigured()) {
     return (
       <div className="mx-auto w-full max-w-2xl px-4 py-12">
         <h1 className="text-2xl">Opportunities</h1>
@@ -85,8 +85,9 @@ export default async function OpportunitiesPage({
   const filtered = Boolean(type || workMode || (lens === 'open' && within))
 
   return (
-    <div className="mx-auto w-full max-w-4xl px-4 py-8 sm:px-6">
+    <div className="page-enter mx-auto w-full max-w-4xl px-4 py-8 sm:px-6">
       <SectionHeading
+        level={1}
         title="Opportunities"
         description="Internships, scholarships, competitions and research placements, posted by students and staff here."
         action={

@@ -4,6 +4,7 @@ import { useActionState } from 'react'
 import { Alert } from '@/components/ui/alert'
 import { Field } from '@/components/ui/field'
 import { Input } from '@/components/ui/input'
+import { PasswordInput } from '@/features/auth/components/password-input'
 import { SubmitButton } from '@/components/ui/submit-button'
 import { signInAction } from '@/features/auth/actions'
 import { emptyAuthState } from '@/features/auth/form-state'
@@ -35,19 +36,21 @@ export function SignInForm({ next, disabled }: { next: string; disabled?: boolea
             name="email"
             type="email"
             autoComplete="email"
+            inputMode="email"
+            autoCapitalize="none"
+            spellCheck={false}
             defaultValue={state.values?.email}
             disabled={disabled}
-            autoFocus
+
           />
         )}
       </Field>
 
       <Field id="password" label="Password" error={state.fieldErrors?.password} required>
         {(field) => (
-          <Input
+          <PasswordInput
             {...field}
             name="password"
-            type="password"
             autoComplete="current-password"
             disabled={disabled}
           />

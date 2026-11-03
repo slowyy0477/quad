@@ -9,9 +9,14 @@ const eslintConfig = defineConfig([
   globalIgnores([
     // Default ignores of eslint-config-next:
     ".next/**",
+    ".next-*/**",
     "out/**",
     "build/**",
     "next-env.d.ts",
+    // Throwaway probes and generated schema output are not application source.
+    // The generated types are still checked by TypeScript.
+    ".scratch/**",
+    "src/lib/db/database.types.ts",
   ]),
 ]);
 

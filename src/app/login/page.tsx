@@ -1,15 +1,14 @@
 import Link from 'next/link'
 import type { Metadata } from 'next'
 import { Alert } from '@/components/ui/alert'
-import { Surface } from '@/components/ui/surface'
+import { AccountShell } from '@/features/auth/components/account-shell'
 import { GoogleSignInButton } from '@/features/auth/components/google-sign-in-button'
 import { SignInForm } from '@/features/auth/components/sign-in-form'
 import { safeRedirect } from '@/features/auth/redirect'
 import { isSupabaseConfigured } from '@/lib/env'
+import { isLocalMode } from '@/lib/mode'
 
 export const metadata: Metadata = { title: 'Sign in' }
-
-/** Callback failures arrive as `?error=`; each gets a sentence a person can act on. */
 const callbackMessages: Record<string, string> = {
   link_expired: 'That link has expired or was already used. Request a new one below.',
   oauth: 'We could not start Google sign-in. Try again, or use your email and password.',
@@ -17,55 +16,26 @@ const callbackMessages: Record<string, string> = {
 }
 
 export default async function LoginPage({ searchParams }: PageProps<'/login'>) {
-  // searchParams is a Promise in Next 16.
   const params = await searchParams
   const next = safeRedirect(typeof params.next === 'string' ? params.next : null)
   const errorCode = typeof params.error === 'string' ? params.error : null
-  const configured = isSupabaseConfigured()
+  const local = isLocalMode()
+  const configured = local || isSupabaseConfigured()
 
   return (
-    <div className="mx-auto w-full max-w-md px-4 py-12 sm:py-16">
-      <h1 className="text-3xl">Welcome back</h1>
-      <p className="mt-2 text-ink-muted">
-        Sign in to your Quad account.{' '}
-        <Link href="/signup" className="text-accent-700 underline underline-offset-2">
-          Need an account?
-        </Link>
-      </p>
-
-      {!configured ? (
-        <Alert tone="warning" title="Sign-in is unavailable here" className="mt-6">
-          <p>
-            This deployment has no database connected, so there is nothing to sign in to. The form
-            below is disabled rather than pretending to work.{' '}
-            <Link href="/setup">Configuration steps</Link>.
-          </p>
-        </Alert>
-      ) : null}
-
-      {errorCode ? (
-        <Alert tone="danger" className="mt-6">
-          {callbackMessages[errorCode] ?? 'Sign-in did not complete. Please try again.'}
-        </Alert>
-      ) : null}
-
-      <Surface className="mt-6 p-5 sm:p-6">
-        <SignInForm next={next} disabled={!configured} />
-
-        <div className="my-5 flex items-center gap-3" aria-hidden="true">
-          <span className="h-px flex-1 bg-hairline" />
-          <span className="text-2xs tracking-wide text-ink-faint uppercase">or</span>
-          <span className="h-px flex-1 bg-hairline" />
-        </div>
-
-        <GoogleSignInButton next={next} disabled={!configured} />
-      </Surface>
-
-      <p className="mt-5 text-center text-sm text-ink-muted">
-        <Link href="/reset-password" className="text-accent-700 underline underline-offset-2">
-          Forgot your password?
-        </Link>
-      </p>
-    </div>
+    <AccountShell title="Welcome back." description="Sign in to pick up your projects, learning goals and campus conversations."
+      footer={<>New to Bulla? <Link href="/signup" className="inline-flex min-h-11 items-center font-semibold text-accent-700 underline underline-offset-4">Create an account</Link></>}>
+      <h2 className="text-xl">Sign in with email</h2>
+      <p className="mt-1 mb-6 text-sm text-ink-muted">Use the email address on your account.</p>
+      {!configured ? <Alert tone="warning" title="Sign-in is unavailable" className="mb-5"><p>No account service is connected. <Link href="/setup">View configuration steps</Link>.</p></Alert> : null}
+      {errorCode ? <Alert tone="danger" className="mb-5">{callbackMessages[errorCode] ?? 'Sign-in did not complete. Please try again.'}</Alert> : null}
+      <SignInForm next={next} disabled={!configured} />
+      {!local && configured ? <>
+        <div className="my-5 flex items-center gap-3" aria-hidden="true"><span className="h-px flex-1 bg-hairline" /><span className="text-xs text-ink-faint">or</span><span className="h-px flex-1 bg-hairline" /></div>
+        <GoogleSignInButton next={next} />
+        <Link href="/reset-password" className="mt-3 flex min-h-11 items-center justify-center text-sm font-medium text-accent-700 underline underline-offset-4">Forgot your password?</Link>
+      </> : null}
+      {local ? <p className="mt-5 border-t border-hairline pt-4 text-xs text-ink-muted">Local accounts stay on this computer. Google sign-in and email recovery are unavailable in local mode.</p> : null}
+    </AccountShell>
   )
 }

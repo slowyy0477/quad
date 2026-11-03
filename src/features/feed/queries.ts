@@ -1,6 +1,10 @@
 import 'server-only'
 
 import { decodeCursor, type Cursor } from '@/lib/cursor'
+import {
+  belowKeyset, boundedPageSize, decodeKeysetCursor, encodeKeysetCursor, keysetScope,
+  newestFirst as newestKeysetFirst,
+} from '@/features/search/paging'
 import type { Database } from '@/lib/db/database.types'
 import {
   readStore,
@@ -10,6 +14,7 @@ import {
   type Tables,
 } from '@/lib/local/db'
 import { isLocalMode } from '@/lib/mode'
+import { blockedPair, connectedPair, canReadContent, profileActive, contentActive, canReadProfile, validLocalId } from '@/lib/local/access'
 import { createClient, getUser } from '@/lib/supabase/server'
 
 /**
@@ -125,6 +130,12 @@ export type CommentPost = {
     avatar_url: string | null
     headline: string | null
   } | null
+}
+
+export type CommentReplyPage = {
+  parentId: string
+  comments: CommentPost[]
+  nextCursor: Cursor | null
 }
 
 const PAGE_SIZE = 20
@@ -422,6 +433,92 @@ type DetailRow = {
   goal: AttachedGoal | null
 }
 
+function detailPost(row: DetailRow, liked: ReadonlySet<string>, saved: ReadonlySet<string>): FeedPost {
+  return toFeedPost({
+    ...row,
+    author_username: row.author?.username ?? null,
+    author_display_name: row.author?.display_name ?? null,
+    author_avatar_url: row.author?.avatar_url ?? null,
+    author_headline: row.author?.headline ?? null,
+    project_id: row.project?.id ?? null,
+    project_slug: row.project?.slug ?? null,
+    project_title: row.project?.title ?? null,
+    project_tagline: row.project?.tagline ?? null,
+    project_status: row.project?.status ?? null,
+    goal_id: row.goal?.id ?? null,
+    goal_title: row.goal?.title ?? null,
+    goal_status: row.goal?.status ?? null,
+    goal_progress_percent: row.goal?.progress_percent ?? null,
+  }, liked, saved)
+}
+
+/** Own bookmarks only, paged by when they were saved, with current post access. */
+export async function getSavedPosts({
+  limit,
+  cursor,
+}: { limit?: number; cursor?: string | string[] } = {}): Promise<{
+  posts: FeedPost[] | null
+  nextCursor: string | null
+  error: string | null
+}> {
+  const size = boundedPageSize(limit, 20, 30)
+  const user = await getUser()
+  if (!user) return { posts: [], nextCursor: null, error: null }
+  const local = isLocalMode()
+  const scope = keysetScope(['saved-posts', user.id])
+  const after = decodeKeysetCursor(cursor, scope, local)
+  if (local) {
+    const { db, me } = await localContext()
+    if (!me) return { posts: [], nextCursor: null, error: null }
+    const rows = db.post_saves.filter((save) => save.profile_id === me.id)
+      .filter((save) => {
+        const post = db.posts.find((item) => item.id === save.post_id)
+        return Boolean(post && localCanViewPost(post, me,
+          db.profiles.find((author) => author.id === post.author_id), db))
+      })
+      .filter((save) => !after || belowKeyset({ created_at: save.created_at, id: save.post_id }, after))
+      .sort((a, b) => newestKeysetFirst(
+        { created_at: a.created_at, id: a.post_id },
+        { created_at: b.created_at, id: b.post_id },
+      ))
+      .slice(0, size + 1)
+    const page = rows.slice(0, size)
+    const last = page.at(-1)
+    return {
+      posts: page.map((save) => localFeedPost(db.posts.find((post) => post.id === save.post_id)!, db, me)),
+      nextCursor: rows.length > size && last
+        ? encodeKeysetCursor({ createdAt: last.created_at, id: last.post_id }, scope) : null,
+      error: null,
+    }
+  }
+  const supabase = await createClient()
+  let query = supabase.from('post_saves')
+    .select(`created_at, post_id, post:posts!inner (${DETAIL_SELECT})`)
+    .eq('profile_id', user.id)
+    .is('post.deleted_at', null).eq('post.moderation_status', 'active')
+    .order('created_at', { ascending: false }).order('post_id', { ascending: false })
+    .limit(size + 1)
+  if (after) query = query.or(
+    `created_at.lt.${after.createdAt},and(created_at.eq.${after.createdAt},post_id.lt.${after.id})`,
+  )
+  const { data, error } = await query.returns<{ created_at: string; post_id: string; post: DetailRow }[]>()
+  if (error) {
+    console.error('[feed:saved] read failed', error.code)
+    return { posts: null, nextCursor: null, error: 'Saved posts could not be loaded. Please try again.' }
+  }
+  const rows = data ?? []
+  const page = rows.slice(0, size)
+  const last = page.at(-1)
+  const { liked } = await viewerState(supabase, page.map((row) => row.post_id))
+  const saved = new Set(page.map((row) => row.post_id))
+  return {
+    posts: page.map((row) => detailPost(row.post, liked, saved)),
+    nextCursor: rows.length > size && last
+      ? encodeKeysetCursor({ createdAt: last.created_at, id: last.post_id }, scope) : null,
+    error: null,
+  }
+}
+
 export type PostDetail = FeedPost & {
   visibility: string
   author_id: string
@@ -457,26 +554,7 @@ export async function getPostDetail(id: string): Promise<PostDetail | null> {
   const { liked, saved } = await viewerState(supabase, [data.id])
 
   return {
-    ...toFeedPost(
-      {
-        ...data,
-        author_username: data.author?.username ?? null,
-        author_display_name: data.author?.display_name ?? null,
-        author_avatar_url: data.author?.avatar_url ?? null,
-        author_headline: data.author?.headline ?? null,
-        project_id: data.project?.id ?? null,
-        project_slug: data.project?.slug ?? null,
-        project_title: data.project?.title ?? null,
-        project_tagline: data.project?.tagline ?? null,
-        project_status: data.project?.status ?? null,
-        goal_id: data.goal?.id ?? null,
-        goal_title: data.goal?.title ?? null,
-        goal_status: data.goal?.status ?? null,
-        goal_progress_percent: data.goal?.progress_percent ?? null,
-      },
-      liked,
-      saved,
-    ),
+    ...detailPost(data, liked, saved),
     visibility: data.visibility,
     author_id: data.author_id,
   }
@@ -567,33 +645,68 @@ export async function getPostComments(
   }
 }
 
-/**
- * The replies to one page of top-level comments, in one query.
- *
- * Depth is capped at one by `comments_before_write`, so this is the whole of the
- * thread below each parent — there is no second level to fetch.
- */
-export async function getCommentReplies(parentIds: string[]): Promise<CommentPost[]> {
-  if (parentIds.length === 0) return []
-  if (isLocalMode()) return localReplies(parentIds)
-
-  const supabase = await createClient()
-  const { data, error } = await supabase
-    .from('comments')
-    .select(COMMENT_SELECT)
-    .in('parent_id', parentIds)
-    .is('deleted_at', null)
-    .eq('moderation_status', 'active')
-    .order('created_at', { ascending: true })
-    .order('id', { ascending: true })
-    .returns<CommentJoinRow[]>()
-
-  if (error) {
-    console.error('[feed:getCommentReplies]', error.code, error.message)
-    return []
+/** Bounded per-parent keysets; never fetch every reply beneath a busy post. */
+export async function getCommentReplyPages(
+  parentIds: string[],
+  { limit = 10, focusParent, cursor }: {
+    limit?: number
+    focusParent?: string | string[]
+    cursor?: string | string[]
+  } = {},
+): Promise<{ pages: CommentReplyPage[]; error: string | null }> {
+  if (parentIds.length === 0) return { pages: [], error: null }
+  const local = isLocalMode()
+  const uuid = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i
+  if (parentIds.length > 30 || parentIds.some((id) => local ? !validLocalId(id) : !uuid.test(id))) {
+    return { pages: [], error: 'That reply page is not available.' }
   }
+  const parents = [...new Set(parentIds)]
+  const size = boundedPageSize(limit, 10, 20)
+  const selected = Array.isArray(focusParent) ? focusParent[0] : focusParent
+  const focus = selected && parents.includes(selected) ? selected : null
+  const after = focus ? (local ? decodeLocalCursor(cursor) : decodeCursor(Array.isArray(cursor) ? cursor[0] : cursor)) : null
+  if (local) {
+    const { db, me } = await localContext()
+    const pages = parents.flatMap((parentId): CommentReplyPage[] => {
+      const parent = db.comments.find((comment) => comment.id === parentId && comment.parent_id === null)
+      if (!parent || !readableLocalComment(parent, db, me)) return []
+      const rows = db.comments
+        .filter((comment) => comment.parent_id === parentId && readableLocalComment(comment, db, me))
+        .sort(oldestFirst)
+        .filter((comment) => parentId !== focus || !after || isNewerThan(comment, after))
+        .slice(0, size + 1)
+      const page = rows.slice(0, size)
+      const last = page.at(-1)
+      return [{
+        parentId, comments: page.map((comment) => localCommentPost(comment, db, me)),
+        nextCursor: rows.length > size && last ? { createdAt: last.created_at, id: last.id } : null,
+      }]
+    })
+    return { pages, error: null }
+  }
+  const supabase = await createClient()
+  const { data, error } = await supabase.rpc('comment_reply_pages', {
+    p_parent_ids: parents, p_limit: size, p_focus_parent: focus,
+    p_after_created_at: after?.createdAt ?? null, p_after_id: after?.id ?? null,
+  })
+  if (error || !Array.isArray(data)) {
+    console.error('[feed:reply-pages] read failed', error?.code ?? 'invalid_result')
+    return { pages: [], error: 'Replies could not be loaded. Please try again.' }
+  }
+  const pages = (data as { parent_id: string; comments: CommentJoinRow[]; has_more: boolean }[]).map((row) => {
+    const comments = row.comments.slice(0, size).map(toCommentPost)
+    const last = comments.at(-1)
+    return {
+      parentId: row.parent_id, comments,
+      nextCursor: row.has_more && last ? { createdAt: last.created_at, id: last.id } : null,
+    }
+  })
+  return { pages, error: null }
+}
 
-  return (data ?? []).map(toCommentPost)
+/** Compatibility reader, now bounded to the first ten replies per parent. */
+export async function getCommentReplies(parentIds: string[]): Promise<CommentPost[]> {
+  return (await getCommentReplyPages(parentIds)).pages.flatMap((page) => page.comments)
 }
 
 export type UniversityPeer = {
@@ -760,10 +873,12 @@ export function localCanViewPost(
   post: LocalPost,
   reader: LocalProfile | null,
   author: LocalProfile | undefined,
+  db?: Tables,
 ): boolean {
-  if (post.deleted_at !== null) return false
+  if (post.deleted_at !== null || post.moderation_status !== 'active') return false
+  if (db && (!profileActive(db, post.author_id) || !contentActive(db, 'post', post.id) || blockedPair(db, post.author_id, reader?.id))) return false
   if (reader && post.author_id === reader.id) return true
-  if (post.moderation_status !== 'active') return false
+  if (db && post.visibility === 'connections' && connectedPair(db, reader?.id, post.author_id)) return true
   if (post.visibility === 'public') return true
   if (post.visibility === 'university') return localSharesUniversity(reader, author)
   return false // 'connections' (no such relation locally) and 'private'
@@ -845,23 +960,6 @@ function decodeLocalCursor(raw: string | string[] | undefined): Cursor | null {
   return { createdAt, id }
 }
 
-/**
- * Whether the reader may see a row that carries its own `visibility` — a project or
- * a goal — so an attachment is dropped exactly when the embed in `DETAIL_SELECT`
- * would have come back as `null` because RLS refused it. Same rule as posts,
- * including the missing-`connections` caveat: visible to its owner only.
- */
-function localCanSeeOwned(
-  visibility: string,
-  ownerId: string,
-  reader: LocalProfile | null,
-  owner: LocalProfile | undefined,
-): boolean {
-  if (reader && reader.id === ownerId) return true
-  if (visibility === 'public') return true
-  if (visibility === 'university') return localSharesUniversity(reader, owner)
-  return false
-}
 
 /**
  * One local post, in the shape the card renders.
@@ -881,16 +979,14 @@ function localFeedPost(post: LocalPost, db: Tables, me: LocalProfile | null): Fe
   const projectRow = post.project_id
     ? db.projects.find((project) => project.id === post.project_id)
     : undefined
-  const projectOwner = projectRow
-    ? db.profiles.find((profile) => profile.id === projectRow.owner_id)
-    : undefined
+
 
   const goalRow = post.goal_id ? db.goals.find((goal) => goal.id === post.goal_id) : undefined
 
   const project =
     projectRow &&
     projectRow.deleted_at === null &&
-    localCanSeeOwned(projectRow.visibility, projectRow.owner_id, me, projectOwner)
+    canReadContent(db, projectRow, projectRow.owner_id, me, 'project')
       ? {
           id: projectRow.id,
           slug: projectRow.slug,
@@ -903,7 +999,7 @@ function localFeedPost(post: LocalPost, db: Tables, me: LocalProfile | null): Fe
       : null
 
   const goal =
-    goalRow && localCanSeeOwned(goalRow.visibility, goalRow.profile_id, me, author)
+    goalRow && canReadContent(db, goalRow, goalRow.profile_id, me, 'goal')
       ? {
           id: goalRow.id,
           title: goalRow.title,
@@ -920,12 +1016,12 @@ function localFeedPost(post: LocalPost, db: Tables, me: LocalProfile | null): Fe
     link_url: null,
     like_count: db.post_likes.filter((like) => like.post_id === post.id).length,
     comment_count: db.comments.filter(
-      (comment) => comment.post_id === post.id && comment.deleted_at === null,
+      (comment) => comment.post_id === post.id && readableLocalComment(comment, db, me),
     ).length,
     save_count: db.post_saves.filter((save) => save.post_id === post.id).length,
     created_at: post.created_at,
     is_edited: false,
-    author: author
+    author: author && canReadProfile(db, author, me)
       ? {
           id: author.id,
           username: author.username,
@@ -977,13 +1073,14 @@ async function localFeedPosts({
 }): Promise<{ posts: FeedPost[] | null; nextCursor: Cursor | null; error: string | null }> {
   const { db, me } = await localContext()
 
-  if (lens === 'following') return { posts: [], nextCursor: null, error: null }
+  const followed = new Set(db.follows.filter(row => row.follower_id === me?.id).map(row => row.following_id))
 
   const authorOf = (post: LocalPost) => db.profiles.find((profile) => profile.id === post.author_id)
   const decoded = decodeLocalCursor(cursor)
 
   const visible = db.posts
-    .filter((post) => localCanViewPost(post, me, authorOf(post)))
+    .filter(post => lens !== 'following' || followed.has(post.author_id))
+    .filter((post) => localCanViewPost(post, me, authorOf(post), db))
     .sort(newestFirst)
 
   const rows = (decoded ? visible.filter((post) => isOlderThan(post, decoded)) : visible).slice(
@@ -1006,7 +1103,7 @@ async function localPostDetail(id: string): Promise<PostDetail | null> {
   if (!post) return null
 
   const author = db.profiles.find((profile) => profile.id === post.author_id)
-  if (!localCanViewPost(post, me, author)) return null
+  if (!localCanViewPost(post, me, author, db)) return null
 
   return {
     ...localFeedPost(post, db, me),
@@ -1023,7 +1120,12 @@ async function localPostDetail(id: string): Promise<PostDetail | null> {
  * `reply_count` is counted from the replies that exist. `is_edited` is false: no
  * column records an edit.
  */
-function localCommentPost(comment: LocalComment, db: Tables): CommentPost {
+function readableLocalComment(comment: LocalComment, db: Tables, me: LocalProfile | null): boolean {
+  if (comment.deleted_at || !contentActive(db, 'comment', comment.id) || !profileActive(db, comment.author_id) || blockedPair(db, me?.id, comment.author_id)) return false
+  const parent = comment.parent_id ? db.comments.find(row => row.id === comment.parent_id && row.post_id === comment.post_id) : null
+  return !comment.parent_id || Boolean(parent && !parent.parent_id && readableLocalComment(parent, db, me))
+}
+function localCommentPost(comment: LocalComment, db: Tables, me: LocalProfile | null): CommentPost {
   const author = db.profiles.find((profile) => profile.id === comment.author_id)
 
   return {
@@ -1032,11 +1134,11 @@ function localCommentPost(comment: LocalComment, db: Tables): CommentPost {
     body: comment.body,
     like_count: 0,
     reply_count: db.comments.filter(
-      (candidate) => candidate.parent_id === comment.id && candidate.deleted_at === null,
+      (candidate) => candidate.parent_id === comment.id && readableLocalComment(candidate, db, me),
     ).length,
     is_edited: false,
     created_at: comment.created_at,
-    author: author
+    author: author && canReadProfile(db, author, me)
       ? {
           id: author.id,
           username: author.username,
@@ -1065,13 +1167,13 @@ async function localComments(
   if (!post) return { comments: [], nextCursor: null, error: null }
 
   const author = db.profiles.find((profile) => profile.id === post.author_id)
-  if (!localCanViewPost(post, me, author)) return { comments: [], nextCursor: null, error: null }
+  if (!localCanViewPost(post, me, author, db)) return { comments: [], nextCursor: null, error: null }
 
   const decoded = decodeLocalCursor(cursor)
   const rows = db.comments
     .filter(
       (comment) =>
-        comment.post_id === postId && comment.parent_id === null && comment.deleted_at === null,
+        comment.post_id === postId && comment.parent_id === null && readableLocalComment(comment, db, me),
     )
     .sort(oldestFirst)
     .filter((comment) => (decoded ? isNewerThan(comment, decoded) : true))
@@ -1080,35 +1182,10 @@ async function localComments(
   const last = rows.at(-1)
 
   return {
-    comments: rows.map((comment) => localCommentPost(comment, db)),
+    comments: rows.map((comment) => localCommentPost(comment, db, me)),
     nextCursor: rows.length === limit && last ? { createdAt: last.created_at, id: last.id } : null,
     error: null,
   }
-}
-
-/** `getCommentReplies` against the store: one level, on posts the reader may see. */
-async function localReplies(parentIds: string[]): Promise<CommentPost[]> {
-  const { db, me } = await localContext()
-  const parents = new Set(parentIds)
-
-  const visiblePostIds = new Set(
-    db.posts
-      .filter((post) =>
-        localCanViewPost(post, me, db.profiles.find((profile) => profile.id === post.author_id)),
-      )
-      .map((post) => post.id),
-  )
-
-  return db.comments
-    .filter(
-      (comment) =>
-        comment.parent_id !== null &&
-        parents.has(comment.parent_id) &&
-        comment.deleted_at === null &&
-        visiblePostIds.has(comment.post_id),
-    )
-    .sort(oldestFirst)
-    .map((comment) => localCommentPost(comment, db))
 }
 
 /** `listUniversityPeers` against the store. */
@@ -1127,7 +1204,7 @@ async function localUniversityPeers(
         profile.id !== me.id &&
         profile.university_id === me.university_id &&
         profile.visibility === 'public' &&
-        profile.searchable,
+        profile.searchable && canReadProfile(db, profile, me),
     )
     .sort((a, b) => a.display_name.localeCompare(b.display_name))
     .slice(0, limit)

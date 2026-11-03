@@ -1,74 +1,70 @@
 'use client'
 
 import { Monitor, Moon, Sun } from 'lucide-react'
-import { useEffect, useState } from 'react'
+import { useEffect, useSyncExternalStore } from 'react'
 import { cn } from '@/lib/utils'
+import { LEGACY_THEME_STORAGE_KEY, THEME_STORAGE_KEY, type ThemeChoice } from './theme-config'
 
-/**
- * ThemeToggle — light, dark, or whatever the system says.
- *
- * globals.css defines a class-based dark theme and says a preference the user stated
- * must beat one the OS inferred. This is where that statement is kept: the choice is
- * stored under one key, applied by the inline script in the layout *before* first paint
- * so there is no flash of light content, and "System" stays live rather than being
- * resolved to a value the moment it is chosen.
- *
- * Three buttons rather than a switch, because a switch cannot express "follow the
- * system": it would have to be either on or off, and both would be a lie half the time.
- */
-export const THEME_STORAGE_KEY = 'quad-theme'
-export type ThemeChoice = 'light' | 'dark' | 'system'
+export { THEME_STORAGE_KEY, type ThemeChoice } from './theme-config'
 
+const CHANGE_EVENT = 'bulla-theme-change'
+let memoryChoice: ThemeChoice = 'system'
 const options: { value: ThemeChoice; label: string; Icon: typeof Sun }[] = [
   { value: 'light', label: 'Light', Icon: Sun },
   { value: 'dark', label: 'Dark', Icon: Moon },
   { value: 'system', label: 'System', Icon: Monitor },
 ]
 
-function apply(choice: ThemeChoice) {
-  const prefersDark = window.matchMedia('(prefers-color-scheme: dark)').matches
-  const dark = choice === 'dark' || (choice === 'system' && prefersDark)
-  document.documentElement.classList.toggle('dark', dark)
+function getChoice(): ThemeChoice {
+  try {
+    const stored = window.localStorage.getItem(THEME_STORAGE_KEY) ?? window.localStorage.getItem(LEGACY_THEME_STORAGE_KEY)
+    memoryChoice = stored === 'light' || stored === 'dark' ? stored : 'system'
+  } catch {
+    // Private browsing can deny storage. The choice still works for this visit.
+  }
+  return memoryChoice
 }
 
+function subscribe(onChange: () => void) {
+  window.addEventListener(CHANGE_EVENT, onChange)
+  window.addEventListener('storage', onChange)
+  return () => {
+    window.removeEventListener(CHANGE_EVENT, onChange)
+    window.removeEventListener('storage', onChange)
+  }
+}
+
+function getServerChoice(): ThemeChoice { return 'system' }
+
+function apply(choice: ThemeChoice) {
+  const prefersDark = window.matchMedia('(prefers-color-scheme: dark)').matches
+  document.documentElement.classList.toggle('dark', choice === 'dark' || (choice === 'system' && prefersDark))
+}
+
+function choose(next: ThemeChoice) {
+  memoryChoice = next
+  try { window.localStorage.setItem(THEME_STORAGE_KEY, next) } catch { /* Use this-visit memory. */ }
+  apply(next)
+  window.dispatchEvent(new Event(CHANGE_EVENT))
+}
+
+/** Shared menu/footer controls follow one external preference, with no hydration flash. */
 export function ThemeToggle({ className }: { className?: string }) {
-  const [choice, setChoice] = useState<ThemeChoice>('system')
-
+  const choice = useSyncExternalStore(subscribe, getChoice, getServerChoice)
   useEffect(() => {
-    const stored = window.localStorage.getItem(THEME_STORAGE_KEY) as ThemeChoice | null
-    if (stored === 'light' || stored === 'dark' || stored === 'system') setChoice(stored)
-
-    // "System" has to keep up with the OS while the page is open, not only at load.
+    apply(choice)
     const media = window.matchMedia('(prefers-color-scheme: dark)')
-    const onChange = () => {
-      const current = (window.localStorage.getItem(THEME_STORAGE_KEY) as ThemeChoice | null) ?? 'system'
-      if (current === 'system') apply('system')
-    }
+    const onChange = () => { if (choice === 'system') apply('system') }
     media.addEventListener('change', onChange)
     return () => media.removeEventListener('change', onChange)
-  }, [])
-
-  function choose(next: ThemeChoice) {
-    setChoice(next)
-    window.localStorage.setItem(THEME_STORAGE_KEY, next)
-    apply(next)
-  }
+  }, [choice])
 
   return (
-    <div className={cn('inline-flex rounded border border-rule p-0.5', className)} role="group" aria-label="Theme">
+    <div className={cn('inline-flex rounded border border-rule bg-paper-raised p-0.5', className)} role="group" aria-label="Theme">
       {options.map(({ value, label, Icon }) => (
-        <button
-          key={value}
-          type="button"
-          onClick={() => choose(value)}
-          aria-pressed={choice === value}
-          className={cn(
-            'flex min-h-9 flex-1 items-center justify-center gap-1.5 rounded-sm px-2.5 text-sm',
-            choice === value ? 'bg-paper-sunken text-ink' : 'text-ink-muted hover:text-ink',
-          )}
-        >
-          <Icon className="size-4" aria-hidden="true" />
-          {label}
+        <button key={value} type="button" onClick={() => choose(value)} aria-pressed={choice === value}
+          className={cn('flex min-h-11 flex-1 items-center justify-center gap-1.5 rounded-sm px-2.5 text-sm', choice === value ? 'bg-accent-50 font-medium text-accent-700' : 'text-ink-muted hover:text-ink')}>
+          <Icon className="size-4" aria-hidden="true" />{label}
         </button>
       ))}
     </div>

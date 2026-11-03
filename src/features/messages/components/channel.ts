@@ -66,7 +66,7 @@ import { createClient } from '@/lib/supabase/client'
 export type ChannelStatus = 'connecting' | 'live' | 'reconnecting' | 'offline'
 
 /** The only two tables this application subscribes to. ARCHITECTURE §4. */
-export type SubscribedTable = 'messages' | 'notifications'
+export type SubscribedTable = 'messages' | 'notifications' | 'conversation_participants'
 
 declare const scoped: unique symbol
 
@@ -101,7 +101,7 @@ const LOCAL_SCOPED = /^[a-z_]+=eq\.[a-z]+_[a-z0-9]{1,64}$/
  * precisely the thing that must not depend on a policy being configured correctly.
  */
 export function scopedFilter(
-  column: 'conversation_id' | 'recipient_id',
+  column: 'conversation_id' | 'recipient_id' | 'profile_id',
   id: string,
 ): ScopedFilter {
   const value = `${column}=eq.${id}`
@@ -152,7 +152,7 @@ export type RowSubscription = {
   table: SubscribedTable
   filter: ScopedFilter
   /** Which row events matter. Notifications resurface (an UPDATE), so they use '*'. */
-  events?: 'INSERT' | 'UPDATE' | '*'
+  events?: 'INSERT' | 'UPDATE' | '*' | readonly ('INSERT' | 'UPDATE')[]
   /** Called for every matching row event. A signal, not something to render raw. */
   onEvent: (payload: unknown) => void
   onStatus: (status: ChannelStatus) => void
@@ -180,6 +180,12 @@ export function subscribeToRows({
         'at the type level because a cast defeats a brand.',
     )
   }
+  const column = filter.slice(0, filter.indexOf('=eq.'))
+  const requiredColumn = table === 'messages' ? 'conversation_id' :
+    table === 'notifications' ? 'recipient_id' : 'profile_id'
+  if (column !== requiredColumn || (table !== 'notifications' && events === '*')) {
+    throw new Error('Private message subscriptions require INSERT/UPDATE and the table-specific owner scope.')
+  }
   // The scope has to be in the channel *name* as well as the filter. Two readers
   // opening a channel with the same name would join one topic on the socket, and
   // the row filter of whichever subscribed last is the one that would apply.
@@ -202,16 +208,17 @@ export function subscribeToRows({
 
   const supabase = createClient()
 
-  const channel = supabase
-    .channel(channelName)
-    .on(
+  const channel = supabase.channel(channelName)
+  for (const event of typeof events === 'string' ? [events] : events) {
+    channel.on(
       'postgres_changes',
-      { event: events, schema: 'public', table, filter },
+      { event, schema: 'public', table, filter },
       (payload: unknown) => {
         onEvent(payload)
       },
     )
-    .subscribe((raw: string) => {
+  }
+  channel.subscribe((raw: string) => {
       onStatus(toChannelStatus(raw))
     })
 
@@ -238,22 +245,26 @@ export function useRowSubscription({
   filter,
   events = 'INSERT',
   onEvent,
-}: Omit<RowSubscription, 'onStatus'>): ChannelStatus {
+  onLive,
+  enabled = true,
+}: Omit<RowSubscription, 'onStatus'> & { onLive?: () => void; enabled?: boolean }): ChannelStatus {
   // Local mode starts — and stays — `offline`: there is no socket, and a spinner
   // for one that will never open is the failure this file is written against.
   const [status, setStatus] = useState<ChannelStatus>(isLocalMode() ? 'offline' : 'connecting')
   const handler = useRef(onEvent)
+  const liveHandler = useRef(onLive)
 
   // Not setState-in-an-effect: this assigns a ref to the newest callback after
   // every render, which is what the library needs and what the lint rule allows.
   useEffect(() => {
     handler.current = onEvent
+    liveHandler.current = onLive
   })
 
   useEffect(() => {
     // Local mode: nothing to connect to, and the status is already `offline`. Skipped
     // here as well as inside `subscribeToRows` so no client is constructed at all.
-    if (isLocalMode()) return
+    if (isLocalMode() || !enabled) return
 
     const subscription = subscribeToRows({
       channelName,
@@ -263,15 +274,46 @@ export function useRowSubscription({
       onEvent: (payload) => {
         handler.current(payload)
       },
-      onStatus: setStatus,
+      onStatus: (next) => {
+        setStatus(next)
+        // A socket can miss every event while disconnected. Reconcile durable
+        // authorized history whenever it becomes live, including reconnection.
+        if (next === 'live') liveHandler.current?.()
+      },
     })
 
     return () => {
       subscription.unsubscribe()
     }
-  }, [channelName, table, filter, events])
+  }, [channelName, table, filter, events, enabled])
 
-  return status
+  return enabled ? status : 'offline'
+}
+
+/**
+ * Durable re-reads also cover an edit/removal that is no longer SELECT-visible
+ * and therefore may produce no socket event. Only the visible, online hosted
+ * thread gets a 30-second safety reconciliation. Local mode has no timer/live
+ * claim. Focus/online/visibility recovery re-reads in either adapter.
+ */
+export function useDurableReconcile(refresh: () => void, scope: string) {
+  const handler = useRef(refresh)
+  useEffect(() => { handler.current = refresh })
+  useEffect(() => {
+    const reconcile = () => {
+      if (document.visibilityState === 'visible' && navigator.onLine !== false) handler.current()
+    }
+    window.addEventListener('focus', reconcile)
+    window.addEventListener('online', reconcile)
+    document.addEventListener('visibilitychange', reconcile)
+    const timer = isLocalMode() ? null : setInterval(reconcile, 30_000)
+    return () => {
+      window.removeEventListener('focus', reconcile)
+      window.removeEventListener('online', reconcile)
+      document.removeEventListener('visibilitychange', reconcile)
+      if (timer !== null) clearInterval(timer)
+    }
+  }, [scope])
 }
 
 /**

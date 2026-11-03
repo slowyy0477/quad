@@ -2,6 +2,10 @@ import 'server-only'
 
 import { promises as fs } from 'node:fs'
 import path from 'node:path'
+import { EMPTY_DOMAIN_TABLES, type DomainTables } from './domain-tables'
+import { cookies } from 'next/headers'
+import { getLocalUserFromSnapshot, LOCAL_SESSION_COOKIE } from './session'
+import { enforceMutationLimits, type LocalMutationLimitWindow } from './mutation-limits'
 
 /**
  * The local store.
@@ -40,7 +44,7 @@ export type Row = { id: string; [key: string]: unknown }
 
 export type Tables = {
   users: LocalUser[]
-  sessions: never[]
+  sessions: LocalSession[]
   profiles: LocalProfile[]
   universities: LocalUniversity[]
   posts: LocalPost[]
@@ -65,7 +69,8 @@ export type Tables = {
   event_attendees: LocalAttendee[]
   reports: LocalReport[]
   user_roles: LocalUserRole[]
-}
+  mutation_limit_windows: LocalMutationLimitWindow[]
+} & DomainTables
 
 /**
  * A staff role.
@@ -81,11 +86,20 @@ export type LocalUserRole = {
   created_at: string
 }
 
+export type LocalSession = {
+  id: string
+  user_id: string
+  token_hash: string
+  created_at: string
+  expires_at: string
+}
+
 export type LocalUser = {
   id: string
   email: string
   password_hash: string
   created_at: string
+  disabled_at?: string | null
 }
 
 export type LocalProfile = {
@@ -97,10 +111,23 @@ export type LocalProfile = {
   avatar_url: string | null
   university_id: string | null
   department: string | null
+  /** Undefined is legacy text-only affiliation; null is an explicit clear. */
+  department_id?: string | null
   programme: string | null
   semester: string | null
   website: string | null
   github: string | null
+  // Profile forms use canonical fields without discarding legacy programme/GitHub
+  // values. Undefined means an older row; explicit null means the user cleared it.
+  degree?: string | null
+  headline?: string | null
+  graduation_year?: number | null
+  location?: string | null
+  github_username?: string | null
+  linkedin_url?: string | null
+  twitter_username?: string | null
+  onboarding_completed?: boolean
+  onboarding_step?: number
   visibility: 'public' | 'university' | 'connections' | 'private'
   searchable: boolean
   // Optional because they were added to the store after the first accounts existed;
@@ -218,6 +245,8 @@ export type LocalParticipant = {
   id: string
   conversation_id: string
   profile_id: string
+  /** Legacy missing roles are members, never inferred administrators. */
+  role?: 'admin' | 'member'
   last_read_at: string | null
 }
 
@@ -334,6 +363,13 @@ export type LocalEvent = {
   status: string
   created_at: string
   deleted_at: string | null
+  /** New writes persist these; legacy snapshots retain their honest fallbacks. */
+  slug?: string
+  type?: string
+  attendance_mode?: string
+  is_all_day?: boolean
+  join_url?: string | null
+  location_url?: string | null
 }
 
 export type LocalAttendee = {
@@ -357,9 +393,12 @@ export type LocalReport = {
   idea_id: string | null
   message_id: string | null
   reported_profile_id: string | null
+  event_id?: string | null
+  opportunity_id?: string | null
 }
 
 const EMPTY: Tables = {
+  ...EMPTY_DOMAIN_TABLES,
   users: [],
   sessions: [],
   profiles: [],
@@ -386,56 +425,95 @@ const EMPTY: Tables = {
   event_attendees: [],
   reports: [],
   user_roles: [],
+  mutation_limit_windows: [],
 }
 
-let cache: Tables | null = null
 let writing: Promise<void> = Promise.resolve()
 
-function filePath() {
-  return path.join(process.cwd(), 'data', 'local.json')
+export function localStorePath(): string {
+  return process.env.LOCAL_DATA_PATH || path.join(process.cwd(), 'data', 'local.json')
 }
 
-/** Read the store once per process, then keep it in memory. */
+/** Read a committed snapshot. Never cache across independently bundled workers. */
 export async function readStore(): Promise<Tables> {
-  if (cache) return cache
-
   try {
-    const raw = await fs.readFile(filePath(), 'utf8')
-    const parsed = JSON.parse(raw) as Partial<Tables>
-    // Merge over EMPTY so a store written by an older build gains new tables
-    // instead of producing `undefined.map` three layers down.
-    cache = { ...EMPTY, ...parsed }
-    return cache
-  } catch {
-    cache = structuredClone(EMPTY)
-    return cache
+    // Runtime-owned private data is supplied by LOCAL_DATA_PATH, never a deploy
+    // asset. Tracing this dynamic read included the source checkout's datastore.
+    const raw = await fs.readFile(/* turbopackIgnore: true */ localStorePath(), 'utf8')
+    const parsed: unknown = JSON.parse(raw)
+    if (!parsed || typeof parsed !== 'object' || Array.isArray(parsed)) {
+      throw new Error('Invalid local store: expected a table object. Restore a known-good backup.')
+    }
+    for (const [name, rows] of Object.entries(parsed)) {
+      if (!Array.isArray(rows)) throw new Error(`Invalid local store table: ${name}`)
+    }
+    return { ...structuredClone(EMPTY), ...parsed } as Tables
+  } catch (error) {
+    if ((error as NodeJS.ErrnoException).code !== 'ENOENT') throw error
+    return structuredClone(EMPTY)
   }
 }
 
-/**
- * Mutate the store and persist it.
- *
- * The mutation runs against the in-memory copy and the write is queued, so two
- * concurrent Server Actions cannot produce a half-written file. If the write
- * fails the in-memory copy is still changed — the alternative is a page that
- * silently loses the row it just created and claims success, which is worse than
- * a logged disk error.
- */
-export async function mutate<T>(fn: (db: Tables) => T | Promise<T>): Promise<T> {
-  const db = await readStore()
-  const result = await fn(db)
-
-  writing = writing.then(async () => {
+/** A filesystem lock prevents lost updates between Next's independent workers. */
+async function lockStore(target: string): Promise<() => Promise<void>> {
+  const lock = `${target}.lock`
+  const deadline = Date.now() + 10_000
+  await fs.mkdir(path.dirname(target), { recursive: true })
+  for (;;) {
     try {
-      await fs.mkdir(path.dirname(filePath()), { recursive: true })
-      await fs.writeFile(filePath(), JSON.stringify(db, null, 2), 'utf8')
+      await fs.mkdir(lock)
+      return () => fs.rmdir(lock)
     } catch (error) {
-      console.error('[local:write]', error)
+      if ((error as NodeJS.ErrnoException).code !== 'EEXIST') throw error
+      if (Date.now() >= deadline) {
+        throw new Error('Local store is busy. If the server crashed, stop it before removing the stale .lock folder.')
+      }
+      await new Promise((resolve) => setTimeout(resolve, 20))
+    }
+  }
+}
+
+/** Commit a private transaction snapshot; failures never become visible state. */
+export async function mutate<T>(fn: (db: Tables) => T | Promise<T>): Promise<T> {
+  const target = localStorePath()
+  const transaction = writing.then(async () => {
+    const release = await lockStore(target)
+    try {
+      const db = await readStore()
+      const before = structuredClone(db)
+      // Resolve from the locked snapshot, not a caller-selected ID or an earlier
+      // getUser read. Non-request maintenance has no session; protected writes
+      // then fail closed. Signup/session changes do not consume content budgets.
+      let rawSession: string | undefined
+      try { rawSession = (await cookies()).get(LOCAL_SESSION_COOKIE)?.value } catch { /* Not a request. */ }
+      const actor = getLocalUserFromSnapshot(before, rawSession)
+      const result = await fn(db)
+      db.mutation_limit_windows = enforceMutationLimits(before, db, {
+        actorUserId: actor?.id ?? null,
+        nowMs: Date.now(),
+      })
+      const temp = `${target}.${process.pid}.${Date.now()}.tmp`
+      try {
+        const handle = await fs.open(temp, 'wx', 0o600)
+        try {
+          await handle.writeFile(JSON.stringify(db, null, 2), 'utf8')
+          await handle.sync()
+        } finally {
+          await handle.close()
+        }
+        await fs.rename(temp, target)
+      } finally {
+        await fs.unlink(temp).catch((error: NodeJS.ErrnoException) => {
+          if (error.code !== 'ENOENT') throw error
+        })
+      }
+      return result
+    } finally {
+      await release()
     }
   })
-
-  await writing
-  return result
+  writing = transaction.then(() => undefined, () => undefined)
+  return transaction
 }
 
 /** A deterministic-enough id. Not a uuid's collision resistance, and not trying to be. */
@@ -448,7 +526,7 @@ export function now(): string {
   return new Date().toISOString()
 }
 
-/** The store is per-process; tests import this to reset between cases. */
+/** Compatibility hook: committed snapshots are now read fresh on every call. */
 export function resetLocalCache() {
-  cache = null
+  writing = Promise.resolve()
 }

@@ -1,11 +1,14 @@
 'use client'
 
-import { useActionState } from 'react'
+import { useActionState, useId, useState } from 'react'
+import Link from 'next/link'
 import { Alert } from '@/components/ui/alert'
 import { Field } from '@/components/ui/field'
 import { Input } from '@/components/ui/input'
 import { SubmitButton } from '@/components/ui/submit-button'
-import { startConversationAction } from '@/features/messages/actions'
+import { createGroupConversationAction, startConversationAction } from '@/features/messages/actions'
+import { GROUP_REACHABILITY_COPY } from '../group-contract'
+import type { GroupCreateState } from '../types'
 import { emptyFormState } from '@/lib/form-state'
 
 /**
@@ -30,15 +33,17 @@ import { emptyFormState } from '@/lib/form-state'
  */
 export function NewConversationForm({ defaultUsername = '' }: { defaultUsername?: string }) {
   const [state, start] = useActionState(startConversationAction, emptyFormState)
+  const formId = useId()
 
   return (
+    <div className="space-y-3">
     <form action={start} className="space-y-3">
       {state.status === 'error' && state.message ? (
         <Alert tone="danger">{state.message}</Alert>
       ) : null}
 
       <Field
-        id="new-conversation-username"
+        id={`${formId}-username`}
         label="Their handle"
         hint="The username after the @ on their profile."
         error={state.fieldErrors?.username}
@@ -60,6 +65,48 @@ export function NewConversationForm({ defaultUsername = '' }: { defaultUsername?
       <SubmitButton variant="secondary" size="sm" pendingLabel="Opening…">
         Start conversation
       </SubmitButton>
+    </form>
+      <details className="border-t border-hairline pt-3">
+        <summary className="cursor-pointer rounded text-sm text-ink-muted hover:text-ink">
+          Create group
+        </summary>
+        <div className="mt-3"><CreateGroupForm /></div>
+      </details>
+    </div>
+  )
+}
+
+export function CreateGroupForm() {
+  const initial: GroupCreateState = emptyFormState
+  const [state, create, pending] = useActionState(createGroupConversationAction, initial)
+  const formId = useId()
+  // Controlled inputs survive a refused action, including a stale consent check.
+  const [title, setTitle] = useState('')
+  const [handles, setHandles] = useState('')
+  return (
+    <form action={create} className="space-y-3">
+      <p className="text-xs text-ink-muted">{GROUP_REACHABILITY_COPY}</p>
+      <p className="text-xs text-ink-faint">Up to 10 handles now; 20 active people per group, including you.</p>
+      <fieldset disabled={pending} className="space-y-3">
+        <Field id={`${formId}-title`} label="Group name" required error={state.fieldErrors?.title}>
+          {props => <Input {...props} name="title" value={title} onChange={event => setTitle(event.target.value)} maxLength={120} />}
+        </Field>
+        <Field id={`${formId}-handles`} label="Group handles" required
+          hint="Accepted connections, separated by commas or spaces."
+          error={state.fieldErrors?.handles}>
+          {props => <Input {...props} name="handles" value={handles} onChange={event => setHandles(event.target.value)}
+            maxLength={500} autoComplete="off" autoCapitalize="none" spellCheck={false} />}
+        </Field>
+      </fieldset>
+      {state.message ? <Alert tone={state.status === 'success' ? 'success' : 'danger'}>{state.message}</Alert> : null}
+      {state.status === 'success' && state.conversationId ? (
+        <Link href={`/messages?c=${state.conversationId}`} className="text-sm text-accent-700 underline underline-offset-2">
+          Open group
+        </Link>
+      ) : null}
+      <div>
+        <SubmitButton variant="secondary" size="sm" pendingLabel="Creating…">Create group</SubmitButton>
+      </div>
     </form>
   )
 }

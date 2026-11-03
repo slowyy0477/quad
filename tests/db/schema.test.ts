@@ -225,14 +225,36 @@ describe('function execute privileges', () => {
 
   /** Functions in `public` that a signed-in user is meant to be able to call. */
   const CLIENT_RPCS = [
+    'account_deletion_status',
+    'account_export',
+    'account_lifecycle_preflight',
+    'account_request_deletion',
     'check_rate_limit',
+    'comment_reply_pages',
     'convert_idea_to_project',
+    'convert_idea_to_project_with_invites',
     'create_group_conversation',
     'current_study_streak',
     'mark_conversation_read',
+    'message_add_group_members',
+    'message_create_group',
+    'message_group_members',
+    'message_leave_conversation',
+    'message_remove_group_member',
+    'message_set_group_role',
     'moderate_report',
+    'my_connection_page',
+    'people_discovery',
+    'profile_follow_page',
+    'profile_graph_counts',
+    'project_invitation_inbox',
+    'respond_to_project_invite',
     'review_university_request',
+    // 0019 intentionally exposes this SECURITY INVOKER search RPC to signed-in
+    // clients. Its SELECTs retain the caller's RLS; anon EXECUTE stays revoked.
+    'search_all',
     'start_direct_conversation',
+    'staff_session_assured',
     'total_unread_messages',
     'touch_last_active',
     'transfer_project_ownership',
@@ -240,7 +262,23 @@ describe('function execute privileges', () => {
   ]
 
   /** Functions in `public` that no client may call, at all. */
-  const SERVICE_ONLY = ['dispatch_due_reminders']
+  const SERVICE_ONLY = [
+    'account_deletion_claim',
+    'account_deletion_cleanup_content',
+    'account_deletion_fail',
+    'account_deletion_finish',
+    'account_deletion_mark_media_removed',
+    'account_deletion_media_batch',
+    'account_deletion_prepare_media',
+    'account_deletion_resume',
+    'account_deletion_yield',
+    'bulla_commit_image',
+    'bulla_forget_image',
+    'bulla_image_upload_readiness',
+    'bulla_reserve_image',
+    'bulla_retire_image',
+    'dispatch_due_reminders',
+  ]
 
   it('exposes no app helper to a client unless a policy or constraint needs it', async () => {
     // `security invoker` helpers are exempt by design: app.is_trusted_write()
@@ -276,12 +314,12 @@ describe('function execute privileges', () => {
     expect(rows.map((r) => `${r.role_name} -> app.${r.proname}()`)).toEqual([])
   })
 
-  it('lets no anonymous visitor call any function in public', async () => {
-    // Every RPC here derives its caller from auth.uid(), which is null for an
-    // anonymous request. There is no correct thing for any of them to do on an
-    // anonymous caller's behalf, and several raise distinguishable errors
-    // depending on whether a row exists -- which makes an anonymous EXECUTE an
-    // enumeration oracle for rows the caller cannot read.
+  it('allows anonymous EXECUTE only for the exact receipt and invoker-read signatures', async () => {
+    // Mutating/account RPCs derive their caller from auth.uid(). Anonymous
+    // execution must not become an enumeration oracle or a write bypass.
+    // These exact exceptions return an opaque receipt, public replies, or
+    // ordinary owner/public follows and counts under the caller's RLS.
+    // The owner-only connection page is deliberately not an anon exception.
     const rows = await db.asService<{ signature: string }>(`
       select p.oid::regprocedure::text as signature
         from pg_proc p
@@ -294,7 +332,12 @@ describe('function execute privileges', () => {
          and has_function_privilege('anon', p.oid, 'EXECUTE')
        order by 1
     `)
-    expect(rows.map((r) => r.signature)).toEqual([])
+    expect(rows.map((r) => r.signature)).toEqual([
+      'account_deletion_status(uuid)',
+      'comment_reply_pages(uuid[],integer,uuid,timestamp with time zone,uuid)',
+      'profile_follow_page(uuid,text,timestamp with time zone,uuid,integer)',
+      'profile_graph_counts(uuid)',
+    ])
   })
 
   it('sorts every function in public into exactly one intended audience', async () => {

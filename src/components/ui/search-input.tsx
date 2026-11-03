@@ -51,6 +51,7 @@ export function SearchInput({
         ref={ref}
         type="search"
         name="q"
+        maxLength={120}
         defaultValue={defaultValue}
         placeholder={placeholder}
         aria-label="Search"

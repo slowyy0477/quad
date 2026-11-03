@@ -1,37 +1,30 @@
 import Link from 'next/link'
 import { redirect } from 'next/navigation'
 import type { Metadata } from 'next'
-import { Avatar } from '@/components/ui/avatar'
 import { Alert } from '@/components/ui/alert'
-import { EmptyState, SectionHeading, Surface } from '@/components/ui/surface'
-import { isSupabaseConfigured } from '@/lib/env'
+import { EmptyState, SectionHeading } from '@/components/ui/surface'
+import { EndOfList, LoadMore } from '@/components/ui/pagination'
+import { isDataConfigured } from '@/lib/env'
 import { getUser } from '@/lib/supabase/server'
-import { listUniversityPeers } from '@/features/feed/queries'
+import { getMyUniversityId } from '@/features/universities/queries'
+import { PeopleFilterForm } from '@/features/search/components/people-filters'
+import { PeopleResults } from '@/features/search/components/people-results'
+import { firstValue, parsePeopleFilters, peopleHref, type DiscoveryParams } from '@/features/search/filters'
+import { discoverPeople, listDiscoveryUniversities } from '@/features/search/people'
 
 export const metadata: Metadata = { title: 'People at your university' }
 
-/**
- * The destination the feed's empty states point at.
- *
- * A new account follows nobody, so "your feed is empty" is only half an answer;
- * this is the other half. It lists the profiles that share the reader's
- * `profiles.university_id` — the only stored affiliation there is, since
- * departments and programmes are not listed yet — and each row links to the
- * person's profile, where Connect and Follow live.
- *
- * It is deliberately not a directory and says so: there is no search here, no
- * pagination, and no claim of completeness. RLS decides who is visible, so a
- * blocked or private profile simply is not in the list.
- */
-export default async function FeedPeoplePage() {
-  if (!isSupabaseConfigured()) {
+/** Starts at the reader's institution, with explicit URL filters and bounded pages. */
+export default async function FeedPeoplePage({
+  searchParams,
+}: { searchParams: Promise<DiscoveryParams> }) {
+  if (!isDataConfigured()) {
     return (
-      <div className="mx-auto w-full max-w-2xl px-4 py-12">
+      <div className="page-enter mx-auto w-full max-w-2xl px-4 py-12">
         <h1 className="text-2xl">People at your university</h1>
         <Alert tone="warning" title="No database connected" className="mt-5">
           <p>
-            This list is rows in Postgres. Without Supabase credentials there is nobody to show, and
-            this page will not invent people.{' '}
+            People discovery needs a configured data provider. No profiles are invented.{' '}
             <Link href="/setup">Configuration steps</Link>.
           </p>
         </Alert>
@@ -39,16 +32,25 @@ export default async function FeedPeoplePage() {
     )
   }
 
+  const params = await searchParams
   const user = await getUser()
-  if (!user) redirect('/login?next=/feed/people')
-
-  const { peers, universityId, error } = await listUniversityPeers()
+  if (!user) {
+    const wanted = peopleHref(parsePeopleFilters(params), firstValue(params.cursor), '/feed/people')
+    redirect(`/login?next=${encodeURIComponent(wanted)}`)
+  }
+  const [myUniversityId, picker] = await Promise.all([getMyUniversityId(), listDiscoveryUniversities()])
+  const filters = parsePeopleFilters(params)
+  if (params.university === undefined) filters.universityId = myUniversityId
+  const { people, nextCursor, error } = await discoverPeople({
+    ...filters, cursor: params.cursor, excludeSelf: true,
+  })
 
   return (
-    <div className="mx-auto w-full max-w-2xl px-4 py-10 sm:px-6">
+    <div className="page-enter mx-auto w-full max-w-2xl px-4 py-10 sm:px-6">
+      <h1 className="text-3xl text-ink">Find people</h1>
       <SectionHeading
-        title="People at your university"
-        description="Profiles that carry the same institution as yours. Open one to connect or follow."
+        title={filters.universityId ? 'People at this institution' : 'Across the Bulla community'}
+        description="Filter by institution, department and self-declared skills. Open a profile to follow or connect."
       />
 
       <p className="mt-2 text-xs text-ink-faint">
@@ -57,62 +59,52 @@ export default async function FeedPeoplePage() {
         </Link>
       </p>
 
+      <div className="mt-6">
+        <PeopleFilterForm filters={filters} universities={picker.universities}
+          action="/feed/people" hasMoreUniversities={picker.hasMore} />
+        {picker.error ? <Alert tone="warning" className="mt-3">{picker.error}</Alert> : null}
+      </div>
+
       {error ? (
         <Alert tone="danger" className="mt-6">
           {error}
         </Alert>
       ) : null}
 
-      {!error && universityId === null ? (
-        <EmptyState title="You have no university on your profile" className="mt-6">
-          <p>
-            People are grouped here by the institution on their profile, and yours is not set yet.
-            Mark your institution in the directory and this list fills up.
-          </p>
-          <p className="mt-2">
+      {myUniversityId === null ? (
+        <p className="mt-4 text-sm text-ink-muted">
+          Your profile has no institution yet. You can still browse, or{' '}
             <Link href="/universities" className="text-accent-700 underline underline-offset-2">
-              Open the institution directory
+              choose your institution
             </Link>
-          </p>
-        </EmptyState>
+          .
+        </p>
       ) : null}
 
-      {!error && universityId !== null && peers && peers.length === 0 ? (
-        <EmptyState title="Nobody else is listed yet" className="mt-6">
+      {!error && people?.length === 0 ? (
+        <EmptyState title={firstValue(params.cursor)
+          ? 'No further readable people in this view' : 'No readable profiles match this view'} className="mt-6">
           <p>
-            You are the only person from your institution here so far. The directory lists
-            institutions people have asked for, so this grows as others join.
+            Clear a department or skill filter, or browse across universities. Only readable
+            profiles that opted into discovery appear here; private and unlisted accounts are
+            not described by this result.
           </p>
+          <Link href="/feed/people?university=" className="mt-3 inline-block text-accent-700 underline">
+            Browse all universities
+          </Link>
         </EmptyState>
       ) : null}
 
-      {peers && peers.length > 0 ? (
-        <ul className="mt-6 divide-y divide-hairline border-t border-hairline">
-          {peers.map((peer) => (
-            <li key={peer.id}>
-              <Surface as="div" className="border-0 bg-transparent p-0">
-                <Link
-                  href={`/u/${peer.username}`}
-                  className="flex items-center gap-3 py-3 underline-offset-2 hover:underline"
-                >
-                  <Avatar name={peer.display_name} src={peer.avatar_url} size="sm" />
-                  <span className="min-w-0">
-                    <span className="block truncate text-sm font-medium text-ink">
-                      {peer.display_name}
-                    </span>
-                    {peer.headline ? (
-                      <span className="block truncate text-xs text-ink-muted">{peer.headline}</span>
-                    ) : (
-                      <span className="block truncate text-xs text-ink-faint">
-                        @{peer.username}
-                      </span>
-                    )}
-                  </span>
-                </Link>
-              </Surface>
-            </li>
-          ))}
-        </ul>
+      {people && people.length > 0 ? (
+        <div className="mt-6">
+          <p role="status" className="text-xs text-ink-faint">
+            Showing {people.length} readable profiles on this page, ordered by profile creation.
+          </p>
+          <PeopleResults people={people} />
+          {nextCursor ? (
+            <LoadMore href={peopleHref(filters, nextCursor, '/feed/people')} label="Next people" />
+          ) : <EndOfList label="No further readable profiles in this view." />}
+        </div>
       ) : null}
     </div>
   )

@@ -28,7 +28,7 @@
  * applied, and `asUser` switches to the `authenticated` role with a JWT `sub`
  * claim, so what these tests exercise is the actual policy, not a model of it.
  */
-import { beforeAll, afterAll, describe, expect, it } from 'vitest'
+import { beforeAll, beforeEach, afterAll, describe, expect, it } from 'vitest'
 import { createTestDb, expectRejection, REJECTS, type TestDb } from './harness'
 
 let db: TestDb
@@ -60,6 +60,13 @@ beforeAll(async () => {
 
 afterAll(async () => {
   await db?.close()
+})
+
+beforeEach(async () => {
+  // These are independent authorization scenarios, not one user's hour-long
+  // activity. Reset only synthetic fixture counters BETWEEN tests. Each test's
+  // real client writes and refusals still use the mandatory production guard.
+  await db.asService('delete from app.rate_limit_windows')
 })
 
 /** A public post by the given user. */
@@ -425,7 +432,7 @@ describe('deciding a report', () => {
 
     await expectRejection(
       () => db.asUser(moderator, `select public.moderate_report($1, 'hide_content', '   ')`, [reportId]),
-      /needs a reason/i,
+      /A bounded reason is required/i,
     )
 
     await expectRejection(
@@ -435,7 +442,7 @@ describe('deciding a report', () => {
           `select public.moderate_report($1, 'hide_content', null)`,
           [reportId],
         ),
-      /needs a reason/i,
+      /A bounded reason is required/i,
     )
 
     // Unchanged: the refusal is not a partial write.
@@ -959,114 +966,103 @@ describe('bug reports', () => {
   })
 })
 
-describe('rate limiting (0021)', () => {
-  it('lets the Nth call through in a window and refuses the N+1th', async () => {
-    // A fresh bucket per test so the window cannot be shared with another case,
-    // and a one-hour window so the boundary cannot move mid-test.
-    //
-    // Sequential, not Promise.all: the harness drives one Postgres session and
-    // each call switches role and sets a claim first, so concurrent calls would
-    // interleave those statements rather than the decisions under test.
-    const limit = 3
-    const allowed: boolean[] = []
+describe('mandatory fixed rate limits (0025)', () => {
+  async function reportPreflight(userId: string): Promise<boolean> {
+    const rows = await db.asUser<{ allowed: boolean }>(
+      userId,
+      `select public.check_rate_limit('report:file', 10, 3600) as allowed`,
+    )
+    return rows[0]!.allowed
+  }
 
-    for (let i = 0; i < 4; i += 1) {
-      const rows = await db.asUser<{ allowed: boolean }>(
-        stranger,
-        `select public.check_rate_limit('test:boundary', $1, 3600) as allowed`,
-        [limit],
-      )
-      allowed.push(rows[0]!.allowed)
+  async function spendReportBudget(userId: string) {
+    // Sequential because PGlite's harness has one role-bearing connection.
+    // Independent native concurrency is tested separately, never implied here.
+    for (let i = 0; i < 10; i += 1) {
+      await fileReport(userId, 'post', 'post_id', await createPost(author))
     }
+  }
 
-    // The Nth call in the window succeeds and the N+1th does not. Off by one in
-    // either direction is the classic limiter bug: one lets everybody through,
-    // the other refuses the last legitimate call.
-    expect(allowed).toEqual([true, true, true, false])
-  })
-
-  it('counts each bucket and each user separately', async () => {
-    const first = await db.asUser<{ allowed: boolean }>(
-      stranger,
-      `select public.check_rate_limit('test:bucket-a', 1, 3600) as allowed`,
-    )
-    expect(first[0]!.allowed).toBe(true)
-
-    // Same user, same window, different surface: a different budget.
-    const otherBucket = await db.asUser<{ allowed: boolean }>(
-      stranger,
-      `select public.check_rate_limit('test:bucket-b', 1, 3600) as allowed`,
-    )
-    expect(otherBucket[0]!.allowed).toBe(true)
-
-    // Same surface, a different user: a different budget too, or one person
-    // reporting would use up everybody else's.
-    const otherUser = await db.asUser<{ allowed: boolean }>(
-      reader,
-      `select public.check_rate_limit('test:bucket-a', 1, 3600) as allowed`,
-    )
-    expect(otherUser[0]!.allowed).toBe(true)
-
-    // ...and the first bucket is now spent for the first user.
-    const spent = await db.asUser<{ allowed: boolean }>(
-      stranger,
-      `select public.check_rate_limit('test:bucket-a', 1, 3600) as allowed`,
-    )
-    expect(spent[0]!.allowed).toBe(false)
-  })
-
-  it('keeps the counter, so a refused call does not reset the window', async () => {
-    for (let i = 0; i < 2; i += 1) {
-      const rows = await db.asUser<{ allowed: boolean }>(
-        reader,
-        `select public.check_rate_limit('test:sticky', 2, 3600) as allowed`,
-      )
-      expect(rows[0]!.allowed).toBe(true)
-    }
-
-    for (let i = 0; i < 3; i += 1) {
-      const rows = await db.asUser<{ allowed: boolean }>(
-        reader,
-        `select public.check_rate_limit('test:sticky', 2, 3600) as allowed`,
-      )
-      expect(rows[0]!.allowed).toBe(false)
-    }
-  })
-
-  it('refuses an anonymous caller, an out-of-range limit and an out-of-range window', async () => {
-    // No identity, no budget: a limit keyed on a value the client chooses is not
-    // a limit, and every surface this protects needs a session anyway.
+  it('allows the Nth write and atomically refuses the N+1th without a preflight', async () => {
+    await spendReportBudget(reader)
+    expect(await reportPreflight(reader)).toBe(false)
+    const target = await createPost(author)
     await expectRejection(
-      () => db.asAnon(`select public.check_rate_limit('test:anon', 5, 60)`),
+      () => fileReport(reader, 'post', 'post_id', target),
+      /rate_limit_exceeded/i,
+    )
+    const rows = await db.asService<{ n: number }>(
+      'select count(*)::int as n from public.reports where post_id = $1',
+      [target],
+    )
+    expect(rows[0]!.n).toBe(0)
+  })
+
+  it('counts actual writes separately by surface and verified user', async () => {
+    await spendReportBudget(reader)
+    expect(await reportPreflight(reader)).toBe(false)
+    expect(await reportPreflight(stranger)).toBe(true)
+    const otherSurface = await db.asUser<{ allowed: boolean }>(
+      reader, `select public.check_rate_limit('bug:file', 5, 3600) as allowed`,
+    )
+    expect(otherSurface[0]!.allowed).toBe(true)
+    await fileReport(stranger, 'post', 'post_id', await createPost(author))
+    expect(await reportPreflight(stranger)).toBe(true)
+  })
+
+  it('keeps the spent counter after refusals and never charges read-only preflights', async () => {
+    for (let i = 0; i < 12; i += 1) expect(await reportPreflight(reader)).toBe(true)
+    const empty = await db.asService<{ n: number }>(
+      'select count(*)::int as n from app.rate_limit_windows where subject = $1',
+      [reader],
+    )
+    expect(empty[0]!.n).toBe(0)
+    await spendReportBudget(reader)
+    const target = await createPost(author)
+    for (let i = 0; i < 3; i += 1) {
+      await expectRejection(
+        () => fileReport(reader, 'post', 'post_id', target),
+        /rate_limit_exceeded/i,
+      )
+      expect(await reportPreflight(reader)).toBe(false)
+    }
+    const rows = await db.asService<{ hits: number }>(
+      `select hits from app.rate_limit_windows where subject = $1 and bucket = 'report:file'`,
+      [reader],
+    )
+    expect(rows).toHaveLength(1)
+    expect(rows[0]!.hits).toBe(10)
+  })
+
+  it('refuses anonymous callers, arbitrary buckets and modified catalogue values', async () => {
+    await expectRejection(
+      () => db.asAnon(`select public.check_rate_limit('report:file', 10, 3600)`),
       REJECTS.permissionDenied,
     )
-
-    await expectRejection(
-      () => db.asUser(reader, `select public.check_rate_limit('test:zero-limit', 0, 60)`),
-      /out of range/i,
-    )
-
-    await expectRejection(
-      () => db.asUser(reader, `select public.check_rate_limit('test:long-window', 5, 999999)`),
-      /out of range/i,
-    )
-
-    await expectRejection(
-      () => db.asUser(reader, `select public.check_rate_limit('   ', 5, 60)`),
-      /bucket name/i,
-    )
+    for (const [bucket, limit, window] of [
+      ['test:caller-selected', 10, 3600],
+      ['report:file', 0, 3600],
+      ['report:file', 1000, 3600],
+      ['report:file', 10, 999999],
+      ['   ', 10, 3600],
+    ] as const) {
+      await expectRejection(
+        () => db.asUser(reader, 'select public.check_rate_limit($1, $2, $3)', [bucket, limit, window]),
+        /Unknown server-owned abuse budget|Abuse budget parameters are server-owned/i,
+      )
+    }
   })
 
   it('hides the limiter itself from every client', async () => {
     // The public wrapper is the only door. app.* is not served by PostgREST, and
     // these assertions are what keep that true if a grant is ever widened.
     await expectRejection(
-      () => db.asUser(reader, `select app.check_rate_limit('test:direct', 5, 60)`),
+      () => db.asUser(reader, `select app.consume_abuse_budget('report:file', 10, 3600)`),
       REJECTS.permissionDenied,
     )
 
     await expectRejection(
-      () => db.asAnon(`select app.check_rate_limit('test:direct', 5, 60)`),
+      () => db.asAnon(`select app.consume_abuse_budget('report:file', 10, 3600)`),
       REJECTS.permissionDenied,
     )
 
@@ -1105,7 +1101,7 @@ describe('security headers', () => {
     expect(byKey.has('Strict-Transport-Security')).toBe(false)
   })
 
-  it('carries a policy whose one exception is named', async () => {
+  it('permits inline styles but never inline scripts without a request nonce', async () => {
     const { contentSecurityPolicy } = await import('../../next.config')
     const csp = contentSecurityPolicy()
 
@@ -1117,17 +1113,16 @@ describe('security headers', () => {
     expect(csp).toContain('connect-src')
     expect(csp).toContain("img-src 'self' data: blob:")
 
-    // The invariant that matters: `'unsafe-inline'` appears in script-src (Next's
-    // streamed flight payload, explained at length in next.config.ts) and in
-    // style-src (Tailwind and Radix inline styles), and nowhere else. If a third
-    // directive ever gains it, this fails and the reason has to be written down.
+    // Next's streamed scripts receive a request nonce from src/proxy.ts.
+    // Radix positioning still requires inline styles; that CSS exception must
+    // never become permission for arbitrary inline JavaScript.
     const loosened = csp
       .split('; ')
       .filter((directive) => directive.includes("'unsafe-inline'"))
       .map((directive) => directive.split(' ')[0])
       .sort()
 
-    expect(loosened).toEqual(['script-src', 'style-src'])
+    expect(loosened).toEqual(['style-src'])
   })
 
   it('tells crawlers to stay away until the launch state says otherwise', async () => {

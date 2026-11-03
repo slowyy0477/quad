@@ -6,16 +6,18 @@ import { EndOfList, LoadMore, cursorHref } from '@/components/ui/pagination'
 import { SearchInput } from '@/components/ui/search-input'
 import { EmptyState, SectionHeading } from '@/components/ui/surface'
 import { encodeCursor } from '@/lib/cursor'
-import { isSupabaseConfigured } from '@/lib/env'
+import { isDataConfigured } from '@/lib/env'
 import { getUser } from '@/lib/supabase/server'
 import { ResultSummary, SearchResults } from '@/features/search/components/search-results'
 import { SearchTabs } from '@/features/search/components/search-tabs'
+import { PeopleFilterForm } from '@/features/search/components/people-filters'
+import { firstValue, parsePeopleFilters } from '@/features/search/filters'
+import { listDiscoveryUniversities } from '@/features/search/people'
 import {
   MIN_QUERY_LENGTH,
   SEARCH_KIND_SPECS,
   kindSpec,
   parseKind,
-  parseQuery,
   searchAll,
 } from '@/features/search/queries'
 
@@ -32,7 +34,7 @@ type SearchParams = Record<string, string | string[] | undefined>
  */
 function NextMoves() {
   const moves = [
-    { href: '/feed/people', label: 'People at your university' },
+    { href: '/feed/people', label: 'Find people, starting at your university' },
     { href: '/projects?lens=open', label: 'Projects open to join' },
     { href: '/universities', label: 'The institution directory' },
   ]
@@ -50,46 +52,15 @@ function NextMoves() {
   )
 }
 
-/**
- * Search.
- *
- * One field, six kinds of result, and every number on the page is a row.
- *
- * The field is `SearchInput` — a GET form, so a search is a URL that can be shared,
- * bookmarked, reloaded and reached with the back button, and the page works before
- * any JavaScript loads. Its target is `/search` with a `q` parameter, which is the
- * address this page reads. One consequence worth naming: the form carries only `q`,
- * so submitting a new query from a non-default tab returns the reader to the
- * default tab. Carrying the tab would mean a hidden input in the form, and the form
- * is a shared primitive this feature does not own.
- *
- * **The kind is in the URL** (`?tab=project`), so a tab is linkable. **The cursor is
- * in the URL too**, and it is opaque (base64url over `created_at|id`), so a reader
- * cannot usefully edit it and a truncated share decodes to nothing — `decodeCursor`
- * fails closed and the first page is shown, which is a better answer than an error
- * page for what is usually a typo. A cursor whose row has since been deleted or
- * hidden is ignored the same way, by the function rather than here.
- *
- * **A session is required.** proxy.ts does not gate this route — search is not in its
- * private prefixes — so this check is the gate rather than a belt-and-braces
- * repeat of one. It is not an interface decision: `public.search_all` is granted to
- * `authenticated` and nobody else, because every result is filtered by a reader's own
- * visibility rules and a signed-out visitor has none. The destination is carried
- * through, so signing in lands on the search that was asked for.
- *
- * Four states, and the two empty ones say different things: no query yet is a page
- * explaining what is searchable, and a query that matched nothing is a page saying
- * what it looked at. They are not the same message and they do not get the same copy.
- */
+/** URL-addressed discovery. Canonical type=people; legacy tab=person still works. */
 export default async function SearchPage({ searchParams }: { searchParams: Promise<SearchParams> }) {
-  if (!isSupabaseConfigured()) {
+  if (!isDataConfigured()) {
     return (
-      <div className="mx-auto w-full max-w-2xl px-4 py-12">
+      <div className="page-enter mx-auto w-full max-w-2xl px-4 py-12">
         <h1 className="text-2xl">Search</h1>
         <Alert tone="warning" title="No database connected" className="mt-5">
           <p>
-            Search reads rows from Postgres. Without Supabase credentials there is nothing to look
-            through, and this page will not show made-up results in their place.{' '}
+            Search needs a configured data provider. No profiles or results are invented.{' '}
             <Link href="/setup">Configuration steps</Link>.
           </p>
         </Alert>
@@ -98,8 +69,9 @@ export default async function SearchPage({ searchParams }: { searchParams: Promi
   }
 
   const params = await searchParams
-  const query = parseQuery(params.q)
-  const kind = parseKind(params.tab)
+  const filters = parsePeopleFilters(params)
+  const query = filters.query
+  const kind = parseKind(params.type ?? params.tab)
 
   const user = await getUser()
   if (!user) {
@@ -114,11 +86,11 @@ export default async function SearchPage({ searchParams }: { searchParams: Promi
   }
 
   const spec = kindSpec(kind)
-  const { results, total, nextCursor, error } = await searchAll({
-    query,
-    kind,
-    cursor: params.cursor,
-  })
+  const [{ results, total, nextCursor, error }, picker] = await Promise.all([
+    searchAll({ ...filters, kind, cursor: params.cursor }),
+    kind === 'person' ? listDiscoveryUniversities()
+      : Promise.resolve({ universities: [], hasMore: false, error: null }),
+  ])
 
   // Switching kind drops the cursor: a cursor is a position in one ordering, and
   // carrying it to another list would land the reader in the middle of a page they
@@ -126,32 +98,58 @@ export default async function SearchPage({ searchParams }: { searchParams: Promi
   const tabs = SEARCH_KIND_SPECS.map((candidate) => ({
     value: candidate.kind,
     label: candidate.label,
-    href: cursorHref('/search', { ...params, tab: candidate.kind }, null),
+    href: cursorHref('/search', {
+      q: query, type: candidate.label.toLowerCase(),
+      university: filters.universityId ?? undefined,
+      department: filters.department || undefined, skill: filters.skill || undefined,
+    }, null),
   }))
 
   const loadMoreHref = nextCursor
-    ? cursorHref('/search', { ...params, tab: kind }, encodeCursor(nextCursor))
+    ? cursorHref('/search', {
+      q: query, type: spec.label.toLowerCase(),
+      university: filters.universityId ?? undefined,
+      department: filters.department || undefined, skill: filters.skill || undefined,
+    }, typeof nextCursor === 'string' ? nextCursor : encodeCursor(nextCursor))
     : null
 
   const tooShort = query.length > 0 && query.length < MIN_QUERY_LENGTH
 
   return (
-    <div className="mx-auto w-full max-w-2xl px-4 py-8 sm:px-6">
-      <SectionHeading
-        title="Search"
-        description="People, projects, posts, ideas, opportunities and events, in one place."
-      />
+    <div className="page-enter mx-auto w-full max-w-2xl px-4 py-8 sm:px-6">
+      <h1 className="text-3xl text-ink">Search Bulla</h1>
+      <SectionHeading title="Find your people and your next project"
+        description="Discover people by institution, department and self-declared skills, or browse shared work." />
 
       {/* `key` on the query, so the field shows the query the URL actually searched
           after a submit rather than whatever was last typed into it. */}
-      <SearchInput key={query} defaultValue={query} className="mt-5" />
+      <div className="mt-5">
+        {kind === 'person' ? (
+          <PeopleFilterForm filters={filters} universities={picker.universities}
+            hasMoreUniversities={picker.hasMore} />
+        ) : <SearchInput key={query} defaultValue={query} />}
+        {picker.error ? <Alert tone="warning" className="mt-3">{picker.error}</Alert> : null}
+      </div>
 
       <div className="mt-6">
         <SearchTabs value={kind} tabs={tabs}>
           {error ? (
             <Alert tone="danger">{error}</Alert>
-          ) : results === null ? null : query.length === 0 ? (
-            <EmptyState title="Search Quad">
+          ) : results === null ? null : kind === 'person' && results.length === 0 ? (
+            <EmptyState title={firstValue(params.cursor)
+              ? 'No further readable people in this view' : 'No readable people match this view'}>
+              <p>
+                Try clearing a filter or using a shorter department or skill name. This view only
+                includes profiles you can read that have opted into discovery; it says nothing
+                about private or unlisted accounts.
+              </p>
+              <p className="mt-2">
+                <Link href="/search?type=people" className="text-accent-700 underline">Browse without filters</Link>
+              </p>
+              <NextMoves />
+            </EmptyState>
+          ) : kind !== 'person' && query.length === 0 ? (
+            <EmptyState title="Search Bulla">
               <p>
                 Type a name, a project, or a word from a post. Search looks at display names and
                 usernames, project titles, post text, idea titles, opportunity titles and event
@@ -160,26 +158,29 @@ export default async function SearchPage({ searchParams }: { searchParams: Promi
               <p className="mt-2">Not sure where to start?</p>
               <NextMoves />
             </EmptyState>
-          ) : tooShort ? (
+          ) : kind !== 'person' && tooShort ? (
             <EmptyState title="One more character">
               <p>
-                Matching is by trigram — three letters at a time — so a single character has nothing
-                to match against. Two characters is the shortest useful search.
+                Use at least two characters to search this tab.
               </p>
             </EmptyState>
           ) : results.length === 0 ? (
             <EmptyState title={`No ${spec.plural} match “${query}”`}>
               <p>
-                This tab looks at {spec.matches}. It does not search taglines, descriptions,
-                biographies or messages, so a word that appears only there will not match. Names
-                that resemble what you typed are included, not just exact ones.
+                This tab looks at {spec.matches}. Try a shorter term or another tab. Biographies
+                and private messages are not searched here.
               </p>
               <p className="mt-2">Try a shorter word, another tab, or start from:</p>
               <NextMoves />
             </EmptyState>
           ) : (
             <div className="space-y-4">
-              {total !== null ? (
+              {kind === 'person' ? (
+                <p className="text-xs text-ink-faint" role="status">
+                  Showing {results.length} readable {results.length === 1 ? 'profile' : 'profiles'} on this page.
+                  Ordered by profile creation, not activity or mastery.
+                </p>
+              ) : total !== null ? (
                 <ResultSummary
                   count={total}
                   singular={spec.singular}
@@ -190,16 +191,17 @@ export default async function SearchPage({ searchParams }: { searchParams: Promi
 
               <SearchResults results={results} />
 
-              {loadMoreHref ? <LoadMore href={loadMoreHref} /> : <EndOfList />}
+              {loadMoreHref ? <LoadMore href={loadMoreHref} label="Next page" />
+                : <EndOfList label="No further readable results in this view." />}
             </div>
           )}
         </SearchTabs>
       </div>
 
       <p className="mt-8 text-xs text-ink-faint">
-        Search runs inside Postgres, so it returns the rows you are allowed to see and nothing else:
-        a private project, a blocked account, a hidden post and a profile that has opted out of
-        search are all excluded before the results reach this page.{' '}
+        Each item keeps its own permissions. People discovery excludes blocked, unavailable and
+        unlisted profiles, and does not return private profile totals. Skill labels are the
+        person&apos;s own claims, not verified qualifications.{' '}
         <Link href="/status" className="text-accent-700 underline underline-offset-2">
           Build status
         </Link>

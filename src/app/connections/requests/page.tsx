@@ -9,7 +9,7 @@ import { ConnectionControls } from '@/features/connections/components/connection
 import { PersonRow } from '@/features/connections/components/person-row'
 import { listRequests } from '@/features/connections/queries'
 import { encodeCursor, nextCursor, parseCursor } from '@/lib/cursor'
-import { isSupabaseConfigured } from '@/lib/env'
+import { isDataConfigured } from '@/lib/env'
 import { getUser } from '@/lib/supabase/server'
 
 export const metadata: Metadata = { title: 'Connection requests' }
@@ -36,7 +36,7 @@ export default async function ConnectionRequestsPage({
 }: {
   searchParams: Promise<SearchParams>
 }) {
-  if (!isSupabaseConfigured()) {
+  if (!isDataConfigured()) {
     return (
       <Alert tone="warning" title="No database connected">
         <p>

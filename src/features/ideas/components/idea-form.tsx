@@ -1,7 +1,7 @@
 'use client'
 
 import { useActionState } from 'react'
-import { Alert } from '@/components/ui/alert'
+import { FormErrorSummary } from '@/components/ui/form-error-summary'
 import { Field } from '@/components/ui/field'
 import { Input, Select, Textarea } from '@/components/ui/input'
 import { SubmitButton } from '@/components/ui/submit-button'
@@ -39,11 +39,14 @@ export function IdeaForm({ mode, idea }: { mode: 'create' | 'edit'; idea?: IdeaF
 
   return (
     <form action={action} className="space-y-5">
-      {state.status === 'error' && state.message ? (
-        <Alert tone="danger" title={mode === 'create' ? 'The idea was not posted' : 'Not saved'}>
-          {state.message}
-        </Alert>
-      ) : null}
+      <FormErrorSummary state={state} title={mode === 'create' ? 'The idea was not posted' : 'Not saved'} fields={{
+        title: { id: 'idea-title', label: 'Title' },
+        description: { id: 'idea-description', label: 'The pitch' },
+        category: { id: 'idea-category', label: 'Category' },
+        visibility: { id: 'idea-visibility', label: 'Who can see it' },
+        lookingFor: { id: 'idea-looking-for', label: 'Who you are looking for' },
+        status: { id: 'idea-status', label: 'Status' },
+      }} />
 
       {mode === 'edit' && idea?.id ? <input type="hidden" name="ideaId" value={idea.id} /> : null}
 

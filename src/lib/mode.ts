@@ -25,12 +25,14 @@ export function isLocalMode(): boolean {
  * behaving like a personal notebook on the public internet.
  */
 export function assertNotDeployedInLocalMode(): void {
-  if (isLocalMode() && process.env.NODE_ENV === 'production' && !process.env.QUAD_ALLOW_LOCAL_IN_PRODUCTION) {
+  const privateDemoOverride =
+    process.env.BULLA_ALLOW_LOCAL_IN_PRODUCTION ?? process.env.QUAD_ALLOW_LOCAL_IN_PRODUCTION
+  if (isLocalMode() && process.env.NODE_ENV === 'production' && privateDemoOverride !== '1') {
     throw new Error(
       'Refusing to serve a production build in local mode. Local mode stores accounts in a ' +
         'plain JSON file with no row-level security. Set NEXT_PUBLIC_DATA_MODE=supabase and ' +
-        'configure a Supabase project, or set QUAD_ALLOW_LOCAL_IN_PRODUCTION=1 if this really ' +
-        'is a private demo and you accept that it has no security model.',
+        'configure a Supabase project, or set BULLA_ALLOW_LOCAL_IN_PRODUCTION=1 only for ' +
+        'a private, loopback-bound review. The local store is not a production database.',
     )
   }
 }

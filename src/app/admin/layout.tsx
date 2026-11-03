@@ -4,7 +4,7 @@ import { AdminUnconfigured, StaffOnly } from '@/features/admin/components/admin-
 import { getStaffRole } from '@/features/admin/queries'
 import { countOpenBugReports } from '@/features/bugs/queries'
 import { getModerationCounts } from '@/features/moderation/queries'
-import { isSupabaseConfigured } from '@/lib/env'
+import { isDataConfigured } from '@/lib/env'
 import { isLocalMode } from '@/lib/mode'
 import { getUser } from '@/lib/supabase/server'
 
@@ -34,7 +34,7 @@ export const metadata: Metadata = {
 }
 
 export default async function AdminLayout({ children }: { children: React.ReactNode }) {
-  if (!isLocalMode() && !isSupabaseConfigured()) return <AdminUnconfigured />
+  if (!isLocalMode() && !isDataConfigured()) return <AdminUnconfigured />
 
   const [role, user] = await Promise.all([getStaffRole(), getUser()])
 

@@ -1,6 +1,6 @@
 'use client'
 
-import { useActionState } from 'react'
+import { useActionState, useState } from 'react'
 import { Alert } from '@/components/ui/alert'
 import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
@@ -53,7 +53,7 @@ function MilestoneToggle({
 }: {
   milestone: GoalCardData['milestones'][number]
 }) {
-  const [state, action] = useActionState(toggleMilestoneAction, emptyFormState)
+  const [state, action, pending] = useActionState(toggleMilestoneAction, emptyFormState)
 
   return (
     <form action={action} className="flex items-start gap-2.5">
@@ -61,15 +61,16 @@ function MilestoneToggle({
       <input type="hidden" name="isCompleted" value={String(!milestone.is_completed)} />
       <button
         type="submit"
+        disabled={pending}
         aria-pressed={milestone.is_completed}
-        className="group flex flex-1 items-start gap-2.5 py-1.5 text-left"
+        className="group flex min-h-11 flex-1 items-start gap-2.5 py-2 text-left disabled:opacity-60"
       >
         <span
           aria-hidden
           className={cn(
             'mt-0.5 grid size-4 shrink-0 place-items-center rounded-[2px] border text-[10px] font-semibold',
             milestone.is_completed
-              ? 'border-accent-600 bg-accent-600 text-paper'
+              ? 'border-accent-600 bg-accent-600 text-accent-contrast'
               : 'border-rule text-transparent group-hover:border-ink-faint',
           )}
         >
@@ -91,7 +92,7 @@ function MilestoneToggle({
       </button>
       {state.status === 'error' && state.message ? (
         <p role="alert" className="text-2xs text-danger-600">
-          Not saved
+          {state.message}
         </p>
       ) : null}
     </form>
@@ -99,7 +100,14 @@ function MilestoneToggle({
 }
 
 function ProgressUpdate({ goal }: { goal: GoalCardData }) {
-  const [state, action] = useActionState(updateGoalProgressAction, emptyFormState)
+  const [state, action, pending] = useActionState(updateGoalProgressAction, emptyFormState)
+  const savedValue = String(goal.current_value ?? 0)
+  const [draft, setDraft] = useState({ savedValue, value: savedValue })
+  // Reconcile a changed stored value before rendering, not in a follow-up
+  // effect. An unchanged value (including a refused write) retains the draft.
+  if (draft.savedValue !== savedValue) {
+    setDraft({ savedValue, value: savedValue })
+  }
   const unit = goal.unit?.trim() || 'units'
 
   return (
@@ -114,10 +122,12 @@ function ProgressUpdate({ goal }: { goal: GoalCardData }) {
         type="number"
         min="0"
         step="any"
-        defaultValue={goal.current_value ?? 0}
-        className="h-8 w-24 text-sm"
+        value={draft.value}
+        onChange={(event) => setDraft({ savedValue, value: event.target.value })}
+        disabled={pending}
+        className="min-h-11 w-28"
       />
-      <Button type="submit" variant="secondary" className="h-8 px-3 text-xs">
+      <Button type="submit" variant="secondary" disabled={pending} size="sm">
         Update
       </Button>
       {state.status === 'error' && state.message ? (
@@ -135,28 +145,37 @@ function ProgressUpdate({ goal }: { goal: GoalCardData }) {
 }
 
 function AddMilestone({ goalId }: { goalId: string }) {
-  const [state, action] = useActionState(addMilestoneAction, emptyFormState)
+  const [title, setTitle] = useState('')
+  const [state, action, pending] = useActionState(async (previous: typeof emptyFormState, formData: FormData) => {
+    const result = await addMilestoneAction(previous, formData)
+    if (result.status === 'success') setTitle('')
+    return result
+  }, emptyFormState)
 
   return (
     <form action={action} className="mt-1 flex flex-wrap items-end gap-2">
       <input type="hidden" name="goalId" value={goalId} />
-      <Field id={`milestone-${goalId}`} label="Add a step" className="min-w-0 flex-1">
+      <Field id={`milestone-${goalId}`} label="Step title" required
+        error={state.fieldErrors?.title} className="min-w-0 flex-1">
         {(props) => (
           <Input
             {...props}
             name="title"
             maxLength={200}
             placeholder="Chapter 3 exercises"
-            className="h-8 text-sm"
+            value={title}
+            onChange={(event) => setTitle(event.target.value)}
+            disabled={pending}
+            className="min-h-11"
           />
         )}
       </Field>
-      <Button type="submit" variant="ghost" className="h-8 px-3 text-xs">
+      <Button type="submit" variant="secondary" disabled={pending} size="sm">
         Add step
       </Button>
-      {state.status === 'error' && state.fieldErrors?.title ? (
+      {state.status === 'error' && state.message ? (
         <p role="alert" className="w-full text-2xs text-danger-600">
-          {state.fieldErrors.title}
+          {state.message}
         </p>
       ) : null}
     </form>
@@ -164,14 +183,14 @@ function AddMilestone({ goalId }: { goalId: string }) {
 }
 
 function StatusButton({ goal }: { goal: GoalCardData }) {
-  const [state, action] = useActionState(setGoalStatusAction, emptyFormState)
+  const [state, action, pending] = useActionState(setGoalStatusAction, emptyFormState)
   const done = goal.status === 'completed'
 
   return (
     <form action={action}>
       <input type="hidden" name="goalId" value={goal.id} />
       <input type="hidden" name="status" value={done ? 'active' : 'completed'} />
-      <Button type="submit" variant="ghost" className="h-8 px-3 text-xs">
+      <Button type="submit" variant="ghost" disabled={pending} size="sm">
         {done ? 'Reopen' : 'Mark as done'}
       </Button>
       {state.status === 'error' && state.message ? (
@@ -251,22 +270,24 @@ export function GoalCard({ goal }: { goal: GoalCardData }) {
       ) : null}
 
       {done ? null : (
-        <div className="mt-3 max-w-lg">
+        <details className="mt-3 max-w-lg">
+          <summary className="inline-flex min-h-11 items-center text-sm font-medium text-accent-700">
+            Add a step
+          </summary>
           <AddMilestone goalId={goal.id} />
-        </div>
+        </details>
       )}
 
       <div className="mt-3 flex items-center gap-2 border-t border-hairline pt-3">
         <StatusButton goal={goal} />
         {goal.milestone_count === 0 && hasNumber ? (
-          <span className="text-2xs text-ink-faint">No steps yet — the number above is the whole measure.</span>
+          <span className="text-xs text-ink-faint">Add steps when you need them.</span>
         ) : null}
       </div>
 
       {!done && goal.milestone_count > 0 && goal.completed_milestone_count === goal.milestone_count ? (
         <Alert tone="info" className="mt-3">
-          Every step is done. The goal is still open until you mark it done — the platform will
-          not decide that for you.
+          All steps are done. Ready to mark the goal as done?
         </Alert>
       ) : null}
     </article>

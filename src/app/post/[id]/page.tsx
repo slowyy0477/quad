@@ -5,12 +5,12 @@ import { Alert } from '@/components/ui/alert'
 import { EndOfList, LoadMore, cursorHref } from '@/components/ui/pagination'
 import { EmptyState, SectionHeading } from '@/components/ui/surface'
 import { encodeCursor } from '@/lib/cursor'
-import { isSupabaseConfigured, siteUrl } from '@/lib/env'
+import { isDataConfigured, siteUrl } from '@/lib/env'
 import { getUser } from '@/lib/supabase/server'
 import { CommentComposer } from '@/features/feed/components/comment-composer'
 import { CommentThread } from '@/features/feed/components/comment-thread'
 import { PostCard } from '@/features/feed/components/post-card'
-import { getCommentReplies, getPostComments, getPostDetail } from '@/features/feed/queries'
+import { getCommentReplyPages, getPostComments, getPostDetail } from '@/features/feed/queries'
 
 type Params = { id: string }
 type SearchParams = Record<string, string | string[] | undefined>
@@ -37,19 +37,19 @@ type SearchParams = Record<string, string | string[] | undefined>
 function excerpt(post: { title: string | null; body: string | null }): string {
   const body = post.body?.replace(/\s+/g, ' ').trim() ?? ''
   if (body) return body.length > 200 ? `${body.slice(0, 197)}…` : body
-  return post.title ?? 'A post on Quad'
+  return post.title ?? 'A post on Bulla'
 }
 
 export async function generateMetadata({ params }: { params: Promise<Params> }): Promise<Metadata> {
-  if (!isSupabaseConfigured()) return { title: 'Post' }
+  if (!isDataConfigured()) return { title: 'Post' }
 
   const { id } = await params
   const post = await getPostDetail(id)
   // No distinction between "no such post" and "not allowed to see it", here either.
   if (!post) return { title: 'Post not found' }
 
-  const author = post.author?.display_name ?? 'A Quad member'
-  const title = post.title ?? `${author} on Quad`
+  const author = post.author?.display_name ?? 'A Bulla member'
+  const title = post.title ?? `${author} on Bulla`
   const description = excerpt(post)
 
   return {
@@ -77,7 +77,7 @@ export default async function PostPage({
   params: Promise<Params>
   searchParams: Promise<SearchParams>
 }) {
-  if (!isSupabaseConfigured()) {
+  if (!isDataConfigured()) {
     return (
       <div className="mx-auto w-full max-w-2xl px-4 py-12">
         <h1 className="text-2xl">Post</h1>
@@ -103,7 +103,21 @@ export default async function PostPage({
   ])
 
   const topLevel = comments.comments ?? []
-  const replies = await getCommentReplies(topLevel.map((comment) => comment.id))
+  const replyResult = await getCommentReplyPages(topLevel.map((comment) => comment.id), {
+    focusParent: query.replyTo, cursor: query.replyCursor,
+  })
+  const replies = replyResult.pages.flatMap((page) => page.comments)
+  const replyLinks = Object.fromEntries(replyResult.pages.map((page) => {
+    const target = `#replies-${page.parentId}`
+    const path = `/post/${post.id}`
+    return [page.parentId, {
+      next: page.nextCursor ? `${cursorHref(path, {
+        replyTo: page.parentId, replyCursor: encodeCursor(page.nextCursor),
+      }, Array.isArray(query.cursor) ? query.cursor[0] : query.cursor)}${target}` : null,
+      first: query.replyTo === page.parentId && query.replyCursor
+        ? `${cursorHref(path, {}, Array.isArray(query.cursor) ? query.cursor[0] : query.cursor)}${target}` : null,
+    }]
+  }))
   const signedIn = Boolean(user)
   const permalink = `${siteUrl()}/post/${post.id}`
   const moreCommentsHref = comments.nextCursor
@@ -112,6 +126,7 @@ export default async function PostPage({
 
   return (
     <div className="mx-auto w-full max-w-2xl px-4 py-8 sm:px-6">
+      <h1 className="sr-only">{post.title ?? 'Post and replies'}</h1>
       <p className="mb-4 text-xs text-ink-faint">
         <Link href="/feed" className="text-accent-700 underline underline-offset-2">
           Back to the feed
@@ -149,6 +164,7 @@ export default async function PostPage({
             {comments.error}
           </Alert>
         ) : null}
+        {replyResult.error ? <Alert tone="danger" className="mt-4">{replyResult.error}</Alert> : null}
 
         <div className="mt-6">
           {topLevel.length > 0 ? (
@@ -158,6 +174,7 @@ export default async function PostPage({
                 comments={topLevel}
                 replies={replies}
                 signedIn={signedIn}
+                replyLinks={replyLinks}
               />
               {moreCommentsHref ? (
                 <LoadMore href={moreCommentsHref} label="Load more comments" />

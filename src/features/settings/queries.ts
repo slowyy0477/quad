@@ -3,6 +3,7 @@ import 'server-only'
 import { createClient, getUser } from '@/lib/supabase/server'
 import { isLocalMode } from '@/lib/mode'
 import { readStore } from '@/lib/local/db'
+import { localActor } from '@/lib/local/access'
 import type { Database } from '@/lib/db/database.types'
 
 /**
@@ -30,7 +31,7 @@ export async function getOwnSettings(): Promise<{
     }
 
     const db = await readStore()
-    const me = db.profiles.find((profile) => profile.user_id === user.id)
+    const me = localActor(db, user.id)
     if (!me) {
       return { profile: null, error: 'Your settings could not be read. Reload the page to try again.' }
     }
@@ -50,12 +51,15 @@ export async function getOwnSettings(): Promise<{
     }
   }
 
+  const user = await getUser()
+  if (!user) return { profile: null, error: 'You are not signed in.' }
   const supabase = await createClient()
 
   const { data, error } = await supabase
     .from('profiles')
     .select('visibility, allow_messages_from, allow_connection_requests, searchable')
-    .maybeSingle<PrivacySettings>()
+    .eq('id', user.id)
+    .single<PrivacySettings>()
 
   if (error) {
     console.error('[settings:getOwnSettings]', error.code, error.message)

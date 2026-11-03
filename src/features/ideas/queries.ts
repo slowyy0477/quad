@@ -3,6 +3,8 @@ import 'server-only'
 import { createClient, getUser } from '@/lib/supabase/server'
 import { decodeCursor, type Cursor } from '@/lib/cursor'
 import { isLocalMode } from '@/lib/mode'
+import { ideaInterestsLocal } from './local'
+import { canReadContent, canReadProfile } from '@/lib/local/access'
 import { readStore, type LocalIdea, type LocalProfile, type Tables } from '@/lib/local/db'
 import { canSeeProject } from '@/features/projects/queries'
 
@@ -191,7 +193,7 @@ export async function listIdeaInterests(ideaId: string): Promise<IdeaInterestRow
   // No `idea_interest` table in the local store, so no offers are stored and this
   // list is empty. `expressInterestAction` refuses rather than pretending
   // otherwise; see the port notes in .scratch/projects-ideas-local.
-  if (isLocalMode()) return []
+  if (isLocalMode()) return ideaInterestsLocal(ideaId)
 
   const supabase = await createClient()
   const { data, error } = await supabase
@@ -246,16 +248,16 @@ export async function getIdeaViewerState(idea: IdeaDetail): Promise<IdeaViewerSt
     const db = await readStore()
     const viewer = db.profiles.find((profile) => profile.user_id === user.id) ?? null
     const isAuthor = Boolean(viewer && idea.author?.id === viewer.id)
+    const own = db.idea_interest.find(row => row.idea_id === idea.id && row.profile_id === viewer?.id)
 
     return {
       userId: user.id,
       isAuthor,
       // No idea_votes table in the local store: no vote exists to read.
-      hasVoted: false,
-      // No idea_interest table: nobody has an offer on file.
-      hasExpressedInterest: false,
+      hasVoted: db.idea_votes.some(row => row.idea_id === idea.id && row.profile_id === viewer?.id),
+      hasExpressedInterest: Boolean(own),
       canConvert: isAuthor && idea.status !== 'converted' && idea.status !== 'closed',
-      ownInterest: null,
+      ownInterest: own ? { message: own.message, offering: own.offering } : null,
     }
   }
 
@@ -300,7 +302,7 @@ export async function listMyIdeas(): Promise<IdeaListItem[]> {
     return db.ideas
       .filter((idea) => idea.author_id === viewer.id && idea.deleted_at === null)
       .sort(newestFirst)
-      .map((idea) => ideaItem(db, idea))
+      .map((idea) => ideaItem(db, idea, viewer))
   }
 
   const supabase = await createClient()
@@ -384,23 +386,7 @@ async function localContext(): Promise<{ db: Tables; viewer: LocalProfile | null
 }
 
 function canSeeIdea(db: Tables, idea: LocalIdea, viewer: LocalProfile | null): boolean {
-  if (idea.deleted_at) return false
-  if (viewer && idea.author_id === viewer.id) return true
-
-  switch (idea.visibility) {
-    case 'public':
-      return true
-    case 'university': {
-      const author = db.profiles.find((profile) => profile.id === idea.author_id)
-      return Boolean(
-        viewer?.university_id && author?.university_id && author.university_id === viewer.university_id,
-      )
-    }
-    case 'connections':
-    case 'private':
-    default:
-      return false
-  }
+  return canReadContent(db, idea, idea.author_id, viewer, 'idea')
 }
 
 /** Newest first, `(created_at, id)` descending. */
@@ -441,7 +427,7 @@ function afterCursor(row: { created_at: string; id: string }, cursor: Cursor | n
   return row.created_at === cursor.createdAt && row.id < cursor.id
 }
 
-function ideaItem(db: Tables, idea: LocalIdea): IdeaListItem {
+function ideaItem(db: Tables, idea: LocalIdea, viewer: LocalProfile | null): IdeaListItem {
   const author = db.profiles.find((profile) => profile.id === idea.author_id)
 
   return {
@@ -469,7 +455,7 @@ function ideaItem(db: Tables, idea: LocalIdea): IdeaListItem {
     created_at: idea.created_at,
     // Nor an `updated_at`; the store records only when the idea was written.
     updated_at: idea.created_at,
-    author: author
+    author: author && canReadProfile(db, author, viewer)
       ? {
           id: author.id,
           username: author.username,
@@ -496,7 +482,7 @@ async function listIdeasLocal({
 
   const last = rows.at(-1)
   return {
-    ideas: rows.map((idea) => ideaItem(db, idea)),
+    ideas: rows.map((idea) => ideaItem(db, idea, viewer)),
     nextCursor: rows.length === limit && last ? { createdAt: last.created_at, id: last.id } : null,
     error: null,
   }
@@ -506,5 +492,5 @@ async function getIdeaByIdLocal(id: string): Promise<IdeaDetail | null> {
   const { db, viewer } = await localContext()
   const idea = db.ideas.find((entry) => entry.id === id)
   if (!idea || !canSeeIdea(db, idea, viewer)) return null
-  return ideaItem(db, idea)
+  return ideaItem(db, idea, viewer)
 }

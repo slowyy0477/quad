@@ -3,7 +3,7 @@ import { redirect } from 'next/navigation'
 import type { Metadata } from 'next'
 import { Alert } from '@/components/ui/alert'
 import { NewEventForm } from '@/features/events/components/new-event-form'
-import { isSupabaseConfigured } from '@/lib/env'
+import { isDataConfigured } from '@/lib/env'
 import { getUser } from '@/lib/supabase/server'
 
 export const metadata: Metadata = { title: 'Create an event' }
@@ -14,7 +14,7 @@ export const metadata: Metadata = { title: 'Create an event' }
  * session.
  */
 export default async function NewEventPage() {
-  if (!isSupabaseConfigured()) {
+  if (!isDataConfigured()) {
     return (
       <div className="mx-auto w-full max-w-2xl px-4 py-12">
         <h1 className="text-2xl">Create an event</h1>

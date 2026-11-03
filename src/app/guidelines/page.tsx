@@ -3,7 +3,7 @@ import { Alert } from '@/components/ui/alert'
 
 export const metadata: Metadata = {
   title: 'Community guidelines',
-  description: 'What is expected of people on Quad, and what happens when those expectations are not met.',
+  description: 'What is expected of people on Bulla, and what happens when those expectations are not met.',
 }
 
 const rules = [
@@ -17,7 +17,7 @@ const rules = [
   },
   {
     title: 'No academic dishonesty',
-    body: 'Do not post solutions to assessments that are still open, do not offer to write someone\'s work for them, and do not ask. Quad is for what you built, not for circumventing what you were asked to build.',
+    body: 'Do not post solutions to assessments that are still open, do not offer to write someone\'s work for them, and do not ask. Bulla is for what you built, not for circumventing what you were asked to build.',
   },
   {
     title: 'No harassment',
@@ -38,7 +38,7 @@ export default function GuidelinesPage() {
     <div className="mx-auto w-full max-w-2xl px-4 py-12 sm:px-6">
       <h1 className="text-3xl">Community guidelines</h1>
       <p className="mt-3 text-ink-muted">
-        Quad is a small, mostly non-anonymous community of people who will run into each other in
+        Bulla is a small, mostly non-anonymous community of people who will run into each other in
         seminars. These are the expectations that follow from that.
       </p>
 

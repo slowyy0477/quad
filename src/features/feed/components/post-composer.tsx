@@ -1,6 +1,7 @@
 'use client'
 
 import { useActionState, useEffect, useRef, useState, useSyncExternalStore } from 'react'
+import { ChevronDown, Paperclip } from 'lucide-react'
 import { Alert } from '@/components/ui/alert'
 import { Select } from '@/components/ui/input'
 import { SubmitButton } from '@/components/ui/submit-button'
@@ -81,9 +82,9 @@ export function PostComposer({
   }
 
   return (
-    <Surface as="section" className="p-4" aria-labelledby="composer-heading">
-      <h2 id="composer-heading" className="sr-only">
-        Write a post
+    <Surface as="section" className="p-4 sm:p-5" aria-labelledby="composer-heading">
+      <h2 id="composer-heading" className="mb-3 text-base font-semibold">
+        Share an update
       </h2>
 
       <form ref={formRef} action={action} className="space-y-3">
@@ -94,13 +95,13 @@ export function PostComposer({
           value={draft.body}
           onChange={(event) => setDraftBody(event.target.value)}
           onKeyDown={onKeyDown}
-          minRows={3}
+          minRows={2}
           maxLength={5000}
           placeholder={`What are you working on, ${authorFirstName}?`}
           aria-label="Post body"
           aria-invalid={state.fieldErrors?.body ? true : undefined}
           aria-describedby={state.fieldErrors?.body ? 'composer-body-error' : 'composer-shortcut'}
-          className="border-transparent bg-transparent px-0 hover:border-transparent focus-visible:border-transparent"
+          className="min-h-20 bg-paper px-3"
         />
 
         {state.fieldErrors?.body ? (
@@ -109,7 +110,7 @@ export function PostComposer({
           </p>
         ) : null}
 
-        <p id="composer-shortcut" className="text-xs text-ink-faint">
+        <p id="composer-shortcut" className="hidden text-xs text-ink-faint sm:block">
           Press <kbd className="font-sans">Ctrl</kbd> or <kbd className="font-sans">⌘</kbd> and{' '}
           <kbd className="font-sans">Enter</kbd> to post.
         </p>
@@ -123,14 +124,20 @@ export function PostComposer({
             <button
               type="button"
               onClick={clearDraft}
-              className="rounded text-accent-700 underline underline-offset-2"
+              className="min-h-11 rounded px-2 text-accent-700 underline underline-offset-2"
             >
               Discard it
             </button>
           </p>
         ) : null}
 
-        <div className="grid gap-3 border-t border-hairline pt-3 sm:grid-cols-2">
+        <details className="group rounded-md border border-hairline bg-paper">
+          <summary className="flex min-h-11 list-none items-center gap-2 px-3 text-sm font-medium text-ink-muted [&::-webkit-details-marker]:hidden">
+            <Paperclip className="size-4" aria-hidden="true" />
+            Add context
+            <ChevronDown className="ml-auto size-4 transition-transform group-open:rotate-180" aria-hidden="true" />
+          </summary>
+          <div className="grid gap-3 border-t border-hairline p-3 sm:grid-cols-2">
           <label className="flex flex-col gap-1 text-xs text-ink-muted">
             Attach a project
             <Select
@@ -142,9 +149,9 @@ export function PostComposer({
                 // derived from the attachment on the server.
                 if (event.target.value) setGoalId('')
               }}
-              className="min-h-9 py-1 text-xs"
+              className="min-h-11 py-1 text-sm"
             >
-              <option value="">Nothing</option>
+              <option value="">No project</option>
               {projects.map((project) => (
                 <option key={project.id} value={project.id}>
                   {project.label}
@@ -162,9 +169,9 @@ export function PostComposer({
                 setGoalId(event.target.value)
                 if (event.target.value) setProjectId('')
               }}
-              className="min-h-9 py-1 text-xs"
+              className="min-h-11 py-1 text-sm"
             >
-              <option value="">Nothing</option>
+              <option value="">No goal</option>
               {goals.map((goal) => (
                 <option key={goal.id} value={goal.id}>
                   {goal.label}
@@ -198,12 +205,13 @@ export function PostComposer({
               here.
             </p>
           ) : null}
-        </div>
+          </div>
+        </details>
 
         <div className="flex flex-wrap items-center justify-between gap-3 border-t border-hairline pt-3">
           <label className="flex items-center gap-2 text-xs text-ink-muted">
             Visible to
-            <Select name="visibility" defaultValue="university" className="w-auto min-h-8 py-1 text-xs">
+            <Select name="visibility" defaultValue="university" className="w-auto min-h-11 py-1 text-sm">
               <option value="public">Anyone</option>
               <option value="university">My university</option>
               <option value="connections">My connections</option>
@@ -211,7 +219,7 @@ export function PostComposer({
             </Select>
           </label>
 
-          <SubmitButton variant="primary" size="sm" pendingLabel="Posting…">
+          <SubmitButton variant="primary" size="sm" pendingLabel="Posting…" disabled={!draft.body.trim()}>
             Post
           </SubmitButton>
         </div>

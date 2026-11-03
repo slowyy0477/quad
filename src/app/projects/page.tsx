@@ -13,7 +13,7 @@ import {
   listSkillOptions,
   listUniversityOptions,
 } from '@/features/projects/queries'
-import { isSupabaseConfigured } from '@/lib/env'
+import { isDataConfigured } from '@/lib/env'
 import { encodeCursor } from '@/lib/cursor'
 import { getUser } from '@/lib/supabase/server'
 
@@ -37,7 +37,7 @@ function first(value: string | string[] | undefined): string | undefined {
  * is complete.
  */
 export default async function ProjectsPage({ searchParams }: { searchParams: Promise<SearchParams> }) {
-  if (!isSupabaseConfigured()) {
+  if (!isDataConfigured()) {
     return (
       <div className="mx-auto w-full max-w-2xl px-4 py-12">
         <h1 className="text-2xl">Projects</h1>
@@ -62,10 +62,11 @@ export default async function ProjectsPage({ searchParams }: { searchParams: Pro
   const cursor = params.cursor
 
   return (
-    <div className="mx-auto w-full max-w-5xl px-4 py-8 sm:px-6">
+    <div className="page-enter mx-auto w-full max-w-5xl px-4 py-8 sm:px-6">
       <SectionHeading
+        level={1}
         title="Projects"
-        description="What students at your university are building, and what they are looking for."
+        description="Find something worth building, and people to build it with."
         action={
           user ? (
             <Button asChild variant="primary" size="sm">
@@ -74,6 +75,14 @@ export default async function ProjectsPage({ searchParams }: { searchParams: Pro
           ) : null
         }
       />
+
+      {user ? (
+        <p className="mt-4 text-sm">
+          <Link href="/projects/invitations" className="inline-flex min-h-11 items-center text-accent-700 underline underline-offset-4">
+            View project invitations
+          </Link>
+        </p>
+      ) : null}
 
       {first(params.deleted) ? (
         <Alert tone="success" className="mt-4">

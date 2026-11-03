@@ -11,7 +11,7 @@ import {
   listSkillCatalogue,
 } from '@/features/skills/queries'
 import { getMyProfile } from '@/features/profiles/queries'
-import { isSupabaseConfigured } from '@/lib/env'
+import { isDataConfigured } from '@/lib/env'
 import { getUser } from '@/lib/supabase/server'
 
 export const metadata: Metadata = {
@@ -32,7 +32,7 @@ export const metadata: Metadata = {
  * sees this page is the person most likely to assume a level means something.
  */
 export default async function SkillsPage() {
-  if (!isSupabaseConfigured()) {
+  if (!isDataConfigured()) {
     return (
       <div className="mx-auto w-full max-w-2xl px-4 py-12 sm:px-6">
         <h1 className="text-3xl">Skills and interests</h1>
@@ -56,11 +56,13 @@ export default async function SkillsPage() {
       <div className="mx-auto w-full max-w-2xl px-4 py-12 sm:px-6">
         <h1 className="text-3xl">Skills and interests</h1>
         <Alert tone="danger" title="Your profile could not be read" className="mt-6">
+          {profile.state === 'error' ? <p>{profile.message}</p> :
           <p>
             A skill is claimed by a profile, so without the profile row there is nothing to attach
             them to. This is the same missing-row problem described on{' '}
             <Link href="/me">your profile page</Link>.
           </p>
+          }
         </Alert>
       </div>
     )
@@ -86,7 +88,7 @@ export default async function SkillsPage() {
 
       <Alert tone="info" title="Levels are self-declared" className="mt-6">
         <p>
-          Quad does not test anyone&rsquo;s skills and does not verify a level. Nothing on your
+          Bulla does not test anyone&rsquo;s skills and does not verify a level. Nothing on your
           profile is presented as checked — not by a badge, not by a colour, not by a score out of
           five.
         </p>

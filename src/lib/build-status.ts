@@ -1,6 +1,10 @@
 /**
  * Build status.
  *
+ * Current Bulla feature ledger, reviewed on 31 October 2026.
+ * "Working" covers the explicit tested scope, not a production launch claim.
+ * "Partial" also includes implemented features awaiting hosted verification.
+ *
  * A single hand-maintained record of what works, so the claim appears in exactly
  * one place instead of being implied differently by each page. The brief forbids
  * describing a feature as complete when only its interface exists; this file is
@@ -18,6 +22,7 @@
  * role can and cannot do.
  */
 export type FeatureStatus = 'working' | 'partial' | 'schema-only' | 'planned'
+export const LAST_REVIEWED = '31 October 2026'
 
 export type Feature = {
   area: string
@@ -27,10 +32,10 @@ export type Feature = {
 }
 
 export const STATUS_LABELS: Record<FeatureStatus, string> = {
-  working: 'Working',
-  partial: 'Partly working',
+  working: 'Verified scope',
+  partial: 'Partly complete',
   'schema-only': 'Database only',
-  planned: 'Planned',
+  planned: 'Not implemented',
 }
 
 export const FEATURES: Feature[] = [
@@ -39,65 +44,71 @@ export const FEATURES: Feature[] = [
     area: 'Foundation',
     name: 'Database schema & row-level security',
     status: 'working',
-    note: '52 tables across 15 migrations, every one with RLS policies. Covered by an automated permission suite.',
+    note: 'Versioned Postgres migrations and automated in-process permission tests exist. Hosted PostgREST/RLS behavior and production load still require staging verification.',
   },
   {
     area: 'Foundation',
     name: 'Function privilege hardening',
     status: 'working',
-    note: 'Every database function is granted to exactly the roles that need it, verified by a test that fails when a new function is added without a decision.',
+    note: 'Database functions have explicit role grants and permission tests. Live deployment configuration is not verified by those tests.',
   },
   {
     area: 'Foundation',
     name: 'Design system',
     status: 'partial',
-    note: 'Tokens, buttons, inputs, fields, alerts, badges, avatars and surfaces exist. Dialogs, menus, tabs and toasts are not built yet.',
+    note: 'Bulla has a shared light/dark system, calmer navigation, campus artwork and reduced-motion-aware effects. Profiles, boards and university layouts are being refined; signed-in device, keyboard and accessibility acceptance is still in progress.',
   },
 
   // --------------------------------------------------------------------- auth
   {
     area: 'Accounts',
     name: 'Email and password sign-up and sign-in',
-    status: 'working',
-    note: 'Real Supabase auth, server-side validation, and a profile row created by a database trigger. Needs Supabase credentials to run.',
+    status: 'partial',
+    note: 'Local authentication/session security is tested; cloud signup/login actions exist. Hosted identity, email delivery and multi-device behavior still need end-to-end acceptance.',
   },
   {
     area: 'Accounts',
     name: 'Google sign-in',
-    status: 'working',
-    note: 'Implemented end-to-end. Requires a Google OAuth client to be configured in the Supabase dashboard first.',
+    status: 'partial',
+    note: 'Cloud OAuth code exists and is offered only in cloud mode. Provider setup and a real callback journey still need verification.',
   },
   {
     area: 'Accounts',
     name: 'Password reset by email',
-    status: 'working',
-    note: 'Sends a one-time link. Deliberately does not reveal whether an address is registered.',
+    status: 'partial',
+    note: 'The /settings/password page and guarded recovery/change-password actions are implemented, including local current-password verification and session revocation. Real hosted email delivery, recovery links and multi-device callbacks remain unverified. Local mode has no email recovery.',
   },
   {
     area: 'Accounts',
     name: 'Onboarding (username, university, programme)',
-    status: 'planned',
-    note: 'The database accepts all of it and enforces username uniqueness. The interface is not built, so new accounts keep their generated handle for now.',
+    status: 'partial',
+    note: 'Signup defaults private in both providers and onboarding offers an explicit publication choice. Persistence and ownership have local/SQL regression coverage; real hosted signup and browser acceptance still need verification.',
+  },
+  {
+    area: 'Accounts',
+    name: 'Staff account security',
+    status: 'partial',
+    note: 'TOTP enrollment and verification controls exist at /settings/security, with fail-closed staff-session checks. Local accounts do not have cloud MFA. Hosted enrollment, expiry, lost-factor recovery and operator acceptance remain required.',
   },
 
   // ------------------------------------------------------------------- social
   {
     area: 'People',
     name: 'Profiles',
-    status: 'schema-only',
-    note: 'Profiles, skills, interests, education and privacy settings are in the database with policies. No profile page yet.',
+    status: 'partial',
+    note: 'Profiles include permission-filtered, paginated project and learning portfolio sections, skills, interests and image controls. Local/SQL ownership and privacy regressions pass; hosted and full browser journeys remain in progress.',
   },
   {
     area: 'People',
     name: 'Universities, departments, programmes',
-    status: 'schema-only',
-    note: 'Schema, verification state and student counts exist. No browsing interface, and no universities have been loaded.',
+    status: 'partial',
+    note: 'Browsing, reference data, institution requests and moderator review exist. Campus membership is self-declared, not verified student identity.',
   },
   {
     area: 'People',
     name: 'Connections, follows and blocking',
-    status: 'schema-only',
-    note: 'Request/accept flow, mutual-connection rules and block enforcement are implemented as policies and tested. No interface.',
+    status: 'partial',
+    note: 'Actions, screens and local domain tests exist. Cross-mode counters, private-content behavior and two-account browser journeys remain acceptance work.',
   },
 
   // --------------------------------------------------------------------- feed
@@ -105,103 +116,115 @@ export const FEATURES: Feature[] = [
     area: 'Feed',
     name: 'Posting and reading a text post',
     status: 'partial',
-    note: 'Writing and reading work against the real database. Ranking, following-only filters and pagination controls are not built; likes, comments and saves are database-only.',
+    note: 'Composer, structured posts, ranking, filters, permalinks and cursor controls exist. Local/hosted ordering and write/reload journeys need final acceptance.',
   },
   {
     area: 'Feed',
     name: 'Likes, comments and saved posts',
-    status: 'schema-only',
-    note: 'Tables, counters and policies exist and are tested. The feed shows the real counts but has no controls yet.',
+    status: 'partial',
+    note: 'Likes, comments and the owner-only /saved list are implemented with permission-aware paging. Real two-account write/reload and hosted concurrency acceptance remain in progress.',
   },
 
   // ----------------------------------------------------------------- projects
   {
     area: 'Projects',
     name: 'Projects, collaborators and applications',
-    status: 'schema-only',
-    note: 'Ownership transfer, roles, join requests and the "seeking members" gate are implemented and tested in the database. No interface.',
+    status: 'partial',
+    note: 'Listing/detail/create, roles, applications, review and updates exist. Ownership/role edge cases and full hosted collaboration journeys need verification.',
   },
   {
     area: 'Projects',
     name: 'Ideas and idea-to-project conversion',
-    status: 'schema-only',
-    note: 'Including the conversion function that carries interested people across. No interface.',
+    status: 'partial',
+    note: 'Forms, voting, interest and conversion exist. Validate atomicity, privacy and membership outcomes in staging.',
   },
 
   // ---------------------------------------------------------------- messaging
   {
     area: 'Messaging',
     name: 'Direct and group conversations',
-    status: 'schema-only',
-    note: 'Participation-based access, read receipts and unread counts exist in the database. No interface, and no realtime subscription wired up.',
+    status: 'partial',
+    note: 'Message privacy windows, current DM consent, retained drafts, nonce retries and bodyless local activity have regression coverage. Group creation/management UI is being completed. Local mode is not realtime; hosted publication, reconnect and delivery remain unverified.',
   },
 
   // ---------------------------------------------------------------- learning
   {
     area: 'Learning',
     name: 'Semester goals and daily study log',
-    status: 'schema-only',
-    note: 'Goals, milestones, study sessions and the streak calculation are implemented and tested. No interface.',
+    status: 'partial',
+    note: 'Goals, milestones, semesters and daily logs have screens/actions; new goals start private unless the author chooses sharing. Edit/reload, date boundaries and hosted provider parity still need final acceptance.',
   },
   {
     area: 'Learning',
     name: 'Achievements',
-    status: 'schema-only',
-    note: 'Awarded by database triggers on real events, not by a scheduled job inventing them. No interface.',
+    status: 'partial',
+    note: 'Stored achievements and display code exist. Verify real-event awards and idempotency in both providers; no skill mastery percentage is implied.',
   },
 
   // ----------------------------------------------------- discovery & community
   {
     area: 'Discovery',
     name: 'Opportunities and events',
-    status: 'schema-only',
-    note: 'Internships, scholarships, competitions and society events, with attendance. No interface.',
+    status: 'partial',
+    note: 'Boards, details, creation, opportunity saves, event RSVPs and readable-target reporting are implemented. Listings are not automatically endorsed. Staff review, independent capacity races, timezones and hosted acceptance remain required.',
   },
   {
     area: 'Discovery',
     name: 'Search',
-    status: 'planned',
-    note: 'Trigram indexes exist on names and titles. The search migration and interface are not written.',
+    status: 'partial',
+    note: 'People-by-name, university, department and self-declared skill filters use stable URL-addressed keyset pages. SQL/privacy regressions pass; hosted query plans and large-dataset performance remain unmeasured.',
   },
   {
     area: 'Community',
     name: 'Notifications',
-    status: 'schema-only',
-    note: 'Generated by triggers on real events, de-duplicated, and impossible for a client to forge — 77 tests cover exactly that. No interface, no email delivery.',
+    status: 'partial',
+    note: 'List/read actions, real unread badges and atomic bodyless local message activity are implemented with recipient-ownership tests. Hosted delivery, fan-out, stale-state invalidation and reconnect still need acceptance.',
   },
 
   // -------------------------------------------------------------- moderation
   {
     area: 'Safety',
     name: 'Reports, moderation and admin tools',
-    status: 'planned',
-    note: 'Admin and moderator roles exist and are enforced in policies. The reporting tables, audit log and admin interface are the next migration.',
+    status: 'partial',
+    note: 'Reports include readable opportunities/events; decisions, audit, institution review and private local staff accounts exist. Mandatory write limits and fresh hosted staff assurance are being verified. Hosted/operator abuse acceptance remains a launch gate.',
   },
   {
     area: 'Safety',
     name: 'Bug reporting',
-    status: 'planned',
-    note: 'Planned as part of the same migration as reports.',
+    status: 'partial',
+    note: 'Submission, own reports and staff triage exist with local domain coverage. Hosted acceptance and operator response procedures remain.',
   },
 
   // ------------------------------------------------------------------- ops
   {
     area: 'Operations',
     name: 'File uploads (avatars, project images)',
-    status: 'planned',
-    note: 'Storage buckets, MIME and size validation, and ownership policies are not written yet. No upload control is shown anywhere.',
+    status: 'partial',
+    note: 'Bounded JPEG/PNG/WebP validation, image normalization, private ownership and local avatar/project controls are implemented. Hosted uploads deliberately remain disabled until exact-object cleanup and storage acceptance are proven. Arbitrary files are not supported.',
   },
   {
     area: 'Operations',
     name: 'Rate limiting',
-    status: 'planned',
-    note: 'Not implemented. Supabase applies its own limits to auth endpoints in the meantime.',
+    status: 'partial',
+    note: 'Server-owned budgets gate accepted direct SQL writes and atomic local mutations; local authentication has separate throttling. Independent connection tests, hosted transport, read/search and per-IP/Sybil protection remain acceptance or implementation work.',
   },
   {
     area: 'Operations',
     name: 'End-to-end browser tests',
+    status: 'partial',
+    note: 'Local browser smoke exists and wider real two-account, password, group, account-data, private-image and device suites are being integrated with fresh fixtures. Comprehensive hosted-provider and accessibility acceptance is not yet complete.',
+  },
+  {
+    area: 'Operations',
+    name: 'Account export and deletion',
+    status: 'partial',
+    note: 'The /settings/account controls and reauthenticated bounded export/deletion pipeline are implemented, including ownership blockers, session revocation and retained audit rules. Local browser acceptance and the hosted cleanup worker/recovery drill remain unverified.',
+  },
+  {
+    area: 'Operations',
+    name: '50,000-user capacity and recovery',
     status: 'planned',
-    note: 'Playwright is installed; no specs are written. The current automated coverage is the database permission suite.',
+    note: 'A workload and load/recovery acceptance plan exist. No production capacity benchmark or successful restore drill has been recorded.',
   },
 ]
 

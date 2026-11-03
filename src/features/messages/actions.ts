@@ -3,7 +3,7 @@
 /**
  * Messaging writes.
  *
- * Four actions, and the security-relevant thing about all of them is what is
+ * The security-relevant thing about all these actions is what is
  * *absent* from the form data. No `sender_id`: the row's author is the session's
  * user, and `app.messages_before_write` overwrites the column with `auth.uid()`
  * anyway, so a caller who builds the request by hand still cannot attribute a
@@ -45,8 +45,14 @@
  *   * `mark_conversation_read` stamps `last_read_at` on the caller's own row and
  *     nothing else, because `last_read_at` is the only read-state column the store
  *     has.
- *   * `is_muted` has no column at all, so muting is refused with a sentence instead
- *     of a switch that reports a state nothing stores.
+ *   * Muting/leave are preference sidecars; closed membership intervals are
+ *     preserved separately. A rejoin starts a fresh interval for the caller.
+ *   * Every direct send rechecks the recipient's current messaging preference,
+ *     active membership and either-way blocking. Nobody stops existing incoming
+ *     DMs as well as new ones; group messages remain membership-scoped.
+ *   * A retained sender nonce makes the exact same accepted send idempotent.
+ *   * A new message creates/resurfaces bodyless activity for eligible unmuted
+ *     recipients in the SAME transaction. Nonce replays do not notify again.
  */
 
 import { revalidatePath } from 'next/cache'
@@ -54,8 +60,20 @@ import { redirect } from 'next/navigation'
 import { ActionError, action, formInput, requireActiveAccount, toFormState } from '@/lib/action'
 import type { FormState } from '@/lib/form-state'
 import { isLocalMode } from '@/lib/mode'
+import { leaveConversationLocal, muteConversationLocal } from './local'
+import { notifyMessageLocal } from './local-activity'
+import { localActor } from '@/lib/local/access'
 import { id, mutate, now, type LocalProfile, type Tables } from '@/lib/local/db'
+import { localFormWrite, localInteractionWrite } from '@/lib/local/write-result'
 import { getUser } from '@/lib/supabase/server'
+import {
+  activeMessageMembershipLocal,
+  canStartDirectMessageLocal,
+  messageSendRefusalLocal,
+  registerMessageMembershipLocal,
+  rejoinDirectMessageMembershipLocal,
+  retriableMessageLocal,
+} from './local-access'
 import {
   findMessagingTarget,
   getMessagingPermission,
@@ -67,7 +85,15 @@ import {
   setMutedSchema,
   startConversationSchema,
 } from '@/features/messages/schemas'
-import type { MarkReadOutcome, MuteOutcome } from '@/features/messages/types'
+import type { GroupChangeOutcome, GroupCreateState, LeaveOutcome, MarkReadOutcome, MuteOutcome } from '@/features/messages/types'
+import { callGroupRPC } from './group-rpc'
+import { FINAL_GROUP_ADMIN_COPY } from './group-contract'
+import {
+  addGroupMembersAction as addGroupMembers,
+  createGroupConversationAction as createGroupConversation,
+  removeGroupMemberAction as removeGroupMember,
+  setGroupMemberRoleAction as setGroupMemberRole,
+} from './group-actions'
 
 /**
  * The refusals the messaging triggers raise, by hint.
@@ -81,6 +107,8 @@ import type { MarkReadOutcome, MuteOutcome } from '@/features/messages/types'
 const SEND_REFUSALS: Record<string, string> = {
   blocked: 'You cannot message this person: one of you has blocked the other.',
   not_participant: 'This conversation is not open to you any more, so nothing was sent.',
+  messaging_not_permitted: 'You cannot send a message here. The recipient may not be accepting messages.',
+  reply_not_visible: 'That earlier message is not available to reply to.',
 }
 
 const START_REFUSALS: Record<string, string> = {
@@ -101,14 +129,7 @@ const NOT_SIGNED_IN = 'Please sign in to do that.'
 
 /** The reader's profile row — messages are authored and read by `profile_id`. */
 function readerProfile(db: Tables, userId: string): LocalProfile | null {
-  return db.profiles.find((profile) => profile.user_id === userId) ?? null
-}
-
-function participates(db: Tables, conversationId: string, profileId: string): boolean {
-  return db.conversation_participants.some(
-    (participant) =>
-      participant.conversation_id === conversationId && participant.profile_id === profileId,
-  )
+  return localActor(db, userId)
 }
 
 /**
@@ -141,9 +162,28 @@ const sendMessage = action(sendMessageSchema)
        */
       sender_id: user.id,
       body: input.body,
+      ...(input.clientNonce ? { client_nonce: input.clientNonce } : {}),
     })
 
     if (error) {
+      if (error.code === '23505' && input.clientNonce) {
+        // A duplicate is success only for the exact accepted send, never merely
+        // because some other write happened to reuse this nonce.
+        const { data: existing, error: lookupError } = await supabase
+          .from('messages')
+          .select('id, conversation_id, body')
+          .eq('sender_id', user.id)
+          .eq('client_nonce', input.clientNonce)
+          .maybeSingle<{ id: string; conversation_id: string; body: string | null }>()
+        if (!lookupError && existing?.conversation_id === input.conversationId &&
+            existing.body === input.body) {
+          revalidatePath('/messages')
+          return { message: 'Sent.' }
+        }
+        throw new ActionError('That send identifier was already used. Start a new message.', {
+          body: 'This message was not sent.',
+        })
+      }
       console.error('[messages:send]', error.code, error.message, error.hint ?? '')
       const refusal = error.hint ? SEND_REFUSALS[error.hint] : undefined
       if (refusal) throw new ActionError(refusal, { body: 'This message was not sent.' })
@@ -161,7 +201,7 @@ export async function sendMessageAction(
   _previous: FormState,
   formData: FormData,
 ): Promise<FormState> {
-  if (isLocalMode()) return sendMessageLocal(formData)
+  if (isLocalMode()) return localFormWrite(() => sendMessageLocal(formData), formData)
 
   const result = await sendMessage(formInput(formData))
   return toFormState(result, 'Sent.', formData)
@@ -182,6 +222,7 @@ async function sendMessageLocal(formData: FormData): Promise<FormState> {
   const values = formInput(formData)
   const conversationId = String(formData.get('conversationId') ?? '')
   const body = String(formData.get('body') ?? '').trim()
+  const clientNonce = formData.has('clientNonce') ? String(formData.get('clientNonce')) : undefined
 
   if (!LOCAL_ID.test(conversationId)) {
     return {
@@ -210,6 +251,13 @@ async function sendMessageLocal(formData: FormData): Promise<FormState> {
     }
   }
 
+  if (clientNonce !== undefined && !sendMessageSchema.shape.clientNonce.safeParse(clientNonce).success) {
+    return {
+      status: 'error', message: 'That send could not be identified.',
+      fieldErrors: { clientNonce: 'That send could not be identified.' }, values,
+    }
+  }
+
   const user = await getUser()
   if (!user) return { status: 'error', message: NOT_SIGNED_IN, values }
 
@@ -225,31 +273,46 @@ async function sendMessageLocal(formData: FormData): Promise<FormState> {
 
     // `messages_insert_participant`: participation, and a conversation that is not the
     // reader's is indistinguishable from one that does not exist.
-    if (!participates(db, conversationId, reader.id)) {
-      return { ok: false as const, message: SEND_REFUSALS.not_participant ?? 'This message was not sent.' }
-    }
+    const refusal = messageSendRefusalLocal(db, conversationId, reader)
+    if (refusal) return { ok: false as const, message: SEND_REFUSALS[refusal] ?? 'This message was not sent.' }
 
     const conversation = db.conversations.find((candidate) => candidate.id === conversationId)
     if (!conversation) {
       return { ok: false as const, message: SEND_REFUSALS.not_participant ?? 'This message was not sent.' }
     }
 
+    if (clientNonce) {
+      const existing = db.messages.find(row => row.author_id === reader.id &&
+        retriableMessageLocal(row).client_nonce === clientNonce)
+      if (existing) {
+        return existing.conversation_id === conversationId && existing.body === body
+          ? { ok: true as const }
+          : { ok: false as const, message: 'That send identifier was already used. Start a new message.' }
+      }
+    }
+
     const createdAt = now()
 
     // The author is the session's profile. There is no field for it in the form and
     // none in this function's input.
-    db.messages.push({
+    const message = retriableMessageLocal({
       id: id('msg'),
       conversation_id: conversation.id,
       author_id: reader.id,
       body,
       created_at: createdAt,
     })
+    if (clientNonce) message.client_nonce = clientNonce
+    db.messages.push(message)
 
     // `app.messages_after_insert`: the list's preview and its ordering key move to the
     // message that was just written.
     conversation.last_message_at = createdAt
     conversation.last_message_preview = previewOf(body)
+
+    // The cloud after-insert trigger emits activity, not private message text.
+    // This is after nonce replay handling and inside the atomic/budgeted write.
+    notifyMessageLocal(db, message)
 
     return { ok: true as const }
   })
@@ -320,7 +383,7 @@ export async function startConversationAction(
   _previous: FormState,
   formData: FormData,
 ): Promise<FormState> {
-  if (isLocalMode()) return startConversationLocal(formData)
+  if (isLocalMode()) return localFormWrite(() => startConversationLocal(formData), formData)
 
   const result = await startConversation(formInput(formData))
 
@@ -381,6 +444,7 @@ async function startConversationLocal(formData: FormData): Promise<FormState> {
       }
     }
 
+    if (!canStartDirectMessageLocal(db, reader, target.id)) return { ok: false as const, message: 'Messaging is not available.' }
     const pair = [reader.id, target.id]
 
     // The pair index, reproduced: a direct conversation whose participant set is
@@ -396,9 +460,15 @@ async function startConversationLocal(formData: FormData): Promise<FormState> {
       )
     })
 
-    if (existing) return { ok: true as const, conversationId: existing.id }
+    if (existing) {
+      if (!rejoinDirectMessageMembershipLocal(db, existing.id, reader.id, now())) {
+        return { ok: false as const, message: 'This conversation could not be reopened.' }
+      }
+      return { ok: true as const, conversationId: existing.id }
+    }
 
     const conversationId = id('cnv')
+    const joinedAt = now()
     db.conversations.push({
       id: conversationId,
       type: 'direct',
@@ -406,7 +476,7 @@ async function startConversationLocal(formData: FormData): Promise<FormState> {
       // `conversations_before_write` nulls these on insert: nobody has written yet.
       last_message_at: null,
       last_message_preview: null,
-      created_at: now(),
+      created_at: joinedAt,
     })
 
     // Both participant rows in the same write, or the conversation is unreachable by
@@ -418,6 +488,7 @@ async function startConversationLocal(formData: FormData): Promise<FormState> {
         profile_id: profileId,
         last_read_at: null,
       })
+      registerMessageMembershipLocal(db, conversationId, profileId, joinedAt)
     }
 
     return { ok: true as const, conversationId }
@@ -471,7 +542,7 @@ const markRead = action(markReadSchema)
  * reader is only trying to read.
  */
 export async function markConversationReadAction(conversationId: string): Promise<MarkReadOutcome> {
-  if (isLocalMode()) return markConversationReadLocal(conversationId)
+  if (isLocalMode()) return localInteractionWrite(() => markConversationReadLocal(conversationId))
 
   const result = await markRead({ conversationId })
   if (result.ok) return { ok: true, marked: true }
@@ -507,6 +578,7 @@ async function markConversationReadLocal(conversationId: string): Promise<MarkRe
         candidate.conversation_id === conversationId && candidate.profile_id === reader.id,
     )
     if (!participant) return false
+    if (!activeMessageMembershipLocal(db, conversationId, reader.id)) return false
 
     participant.last_read_at = now()
     return true
@@ -567,19 +639,58 @@ export async function setConversationMutedAction(
   muted: boolean,
 ): Promise<MuteOutcome> {
   if (isLocalMode()) {
-    // `conversation_participants` in the store has `last_read_at` and nothing else.
-    // There is no `is_muted` column, so there is nowhere to put this, and a no-op
-    // that reported success would leave the switch showing a state nothing stores —
-    // which is worse than the switch saying why it cannot move.
-    return {
-      ok: false,
-      message:
-        'Muting is not stored in local mode: the local conversation_participants row has no ' +
-        'is_muted column, so nothing was changed.',
-    }
+    const result = await localInteractionWrite(() => muteConversationLocal(conversationId, muted))
+    if (result.ok) revalidatePath('/messages')
+    return result
   }
 
   const result = await setMuted({ conversationId, muted })
   if (result.ok) return { ok: true, muted: result.value.muted }
   return { ok: false, message: result.error }
+}
+
+// Leave is a membership transition, not a deletion of anyone's history.
+const leaveConversation = action(markReadSchema)
+  .use(requireActiveAccount)
+  .run(async ({ input, supabase }) => {
+    const { data, error } = await callGroupRPC(supabase, 'message_leave_conversation', {
+      p_conversation_id: input.conversationId,
+    })
+    if (error?.hint === 'final_group_admin') throw new ActionError(FINAL_GROUP_ADMIN_COPY)
+    if (error) {
+      if (error.code === '42501') throw new ActionError('That conversation is not yours to leave.')
+      throw error
+    }
+    if (data !== true) throw new ActionError('That conversation is not yours to leave.')
+    revalidatePath('/messages')
+    return { left: true as const }
+  })
+
+export async function leaveConversationAction(conversationId: string): Promise<LeaveOutcome> {
+  if (isLocalMode()) {
+    const result = await localInteractionWrite(() => leaveConversationLocal(conversationId))
+    if (result.ok) revalidatePath('/messages')
+    return result
+  }
+  const result = await leaveConversation({ conversationId })
+  return result.ok ? { ok: true, left: true } : { ok: false, message: result.error }
+}
+
+// Keep one client action surface; the server-only group DAL owns its guards.
+export async function createGroupConversationAction(previous: GroupCreateState, data: FormData): Promise<GroupCreateState> {
+  return createGroupConversation(previous, data)
+}
+
+export async function addGroupMembersAction(previous: FormState, data: FormData): Promise<FormState> {
+  return addGroupMembers(previous, data)
+}
+
+export async function setGroupMemberRoleAction(
+  conversationId: string, profileId: string, role: 'admin' | 'member',
+): Promise<GroupChangeOutcome> {
+  return setGroupMemberRole(conversationId, profileId, role)
+}
+
+export async function removeGroupMemberAction(conversationId: string, profileId: string): Promise<GroupChangeOutcome> {
+  return removeGroupMember(conversationId, profileId)
 }

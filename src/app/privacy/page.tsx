@@ -32,7 +32,7 @@ export default function PrivacyPage() {
           <ul className="mt-1.5 list-disc space-y-1.5 pl-5">
             <li>
               <span className="font-medium text-ink">Account:</span> email address, and a password
-              hash if you signed up with a password. Quad never stores your password and no
+              hash if you signed up with a password. Bulla never stores your password and no
               administrator can read it — password checking happens inside Supabase Auth.
             </li>
             <li>
@@ -71,7 +71,7 @@ export default function PrivacyPage() {
           <h2 className="text-lg text-ink">What is not done with it</h2>
           <p className="mt-1.5">
             Your content is not sold, is not used to target advertising, and is not used to train
-            machine-learning models. Quad has no advertising at present; if that changes, adverts
+            machine-learning models. Bulla has no advertising at present; if that changes, adverts
             will not appear in private messages and will not be targeted using message content.
           </p>
         </section>
@@ -80,7 +80,7 @@ export default function PrivacyPage() {
           <h2 className="text-lg text-ink">Third parties currently involved</h2>
           <p className="mt-1.5">
             Supabase, which hosts the database, authentication and file storage. If you sign in with
-            Google, Google confirms your identity to Supabase; Quad requests your name, email address
+            Google, Google confirms your identity to Supabase; Bulla requests your name, email address
             and profile picture and no other permission. Analytics and email delivery providers are
             not yet chosen, and this notice will name them when they are.
           </p>

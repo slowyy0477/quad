@@ -26,8 +26,8 @@ import { cn } from '@/lib/utils'
  */
 const buttonVariants = cva(
   cn(
-    'inline-flex items-center justify-center gap-2 rounded border font-medium',
-    'transition-colors duration-150 ease-out-soft',
+    'button-press inline-flex items-center justify-center gap-2 rounded border font-semibold',
+    'transition-[color,background-color,border-color,transform,box-shadow] duration-150 ease-out-soft',
     'disabled:pointer-events-none disabled:opacity-55',
     // Icons inside a button should never be the thing that stretches it.
     '[&_svg]:size-4 [&_svg]:shrink-0',
@@ -36,7 +36,7 @@ const buttonVariants = cva(
     variants: {
       variant: {
         primary: cn(
-          'border-accent-700 bg-accent-600 text-white',
+          'border-accent-600 bg-accent-600 text-accent-contrast',
           'hover:bg-accent-700 active:bg-accent-900',
         ),
         secondary: cn(
@@ -44,17 +44,17 @@ const buttonVariants = cva(
           'hover:bg-paper-sunken active:bg-paper-sunken',
         ),
         ghost: cn('border-transparent bg-transparent text-ink-muted', 'hover:bg-paper-sunken hover:text-ink'),
-        danger: cn('border-danger-700 bg-danger-600 text-white', 'hover:bg-danger-700'),
+        danger: cn('border-danger-600 bg-danger-600 text-danger-contrast', 'hover:bg-danger-700'),
         link: cn(
           'h-auto min-h-0 border-transparent bg-transparent p-0 text-accent-700 underline underline-offset-2',
           'hover:text-accent-900',
         ),
       },
       size: {
-        sm: 'min-h-8 px-2.5 text-xs',
-        default: 'min-h-11 px-4 text-sm sm:min-h-10',
+        sm: 'min-h-11 px-3 text-sm',
+        default: 'min-h-11 px-4 text-sm',
         lg: 'min-h-12 px-6 text-base',
-        icon: 'size-10 p-0',
+        icon: 'size-11 p-0',
       },
       block: {
         true: 'w-full',

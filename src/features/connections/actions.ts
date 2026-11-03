@@ -7,6 +7,7 @@ import { isSupabaseConfigured } from '@/lib/env'
 import { describeWriteError, echoValues, fieldErrorsOf, type FormState } from '@/lib/form-state'
 import { createClient, getUser } from '@/lib/supabase/server'
 import { isLocalMode } from '@/lib/mode'
+import { followLocal, graphLocal } from './local'
 
 /**
  * Connection, follow and block writes.
@@ -37,53 +38,7 @@ const UNAVAILABLE: FormState = {
   message: 'This deployment has no database connection, so nothing can be sent.',
 }
 
-/*
- * LOCAL MODE
- * ----------
- * The local store has no `connections`, `follows` or `blocks` table — `Tables` in
- * `src/lib/local/db.ts` is the whole store, and none of the three is in it. These
- * actions therefore do not write anything; they return a FormState that says which
- * table is missing and confirms that nothing was saved.
- *
- * Why not add the tables here: the local store's shape is decided in
- * `src/lib/local/db.ts` and mirrored by the Postgres migrations, not by a feature
- * module. A `connections` array invented in this file would be a second schema that
- * the deployment would then have to match, and a request button that appeared to
- * work against it would be claiming a graph that no page can read.
- *
- * The reads in `./queries` take the matching position: they return `'none'` and
- * empty lists with no error, so the pages' real empty states render.
- */
-const LOCAL_SEND: FormState = {
-  status: 'error',
-  message:
-    'Local mode has no connections table, so a connection request cannot be recorded. Nothing was sent.',
-}
-
-const LOCAL_RESPOND: FormState = {
-  status: 'error',
-  message: 'Local mode has no connections table, so there is no request to answer. Nothing was changed.',
-}
-
-const LOCAL_REMOVE: FormState = {
-  status: 'error',
-  message: 'Local mode has no connections table, so there is no connection or request to remove.',
-}
-
-const LOCAL_FOLLOW: FormState = {
-  status: 'error',
-  message: 'Local mode has no follows table, so following cannot be recorded. Nothing was changed.',
-}
-
-const LOCAL_BLOCK: FormState = {
-  status: 'error',
-  message: 'Local mode has no blocks table, so a block cannot be recorded. Nothing was changed.',
-}
-
-const LOCAL_UNBLOCK: FormState = {
-  status: 'error',
-  message: 'Local mode has no blocks table, so there is no block to remove.',
-}
+// Local-mode mutations use the persistent domain tables and shared access guards.
 
 const targetSchema = z.object({
   profileId: z.string().uuid('That person could not be identified'),
@@ -142,7 +97,11 @@ export async function sendConnectionRequestAction(
   _previous: FormState,
   formData: FormData,
 ): Promise<FormState> {
-  if (isLocalMode()) return LOCAL_SEND
+  if (isLocalMode()) {
+    const result = await graphLocal(formData, 'request')
+    if (result.status === 'success') { revalidatePair(); revalidatePath('/feed'); revalidatePath('/messages') }
+    return result
+  }
   if (!isSupabaseConfigured()) return UNAVAILABLE
 
   const parsed = targetSchema.safeParse({
@@ -196,7 +155,11 @@ async function respond(
   formData: FormData,
   status: 'accepted' | 'rejected',
 ): Promise<FormState> {
-  if (isLocalMode()) return LOCAL_RESPOND
+  if (isLocalMode()) {
+    const result = await graphLocal(formData, status)
+    if (result.status === 'success') { revalidatePair(); revalidatePath('/feed'); revalidatePath('/messages') }
+    return result
+  }
   if (!isSupabaseConfigured()) return UNAVAILABLE
 
   const id = String(formData.get('connectionId') ?? '')
@@ -251,7 +214,11 @@ export async function removeConnectionAction(
   _previous: FormState,
   formData: FormData,
 ): Promise<FormState> {
-  if (isLocalMode()) return LOCAL_REMOVE
+  if (isLocalMode()) {
+    const result = await graphLocal(formData, 'remove')
+    if (result.status === 'success') { revalidatePair(); revalidatePath('/feed'); revalidatePath('/messages') }
+    return result
+  }
   if (!isSupabaseConfigured()) return UNAVAILABLE
 
   const id = String(formData.get('connectionId') ?? '')
@@ -295,7 +262,11 @@ export async function setFollowAction(
   _previous: FormState,
   formData: FormData,
 ): Promise<FormState> {
-  if (isLocalMode()) return LOCAL_FOLLOW
+  if (isLocalMode()) {
+    const result = await followLocal(formData)
+    if (result.status === 'success') { revalidatePair(); revalidatePath('/feed') }
+    return result
+  }
   if (!isSupabaseConfigured()) return UNAVAILABLE
 
   const parsed = targetSchema.safeParse({
@@ -371,7 +342,11 @@ export async function blockAction(
   _previous: FormState,
   formData: FormData,
 ): Promise<FormState> {
-  if (isLocalMode()) return LOCAL_BLOCK
+  if (isLocalMode()) {
+    const result = await graphLocal(formData, 'block')
+    if (result.status === 'success') { revalidatePair(); revalidatePath('/feed'); revalidatePath('/messages') }
+    return result
+  }
   if (!isSupabaseConfigured()) return UNAVAILABLE
 
   const parsed = blockSchema.safeParse({
@@ -423,7 +398,11 @@ export async function unblockAction(
   _previous: FormState,
   formData: FormData,
 ): Promise<FormState> {
-  if (isLocalMode()) return LOCAL_UNBLOCK
+  if (isLocalMode()) {
+    const result = await graphLocal(formData, 'unblock')
+    if (result.status === 'success') { revalidatePair(); revalidatePath('/feed'); revalidatePath('/messages') }
+    return result
+  }
   if (!isSupabaseConfigured()) return UNAVAILABLE
 
   const parsed = targetSchema.safeParse({

@@ -46,7 +46,7 @@ export function ClaimUniversityControl({
   if (!signedIn) {
     return (
       <Button asChild variant="secondary" size="sm">
-        <Link href="/login?next=/universities">Sign in to say you study here</Link>
+        <Link href="/login?next=/universities">Sign in to join</Link>
       </Button>
     )
   }

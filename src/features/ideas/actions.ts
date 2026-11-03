@@ -11,8 +11,14 @@ import {
 } from '@/lib/form-state'
 import { createClient, getUser } from '@/lib/supabase/server'
 import { isLocalMode } from '@/lib/mode'
+import { localFormWrite } from '@/lib/local/write-result'
+import { ideaParticipationLocal } from './local'
+import { canReadContent, localActor } from '@/lib/local/access'
 import { id, mutate, now, type LocalIdea, type LocalProject, type Tables } from '@/lib/local/db'
 import { clampVisibility } from '@/features/projects/queries'
+import { inviteIdeaParticipantsLocal, projectInvitationFailure, validProjectInvitationId } from '@/features/projects/invitations'
+import { enforceMutationLimits } from '@/lib/local/mutation-limits'
+import { RATE_LIMITS } from '@/lib/rate-limit/budgets'
 import {
   ideaCreateSchema,
   ideaEditSchema,
@@ -48,18 +54,6 @@ const UNAVAILABLE: FormState = {
   message: 'This deployment has no database connection, so ideas cannot be saved.',
 }
 
-/** Neither `idea_votes` nor `idea_interest` exists in the local store. */
-const NO_VOTES: FormState = {
-  status: 'error',
-  message:
-    'Votes are not stored in local mode yet — the local store has no idea_votes table. Nothing was saved.',
-}
-
-const NO_INTEREST: FormState = {
-  status: 'error',
-  message:
-    'Offers to help are not stored in local mode yet — the local store has no idea_interest table. Nothing was saved.',
-}
 
 // -----------------------------------------------------------------------------
 // Create
@@ -86,7 +80,7 @@ export async function createIdeaAction(
     return { status: 'error', fieldErrors: fieldErrorsOf(parsed.error), values: echoValues(formData) }
   }
 
-  if (isLocalMode()) return createIdeaLocal(user.id, parsed.data, formData)
+  if (isLocalMode()) return localFormWrite(() => createIdeaLocal(user.id, parsed.data, formData), formData)
 
   const supabase = await createClient()
   const { data, error } = await supabase
@@ -145,7 +139,7 @@ export async function updateIdeaAction(
     return { status: 'error', fieldErrors: fieldErrorsOf(parsed.error), values: echoValues(formData) }
   }
 
-  if (isLocalMode()) return updateIdeaLocal(user.id, ideaId, parsed.data)
+  if (isLocalMode()) return localFormWrite(() => updateIdeaLocal(user.id, ideaId, parsed.data), formData)
 
   const supabase = await createClient()
   const { data, error } = await supabase
@@ -183,7 +177,7 @@ export async function closeIdeaAction(
   const user = await getUser()
   if (!user) redirect('/login')
 
-  if (isLocalMode()) return closeIdeaLocal(user.id, ideaId)
+  if (isLocalMode()) return localFormWrite(() => closeIdeaLocal(user.id, ideaId), formData)
 
   const supabase = await createClient()
   const { data, error } = await supabase
@@ -228,7 +222,7 @@ export async function voteIdeaAction(
   // There is no `idea_votes` table in the local store. Bumping `upvote_count`
   // instead would be worse than refusing: `hasVoted` can only answer false, so the
   // same person could vote on every reload and the number would never mean anything.
-  if (isLocalMode()) return NO_VOTES
+  if (isLocalMode()) { const result = await localFormWrite(() => ideaParticipationLocal(formData, 'vote'), formData); if (result.status === 'success') { revalidatePath('/ideas'); revalidatePath(`/ideas/${ideaId}`) }; return result }
 
   const supabase = await createClient()
 
@@ -277,7 +271,7 @@ export async function expressInterestAction(
 
   // No `idea_interest` table in the local store: the offer has nowhere to be kept,
   // and `listIdeaInterests` would still return nothing afterwards.
-  if (isLocalMode()) return NO_INTEREST
+  if (isLocalMode()) { const result = await localFormWrite(() => ideaParticipationLocal(formData, 'interest'), formData); if (result.status === 'success') revalidatePath(`/ideas/${ideaId}`); return result }
 
   const supabase = await createClient()
   const { error } = await supabase.from('idea_interest').insert({
@@ -310,7 +304,7 @@ export async function withdrawInterestAction(
   if (!user) redirect(`/login?next=/ideas/${ideaId}`)
 
   // Nothing was recorded, so there is nothing to take back.
-  if (isLocalMode()) return NO_INTEREST
+  if (isLocalMode()) { const result = await localFormWrite(() => ideaParticipationLocal(formData, 'withdraw'), formData); if (result.status === 'success') revalidatePath(`/ideas/${ideaId}`); return result }
 
   const supabase = await createClient()
   const { data, error } = await supabase
@@ -335,25 +329,13 @@ export async function withdrawInterestAction(
 /**
  * Turn an idea into a project.
  *
- * Three steps, in this order, and each one is necessary:
+ * 0036's caller-RLS RPC atomically creates the project, copies required skills,
+ * records conversion, and invites eligible interested people. Blocks, current
+ * privacy/preferences and mandatory budgets may exclude people. The count is
+ * actual inserted invitations, never a promise to invite every interest.
  *
- * 1. `public.convert_idea_to_project` creates the project from the idea's own fields,
- *    copies the required skills across into `project_skills`, and marks the idea
- *    `converted` with `converted_project_id` set — all inside one transaction, so an
- *    idea can never point at nothing. It refuses a second run with 23505.
- *
- * 2. Everyone who said they would help is invited. The function does not do this and
- *    no trigger does either, so the wizard's promise — "3 people interested will be
- *    invited" — is only true because this loop runs. Each invite goes in on its own so
- *    one person who has invites switched off cannot block the other two; the number
- *    reported back is the number that actually landed.
- *
- * 3. The reader is sent to the new project, which already lists them as its owner
- *    through the membership row the create trigger wrote.
- *
- * No notification row is written here. `project_invites_notify` in 0014 fires on the
- * invite insert and produces the notification, which is the whole reason the invites
- * are real rows rather than a message this action prints.
+ * Local mode has the same locked transaction and bodyless notifications. Neither
+ * path makes an invited person a member until they explicitly accept.
  */
 export async function convertIdeaToProjectAction(
   _previous: FormState,
@@ -362,77 +344,38 @@ export async function convertIdeaToProjectAction(
   if (!isLocalMode() && !isSupabaseConfigured()) return UNAVAILABLE
 
   const ideaId = String(formData.get('ideaId') ?? '')
-  if (!ideaId) return { status: 'error', message: 'That idea could not be identified.' }
+  if (!validProjectInvitationId(ideaId)) return { status: 'error', message: 'That idea could not be identified.' }
 
   const user = await getUser()
   if (!user) redirect(`/login?next=/ideas/${ideaId}`)
 
-  if (isLocalMode()) return convertIdeaLocal(user.id, ideaId)
+  if (isLocalMode()) return localFormWrite(() => convertIdeaLocal(user.id, ideaId), formData)
 
-  const supabase = await createClient()
-
-  // Read the interested people first, so a failure to invite one of them cannot be
-  // mistaken for there having been nobody to invite.
-  const { data: interested, error: interestError } = await supabase
-    .from('idea_interest')
-    .select('profile_id')
-    .eq('idea_id', ideaId)
-    .returns<{ profile_id: string }[]>()
-
-  if (interestError) {
-    console.error('[ideas:convert:interest]', interestError.code, interestError.message)
-    return { status: 'error', message: 'That idea could not be read, so nothing was converted.' }
+  let conversion: { data: unknown; error: { code?: string; hint?: string | null } | null }
+  try {
+    const supabase = await createClient()
+    conversion = await supabase.rpc('convert_idea_to_project_with_invites', { p_idea_id: ideaId })
+  } catch {
+    return { status: 'error', message: 'The conversion could not be confirmed. Reload the idea before trying again.' }
   }
+  const { data, error } = conversion
 
-  const { data: projectId, error } = await supabase.rpc('convert_idea_to_project', {
-    p_idea_id: ideaId,
-  })
-
-  if (error) {
-    return describeWriteError(error, 'ideas:convert', {
-      '42501': 'Only the person who proposed the idea can turn it into a project.',
-      '23505': 'This idea has already become a project.',
-      P0002: 'That idea no longer exists.',
-    })
-  }
-
-  const newProjectId = projectId as unknown as string
-
-  let invited = 0
-  for (const person of interested ?? []) {
-    const { error: inviteError } = await supabase.from('project_invites').insert({
-      project_id: newProjectId,
-      invitee_id: person.profile_id,
-      // inviter_id and status are set by the trigger; sending them would be inert.
-      message: 'You said you would help build this. It is a project now.',
-    })
-    if (inviteError) {
-      // Logged and skipped: one person with invitations switched off must not stop
-      // the rest. describeWriteError is not used because there is no form to answer.
-      console.error('[ideas:convert:invite]', inviteError.code, inviteError.message)
-    } else {
-      invited += 1
-    }
-  }
-
-  const { data: project, error: slugError } = await supabase
-    .from('projects')
-    .select('slug')
-    .eq('id', newProjectId)
-    .maybeSingle<{ slug: string }>()
-
-  if (slugError || !project) {
-    console.error('[ideas:convert:slug]', slugError?.code, slugError?.message)
-    revalidatePath('/ideas')
-    revalidatePath('/projects')
-    return { status: 'success', message: 'The project was created. Find it under Projects.' }
+  if (error) return projectInvitationFailure(error)
+  const project = Array.isArray(data) && data.length === 1 ? data[0] as Record<string, unknown> : null
+  if (!project || typeof project.project_id !== 'string' || !validProjectInvitationId(project.project_id, false) ||
+      typeof project.project_slug !== 'string' || project.project_slug.length > 128 ||
+      !/^[a-z0-9]+(?:-[a-z0-9]+)*$/.test(project.project_slug) ||
+      typeof project.invited_count !== 'number' || !Number.isSafeInteger(project.invited_count) ||
+      project.invited_count < 0 || project.invited_count > 29) {
+    return { status: 'error', message: 'The conversion could not be confirmed. Reload the idea before trying again.' }
   }
 
   revalidatePath('/ideas')
   revalidatePath(`/ideas/${ideaId}`)
   revalidatePath('/projects')
-  revalidatePath(`/projects/${project.slug}`)
-  redirect(`/projects/${project.slug}?converted=1&invited=${invited}`)
+  revalidatePath(`/projects/${project.project_slug}`)
+  revalidatePath('/notifications')
+  redirect(`/projects/${project.project_slug}?converted=1&invited=${project.invited_count}`)
 }
 
 // =============================================================================
@@ -480,7 +423,7 @@ async function createIdeaLocal(
   formData: FormData,
 ): Promise<FormState> {
   const created = await mutate((db) => {
-    const author = db.profiles.find((profile) => profile.user_id === userId)
+    const author = localActor(db, userId)
     if (!author) return null
 
     const idea: LocalIdea = {
@@ -519,12 +462,12 @@ async function updateIdeaLocal(
   data: IdeaEditInput,
 ): Promise<FormState> {
   const updated = await mutate((db) => {
-    const viewer = db.profiles.find((profile) => profile.user_id === userId)
+    const viewer = localActor(db, userId)
     if (!viewer) return false
 
     const idea = db.ideas.find((entry) => entry.id === ideaId && entry.deleted_at === null)
     // `ideas_update_own`: the author, and nobody else.
-    if (!idea || idea.author_id !== viewer.id) return false
+    if (!idea || idea.author_id !== viewer.id || !canReadContent(db, idea, idea.author_id, viewer, 'idea')) return false
 
     idea.title = data.title.trim()
     idea.description = data.description.trim()
@@ -548,11 +491,11 @@ async function updateIdeaLocal(
 
 async function closeIdeaLocal(userId: string, ideaId: string): Promise<FormState> {
   const closed = await mutate((db) => {
-    const viewer = db.profiles.find((profile) => profile.user_id === userId)
+    const viewer = localActor(db, userId)
     if (!viewer) return false
 
     const idea = db.ideas.find((entry) => entry.id === ideaId && entry.deleted_at === null)
-    if (!idea || idea.author_id !== viewer.id) return false
+    if (!idea || idea.author_id !== viewer.id || !canReadContent(db, idea, idea.author_id, viewer, 'idea')) return false
 
     idea.status = 'closed'
     return true
@@ -567,16 +510,21 @@ async function closeIdeaLocal(userId: string, ideaId: string): Promise<FormState
 
 async function convertIdeaLocal(userId: string, ideaId: string): Promise<FormState> {
   const result = await mutate((db) => {
-    const viewer = db.profiles.find((profile) => profile.user_id === userId)
+    const viewer = localActor(db, userId)
     if (!viewer) return 'not-found'
 
     const idea = db.ideas.find((entry) => entry.id === ideaId && entry.deleted_at === null)
-    if (!idea) return 'not-found'
+    if (!idea || !canReadContent(db, idea, idea.author_id, viewer, 'idea')) return 'not-found'
 
     // `convert_idea_to_project`: the author, or an admin.
     if (idea.author_id !== viewer.id) return 'forbidden'
     if (idea.status === 'converted') return 'already'
 
+    const requiredSkills = db.idea_skills.filter(row => row.idea_id === idea.id)
+    if (requiredSkills.some(row => !db.skills.some(skill => skill.id === row.skill_id &&
+        (skill.is_approved || skill.created_by === viewer.id)))) return 'skills'
+    const before = structuredClone(db)
+    const mutationNowMs = Date.now()
     const author = db.profiles.find((profile) => profile.id === idea.author_id)
     // The project is created on the author's behalf, so the owner-profile clamp
     // applies exactly as it would on a direct create.
@@ -616,13 +564,29 @@ async function convertIdeaLocal(userId: string, ideaId: string): Promise<FormSta
       role: 'owner',
       created_at: created,
     })
+    for (const skill of requiredSkills) {
+      if (!db.project_skills.some(row => row.project_id === project.id && row.skill_id === skill.skill_id)) {
+        db.project_skills.push({ id: id('psk'), project_id: project.id, skill_id: skill.skill_id, is_required: true, created_at: created })
+      }
+    }
 
     // Both halves of the conversion, in the same mutation: the idea cannot end up
     // pointing at a project that was never written.
     idea.status = 'converted'
     idea.converted_project_id = project.id
 
-    return { slug: project.slug }
+    // A non-consuming preview INSIDE the store lock validates the existing
+    // ledger and reserves no bypass. The real commit hook rechecks every actual
+    // row. A refused base conversion rolls everything back; optional fan-out
+    // only uses remaining slots and never edits/reset the ledger.
+    const ledger = enforceMutationLimits(before, db, { actorUserId: userId, nowMs: mutationNowMs })
+    const policy = RATE_LIMITS['project:write']
+    const windowMs = policy.windowSeconds * 1000
+    const start = Math.floor(mutationNowMs / windowMs) * windowMs
+    const spent = ledger.find(row => row.bucket === 'project:write' &&
+      row.subject === userId && row.window_start_ms === start)?.hits ?? 0
+    const invited = inviteIdeaParticipantsLocal(db, idea.id, project, viewer, Math.max(0, policy.limit - spent), created)
+    return { slug: project.slug, invited }
   })
 
   if (result === 'forbidden') {
@@ -634,12 +598,14 @@ async function convertIdeaLocal(userId: string, ideaId: string): Promise<FormSta
   if (result === 'not-found') {
     return { status: 'error', message: 'That idea no longer exists.' }
   }
+  if (result === 'skills') {
+    return { status: 'error', message: 'A required skill is no longer available, so nothing was converted.' }
+  }
 
-  // No `project_invites` table in the local store, so nobody is invited and the
-  // page is told the truth: the project exists, and the author owns it.
   revalidatePath('/ideas')
   revalidatePath(`/ideas/${ideaId}`)
   revalidatePath('/projects')
   revalidatePath(`/projects/${result.slug}`)
-  redirect(`/projects/${result.slug}?converted=1&invited=0`)
+  revalidatePath('/notifications')
+  redirect(`/projects/${result.slug}?converted=1&invited=${result.invited}`)
 }

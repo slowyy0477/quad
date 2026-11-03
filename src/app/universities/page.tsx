@@ -3,6 +3,7 @@ import type { Metadata } from 'next'
 import { Alert } from '@/components/ui/alert'
 import { Badge } from '@/components/ui/badge'
 import { SearchInput } from '@/components/ui/search-input'
+import { CampusArtwork } from '@/components/ui/campus-artwork'
 import { EmptyState, SectionHeading, Surface } from '@/components/ui/surface'
 import { ClaimUniversityControl } from '@/features/universities/components/claim-university-control'
 import { RequestUniversityForm } from '@/features/universities/components/request-university-form'
@@ -12,7 +13,7 @@ import {
   listMyPendingSubmissions,
   searchUniversities,
 } from '@/features/universities/queries'
-import { isSupabaseConfigured } from '@/lib/env'
+import { isDataConfigured } from '@/lib/env'
 import { getUser } from '@/lib/supabase/server'
 
 export const metadata: Metadata = { title: 'Universities' }
@@ -51,7 +52,7 @@ export default async function UniversitiesPage({
   const params = await searchParams
   const q = firstValue(params.q).slice(0, 120)
 
-  if (!isSupabaseConfigured()) {
+  if (!isDataConfigured()) {
     return (
       <div className="mx-auto w-full max-w-2xl px-4 py-12">
         <h1 className="text-3xl">Universities</h1>
@@ -76,19 +77,25 @@ export default async function UniversitiesPage({
   ])
 
   return (
-    <div className="mx-auto w-full max-w-3xl px-4 py-10 sm:px-6">
-      <h1 className="text-3xl">Universities</h1>
-      <p className="mt-2 max-w-prose text-ink-muted">
-        Quad holds institutions people have asked for, and marking yours is how you find the other
-        students there. The list is not complete — it starts with a set of real universities and
-        grows as people file the ones missing from it.
-      </p>
+    <div className="page-enter mx-auto w-full max-w-6xl px-4 py-8 sm:px-6">
+      <header className="university-hero">
+        <div>
+          <p className="eyebrow">Around campus</p>
+          <h1 className="mt-3 text-3xl">Find your university.</h1>
+          <p className="mt-3 max-w-xl text-ink-muted">
+            A familiar starting point for new connections. Choose your campus,
+            then find people and projects around you.
+          </p>
+          <p className="mt-3 text-xs text-ink-faint">Campus affiliation is self-declared, not verified student identity.</p>
+        </div>
+        <CampusArtwork className="hidden lg:block" />
+      </header>
 
       <div className="mt-6">
         <SearchInput
           action="/universities"
           defaultValue={q}
-          placeholder="Search by name, short name or city"
+          placeholder="Search a university or city"
         />
       </div>
 
@@ -121,9 +128,9 @@ export default async function UniversitiesPage({
         </Alert>
       ) : null}
 
-      <section className="mt-10">
+      <section className="mt-8" aria-label="University directory">
         <SectionHeading
-          title={q ? `Institutions matching “${q}”` : 'All institutions'}
+          title={q ? `Results for “${q}”` : 'Explore campuses'}
           description={
             search.truncated
               ? 'Only the first 60 matches are shown. Search to narrow the list.'
@@ -132,7 +139,7 @@ export default async function UniversitiesPage({
         />
 
         {search.universities.length > 0 ? (
-          <ul className="divide-y divide-hairline border-t border-hairline">
+          <ul className="grid items-stretch gap-4 md:grid-cols-2">
             {search.universities.map((university) => (
               <UniversityRow
                 key={university.id}
@@ -178,33 +185,32 @@ export default async function UniversitiesPage({
         </section>
       ) : null}
 
-      <section id="request" className="mt-12 scroll-mt-20">
-        <SectionHeading
-          title="Request this university"
-          description="If your institution is missing, file it here. A moderator approves new ones — Quad does not add institutions automatically, and it does not check that anyone studies where they say they do."
-        />
-        <Surface className="mt-4 p-5">
+      <section id="request" className="mt-8 scroll-mt-20">
+        <details className="quiet-disclosure">
+          <summary>Missing your university? Request it.</summary>
+          <div className="p-5">
+          <p className="mb-4 text-sm text-ink-muted">The directory grows through member requests. A moderator reviews each new institution before it appears.</p>
           {signedIn ? (
             <RequestUniversityForm defaultName={q} />
           ) : (
             <p className="text-sm text-ink-muted">
-              Filing an institution needs an account, because the row records who asked for it.{' '}
+              Sign in to send a university request.{' '}
               <Link href="/login?next=/universities" className="text-accent-700 underline underline-offset-2">
                 Sign in
               </Link>{' '}
               or{' '}
               <Link href="/signup" className="text-accent-700 underline underline-offset-2">
-                join Quad
+                join Bulla
               </Link>{' '}
-              first. You can browse the list without one.
+              first. Browsing does not need an account.
             </p>
           )}
-        </Surface>
+          </div>
+        </details>
       </section>
 
       <p className="mt-8 border-t border-hairline pt-4 text-xs text-ink-faint">
-        Departments and programmes are not listed yet, so an institution is the finest-grained
-        affiliation a profile can carry. The{' '}
+        This is a growing directory, not a complete register of institutions. The{' '}
         <Link href="/status" className="text-accent-700 underline underline-offset-2">
           build status page
         </Link>{' '}

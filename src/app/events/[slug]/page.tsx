@@ -5,6 +5,7 @@ import { CalendarClock, MapPin, Video } from 'lucide-react'
 import { Alert } from '@/components/ui/alert'
 import { Avatar } from '@/components/ui/avatar'
 import { Badge } from '@/components/ui/badge'
+import { Button } from '@/components/ui/button'
 import { ProgressMeter } from '@/components/ui/progress-meter'
 import { StatRow } from '@/components/ui/stat-row'
 import { EmptyState, SectionHeading, Surface } from '@/components/ui/surface'
@@ -12,8 +13,9 @@ import { attendanceModeLabel, eventTypeLabel } from '@/features/events/constants
 import { RsvpControls } from '@/features/events/components/rsvp-controls'
 import { getEventBySlug, getMyRsvp, listEventAttendees } from '@/features/events/queries'
 import { eventHasPassed, formatEventWhen } from '@/features/events/when'
-import { isSupabaseConfigured } from '@/lib/env'
+import { isDataConfigured } from '@/lib/env'
 import { getUser } from '@/lib/supabase/server'
+import { ReportDialog } from '@/features/moderation/components/report-dialog'
 
 type Params = { slug: string }
 type SearchParams = Record<string, string | string[] | undefined>
@@ -25,7 +27,7 @@ type SearchParams = Record<string, string | string[] | undefined>
  * description. Nothing is invented for a preview card.
  */
 export async function generateMetadata({ params }: { params: Promise<Params> }): Promise<Metadata> {
-  if (!isSupabaseConfigured()) return { title: 'Event' }
+  if (!isDataConfigured()) return { title: 'Event' }
 
   const { slug } = await params
   const event = await getEventBySlug(slug)
@@ -62,7 +64,7 @@ export default async function EventPage({
   params: Promise<Params>
   searchParams: Promise<SearchParams>
 }) {
-  if (!isSupabaseConfigured()) notFound()
+  if (!isDataConfigured()) notFound()
 
   const { slug } = await params
   const event = await getEventBySlug(slug)
@@ -83,7 +85,7 @@ export default async function EventPage({
   const moreAttendees = Math.max(0, event.attendee_count - attendees.length)
 
   return (
-    <div className="mx-auto w-full max-w-3xl px-4 py-8 sm:px-6">
+    <div className="page-enter mx-auto w-full max-w-3xl px-4 py-8 sm:px-6">
       {query.created ? (
         <Alert tone="success" className="mb-5" title="The event is on the calendar">
           It appears under Upcoming until its start time passes, then under Past — the row is not deleted.
@@ -142,6 +144,15 @@ export default async function EventPage({
           ) : null}
         </div>
       </header>
+
+      <div className="mt-5 flex flex-wrap items-center justify-between gap-3 border-y border-hairline py-3">
+        <p className="max-w-prose text-xs text-ink-muted">
+          Community-submitted. Bulla has not independently verified the host or joining links.
+          Do not send money or sensitive documents to an unknown organiser.
+        </p>
+        {user ? <ReportDialog kind="event" targetId={event.id} subject="this event"
+          trigger={<Button variant="ghost" size="sm">Report event</Button>} /> : null}
+      </div>
 
       <Surface className="mt-6 p-5">
         <StatRow

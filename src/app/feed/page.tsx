@@ -5,7 +5,7 @@ import { Alert } from '@/components/ui/alert'
 import { EndOfList, LoadMore, cursorHref } from '@/components/ui/pagination'
 import { EmptyState, SectionHeading } from '@/components/ui/surface'
 import { encodeCursor } from '@/lib/cursor'
-import { isSupabaseConfigured } from '@/lib/env'
+import { isDataConfigured } from '@/lib/env'
 import { getUser } from '@/lib/supabase/server'
 import { FeedLensTabs } from '@/features/feed/components/feed-lens-tabs'
 import { PostCard } from '@/features/feed/components/post-card'
@@ -42,7 +42,7 @@ type SearchParams = Record<string, string | string[] | undefined>
  * fictional students, and every number comes from a stored column.
  */
 export default async function FeedPage({ searchParams }: { searchParams: Promise<SearchParams> }) {
-  if (!isSupabaseConfigured()) {
+  if (!isDataConfigured()) {
     return (
       <div className="mx-auto w-full max-w-2xl px-4 py-12">
         <h1 className="text-2xl">Feed</h1>
@@ -91,13 +91,14 @@ export default async function FeedPage({ searchParams }: { searchParams: Promise
     : null
 
   return (
-    <div className="mx-auto grid w-full max-w-6xl gap-8 px-4 py-8 sm:px-6 lg:grid-cols-[minmax(0,1fr)_16rem]">
+    <div className="page-enter mx-auto grid w-full max-w-6xl gap-8 px-4 py-8 sm:px-6 xl:grid-cols-[minmax(0,1fr)_15rem]">
       <div className="min-w-0 space-y-5">
         <SectionHeading
-          title="Your feed"
+          level={1}
+          title="Campus feed"
           description={
             lens === 'for-you'
-              ? 'Ranked by a weighted mix of recency, likes, comments and saves, with a small bonus for your own university.'
+              ? 'Student work, questions and updates. Share what’s on your mind.'
               : 'Posts from the accounts you follow, newest first.'
           }
         />
@@ -109,7 +110,7 @@ export default async function FeedPage({ searchParams }: { searchParams: Promise
         <FeedLensTabs lens={lens} forYouHref={forYouHref} followingHref={followingHref}>
           {feed.posts && feed.posts.length > 0 ? (
             <>
-              <div className="mt-5 border-t border-hairline">
+              <div className="mt-5 space-y-4">
                 {feed.posts.map((post) => (
                   <PostCard key={post.id} post={post} signedIn />
                 ))}
@@ -133,14 +134,11 @@ export default async function FeedPage({ searchParams }: { searchParams: Promise
             >
               {lens === 'for-you' ? (
                 <p>
-                  There are no posts you are allowed to see yet. It may be a new deployment, or
-                  nobody at your university has posted. Write the first post above, or follow
-                  someone so this fills up.
+                  Share the first update, or find people whose work you want to follow.
                 </p>
               ) : (
                 <p>
-                  The Following lens shows posts from accounts you follow, and you follow nobody
-                  yet. People from your university are a good place to start.
+                  Follow someone to see their updates here. Your campus is a good place to start.
                 </p>
               )}
             </EmptyState>
@@ -153,46 +151,20 @@ export default async function FeedPage({ searchParams }: { searchParams: Promise
           unbuilt while all three were working, which is worse than saying nothing.
           The status page is the single record of what works; this list does not
           try to keep a second copy of that truth. */}
-      <aside className="space-y-6 lg:border-l lg:border-hairline lg:pl-6">
-        <nav aria-labelledby="feed-nav-heading">
-          <h2
-            id="feed-nav-heading"
-            className="font-sans text-2xs font-semibold tracking-[0.12em] text-ink-faint uppercase"
-          >
-            Your Quad
-          </h2>
-          <ul className="mt-3 space-y-1 text-sm">
-            {[
-              { href: '/me', label: 'Your profile' },
-              { href: '/feed/people', label: 'People at your university' },
-              { href: '/projects', label: 'Projects' },
-              { href: '/ideas', label: 'Ideas' },
-              { href: '/messages', label: 'Messages' },
-              { href: '/goals', label: 'Goals & study log' },
-              { href: '/opportunities', label: 'Opportunities' },
-              { href: '/events', label: 'Events' },
-            ].map((item) => (
-              <li key={item.href}>
-                <Link
-                  href={item.href}
-                  className="block rounded py-1 text-ink-muted underline-offset-2 hover:text-ink hover:underline"
-                >
-                  {item.label}
-                </Link>
-              </li>
-            ))}
-          </ul>
-        </nav>
-
-        <div className="border-t border-hairline pt-4 text-xs text-ink-faint">
-          <p>
-            Quad is unfinished, and the{' '}
-            <Link href="/status" className="text-accent-700 underline underline-offset-2">
-              status page
-            </Link>{' '}
-            lists exactly which parts work.
-          </p>
-        </div>
+      <aside className="hidden space-y-6 pt-2 xl:block">
+        <section>
+          <h2 className="text-base">Your work in progress</h2>
+          {projects.length ? <ul className="mt-3 divide-y divide-hairline">{projects.slice(0, 3).map(project =>
+            <li key={project.id}><Link href={`/projects/${project.slug}`} className="flex min-h-11 items-center py-2 text-sm font-medium text-accent-700">{project.title}</Link></li>)}</ul>
+            : <p className="mt-3 text-sm text-ink-muted">You haven’t added a project yet. A small first idea is enough.</p>}
+          <Link href="/projects/new" className="mt-3 flex min-h-11 items-center text-sm font-semibold text-accent-700">Start a project →</Link>
+        </section>
+        <section className="border-t border-rule pt-4">
+          <h2 className="text-base">Make room to learn</h2>
+          {goals.length ? <ul className="mt-3 space-y-2">{goals.slice(0, 3).map(goal => <li key={goal.id}><Link href="/goals" className="flex min-h-11 items-center text-sm text-ink-muted">{goal.label}</Link></li>)}</ul>
+            : <p className="mt-3 text-sm text-ink-muted">Give the next thing you want to learn a place to start.</p>}
+          <Link href="/goals" className="mt-2 flex min-h-11 items-center text-sm font-semibold text-accent-700">Your learning goals →</Link>
+        </section>
       </aside>
     </div>
   )

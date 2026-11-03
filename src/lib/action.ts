@@ -42,6 +42,7 @@ import 'server-only'
 
 import type { User } from '@supabase/supabase-js'
 import type { z } from 'zod'
+import { requireStaffAssurance, StaffAssuranceError } from '@/features/auth/staff-mfa'
 import { describeWriteError, echoValues, type FormState } from '@/lib/form-state'
 import { isSupabaseConfigured } from '@/lib/env'
 import { checkRateLimit, type RateLimitBucket } from '@/lib/rate-limit'
@@ -182,29 +183,38 @@ export const requireActiveAccount: Step<unknown> = async (ctx) => {
 /**
  * Refuse a caller without the role.
  *
- * Reads `user_roles`, which no client can write (0002), so this is not a
- * privilege escalation vector — and it is not the boundary either: every table
- * these actions write is governed by a policy that checks the role again, in the
- * database.
+ * Cloud staff actions require a freshly verified own role, MFA factor and live
+ * provider session on EACH invocation. Local domain actions retain their
+ * separate private-local adapter guards; this step never manufactures local
+ * MFA. The database repeats staff assurance for direct writes and RPC calls.
  */
 export function requireRole(role: 'moderator' | 'admin'): Step<unknown> {
   return async (ctx) => {
-    const { data, error } = await ctx.supabase
-      .from('user_roles')
-      .select('role')
-      .eq('user_id', ctx.user.id)
-
-    if (error) {
-      console.error('[action:role]', error.code, error.message)
-      return 'Your permissions could not be checked just now. Please try again.'
+    try {
+      const assured = await requireStaffAssurance()
+      if (assured.userId !== ctx.user.id) {
+        return 'Your staff verification could not be checked. Please try again.'
+      }
+      // An administrator implicitly holds every moderator capability, the same
+      // way app.is_moderator() defines it. Never use editable user metadata.
+      const allowed = assured.role === 'admin' ||
+        (role === 'moderator' && assured.role === 'moderator')
+      return allowed ? null : 'That is not available to your account.'
+    } catch (error) {
+      // Keep expected refusals out of the wrapper's raw unexpected-error path.
+      // Unknown/provider exceptions are also reduced to fixed copy, never logged.
+      if (error instanceof StaffAssuranceError) {
+        if (error.reason === 'signed_out') return NOT_SIGNED_IN
+        if (error.reason === 'not_staff') return 'That is not available to your account.'
+        if (error.reason === 'mfa_required') {
+          return 'Verify your authenticator in Settings → Security before using staff tools.'
+        }
+        if (error.reason === 'local_unsupported') {
+          return 'Local staff tools are private-preview only and do not provide MFA.'
+        }
+      }
+      return 'Your staff verification could not be checked. Please try again.'
     }
-
-    const held = (data ?? []).map((row) => (row as { role: string }).role)
-    // An administrator implicitly holds every moderator capability, the same way
-    // app.is_moderator() defines it.
-    const allowed = role === 'moderator' ? held.includes('moderator') || held.includes('admin') : held.includes('admin')
-
-    return allowed ? null : 'That is not available to your account.'
   }
 }
 

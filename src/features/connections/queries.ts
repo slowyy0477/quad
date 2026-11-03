@@ -3,9 +3,9 @@ import 'server-only'
 import { createClient, getUser } from '@/lib/supabase/server'
 import { readStore } from '@/lib/local/db'
 import { isLocalMode } from '@/lib/mode'
+import { blockedPair, canReadProfile, localActor } from '@/lib/local/access'
+import type { LocalProfile, Tables } from '@/lib/local/db'
 import {
-  canViewLocalProfile,
-  localViewer,
   toProfileSummary,
   type ProfileSummary,
 } from '@/features/profiles/queries'
@@ -116,6 +116,22 @@ export type ViewerConnection = {
   isBlockingThem: boolean
 }
 
+function graphState(db: Tables, me: LocalProfile | null, targetId: string): ViewerConnection {
+  const blank: ViewerConnection = { state: 'none', connectionId: null, isFollowing: false, isBlockingThem: false }
+  if (!me || me.id === targetId) return blank
+  const mine = db.blocks.some(row => row.blocker_id === me.id && row.blocked_id === targetId)
+  if (blockedPair(db, me.id, targetId)) return { ...blank, isBlockingThem: mine }
+  const row = db.connections.find(row => (row.requester_id === me.id && row.addressee_id === targetId) || (row.addressee_id === me.id && row.requester_id === targetId))
+  return { state: !row ? 'none' : row.status === 'accepted' ? 'connected' : row.status === 'rejected' ? 'rejected' : row.requester_id === me.id ? 'outgoing' : 'incoming', connectionId: row?.id ?? null, isFollowing: db.follows.some(row => row.follower_id === me.id && row.following_id === targetId), isBlockingThem: false }
+}
+function visiblePerson(db: Tables, me: LocalProfile | null, targetId: string): ProfileSummary | null {
+  const target = db.profiles.find(row => row.id === targetId)
+  return target && canReadProfile(db, target, me) ? toProfileSummary(target) : null
+}
+function graphPage<T extends { created_at: string; id: string }>(rows: T[], before: string | undefined, limit: number): T[] {
+  return rows.filter(row => !before || row.created_at < before).sort((a,b) => b.created_at.localeCompare(a.created_at) || b.id.localeCompare(a.id)).slice(0, Math.max(1, Math.min(100, limit)))
+}
+
 /**
  * Everything a profile page needs to decide what to offer.
  *
@@ -132,7 +148,8 @@ export async function getViewerConnection(profileId: string): Promise<ViewerConn
   if (!user) return null
 
   if (isLocalMode()) {
-    return { state: 'none', connectionId: null, isFollowing: false, isBlockingThem: false }
+    const db = await readStore()
+    return graphState(db, localActor(db, user.id), profileId)
   }
 
   if (user.id === profileId) return { state: 'none', connectionId: null, isFollowing: false, isBlockingThem: false }
@@ -275,7 +292,11 @@ export async function listConnections({
   const user = await getUser()
   if (!user) return { items: [], error: null }
 
-  if (isLocalMode()) return { items: [], error: null }
+  if (isLocalMode()) {
+    const db = await readStore(); const me = localActor(db, user.id)
+    const rows = db.connections.filter(row => row.status === 'accepted' && (row.requester_id === me?.id || row.addressee_id === me?.id) && !blockedPair(db, row.requester_id, row.addressee_id))
+    return { items: graphPage(rows, before, limit).map(row => ({ id: row.id, created_at: row.created_at, person: visiblePerson(db, me, row.requester_id === me?.id ? row.addressee_id : row.requester_id) })), error: null }
+  }
 
   const supabase = await createClient()
 
@@ -339,7 +360,12 @@ export async function listRequests({
   const user = await getUser()
   if (!user) return { incoming: [], outgoing: [], error: null }
 
-  if (isLocalMode()) return { incoming: [], outgoing: [], error: null }
+  if (isLocalMode()) {
+    const db = await readStore(); const me = localActor(db, user.id)
+    const rows = db.connections.filter(row => row.status === 'pending' && !blockedPair(db, row.requester_id, row.addressee_id))
+    const select = (direction: 'incoming' | 'outgoing'): RequestItem[] => graphPage(rows.filter(row => (direction === 'incoming' ? row.addressee_id : row.requester_id) === me?.id), before, limit).map(row => ({ id: row.id, created_at: row.created_at, message: row.message, direction, person: visiblePerson(db, me, direction === 'incoming' ? row.requester_id : row.addressee_id) }))
+    return { incoming: select('incoming'), outgoing: select('outgoing'), error: null }
+  }
 
   const supabase = await createClient()
 
@@ -423,7 +449,11 @@ export async function listFollows({
   const user = await getUser()
   if (!user) return { items: [], error: null }
 
-  if (isLocalMode()) return { items: [], error: null }
+  if (isLocalMode()) {
+    const db = await readStore(); const me = localActor(db, user.id)
+    const rows = db.follows.filter(row => (direction === 'followers' ? row.following_id : row.follower_id) === me?.id && !blockedPair(db, row.follower_id, row.following_id)).map(row => ({ ...row, id: direction === 'followers' ? row.follower_id : row.following_id }))
+    return { items: graphPage(rows, before, limit).map(row => ({ id: row.id, created_at: row.created_at, person: visiblePerson(db, me, row.id) })), error: null }
+  }
 
   const supabase = await createClient()
   const mine = direction === 'followers' ? 'following_id' : 'follower_id'
@@ -479,7 +509,11 @@ export async function listBlocked({
   const user = await getUser()
   if (!user) return { items: [], error: null }
 
-  if (isLocalMode()) return { items: [], error: null }
+  if (isLocalMode()) {
+    const db = await readStore(); const me = localActor(db, user.id)
+    const rows = db.blocks.filter(row => row.blocker_id === me?.id).map(row => ({ ...row, id: row.blocked_id }))
+    return { items: graphPage(rows, before, limit).map(row => ({ id: row.id, created_at: row.created_at, reason: row.reason, person: null })), error: null }
+  }
 
   const supabase = await createClient()
 
@@ -556,13 +590,13 @@ export async function listUniversitySuggestions({ limit = 12 }: { limit?: number
 
   if (isLocalMode()) {
     const db = await readStore()
-    const me = db.profiles.find((profile) => profile.user_id === user.id)
+    const me = localActor(db, user.id)
     const universityId = me?.university_id ?? null
     if (!me || !universityId) return { suggestions: [], universityName: null, error: null }
 
     const universityName =
       db.universities.find((university) => university.id === universityId)?.name ?? null
-    const viewer = localViewer(db, user.id)
+
 
     const suggestions = db.profiles
       .filter(
@@ -570,14 +604,15 @@ export async function listUniversitySuggestions({ limit = 12 }: { limit?: number
           profile.id !== me.id &&
           profile.university_id === universityId &&
           profile.searchable &&
-          canViewLocalProfile(profile, viewer),
+          canReadProfile(db, profile, me) &&
+          !['connected','incoming','outgoing'].includes(graphState(db, me, profile.id).state),
       )
       .sort((a, b) => b.created_at.localeCompare(a.created_at))
       .slice(0, limit)
       .map((profile) => ({
         person: toProfileSummary(profile),
-        state: 'none' as ConnectionState,
-        isFollowing: false,
+        state: graphState(db, me, profile.id).state,
+        isFollowing: graphState(db, me, profile.id).isFollowing,
       }))
 
     return { suggestions, universityName, error: null }

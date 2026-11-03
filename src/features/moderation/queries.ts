@@ -3,6 +3,10 @@ import 'server-only'
 import { createClient } from '@/lib/supabase/server'
 import { isLocalMode } from '@/lib/mode'
 import { readStore } from '@/lib/local/db'
+import { reportsLocal, auditLocal, staffLocal } from './local'
+import { getUser } from '@/lib/supabase/server'
+import { localActor } from '@/lib/local/access'
+import { pendingUniversitiesLocal } from '@/features/universities/local'
 import type { ReportKind } from '@/features/moderation/schemas'
 
 /**
@@ -77,6 +81,14 @@ export type ReportTarget =
       person: PersonRef | null
       status: string
     }
+  | {
+      kind: 'event' | 'opportunity'
+      id: string
+      title: string
+      description: string | null
+      moderationStatus: string
+      author: PersonRef | null
+    }
 
 export type QueueReport = {
   id: string
@@ -148,6 +160,8 @@ type RawQueueRow = {
   idea: { id: string; title: string; description: string; moderation_status: string; author_id: string } | null
   message: { id: string; body: string | null; created_at: string; moderation_status: string; sender_id: string } | null
   target_profile: RawPerson | null
+  event: { id: string; title: string; description: string | null; moderation_status: string; created_by: string } | null
+  opportunity: { id: string; title: string; description: string; moderation_status: string; posted_by: string } | null
 }
 
 /**
@@ -170,7 +184,9 @@ const QUEUE_SELECT = `
   project:projects ( id, title, tagline, slug, moderation_status, owner_id ),
   idea:ideas ( id, title, description, moderation_status, author_id ),
   message:messages ( id, body, created_at, moderation_status, sender_id ),
-  target_profile:profiles!reports_user_id_fkey ( id, username, display_name )
+  target_profile:profiles!reports_user_id_fkey ( id, username, display_name ),
+  event:events!reports_event_id_fkey ( id, title, description, moderation_status, created_by ),
+  opportunity:opportunities!reports_opportunity_id_fkey ( id, title, description, moderation_status, posted_by )
 `
 
 function personOf(row: RawPerson | null | undefined, index: Map<string, PersonRef>): PersonRef | null {
@@ -184,12 +200,7 @@ export async function getOpenReports({
   perPage = ADMIN_PAGE_SIZE,
 }: { page?: number; perPage?: number } = {}): Promise<ReadResult<QueueReport[]>> {
   if (isLocalMode()) {
-    // The store has a `reports` table, but nothing in local mode writes to it: the
-    // report flow, the moderation decisions and the append-only audit log are one
-    // unit and none of them is ported. Returning the real rows here without the
-    // decision machinery would offer a queue whose buttons cannot work, so this
-    // says "nothing is waiting" — which is true — rather than half-building it.
-    return { rows: [], total: 0, error: null }
+    return reportsLocal(page, perPage)
   }
 
   const supabase = await createClient()
@@ -222,6 +233,8 @@ export async function getOpenReports({
     if (row.project) ids.add(row.project.owner_id)
     if (row.idea) ids.add(row.idea.author_id)
     if (row.message) ids.add(row.message.sender_id)
+    if (row.event) ids.add(row.event.created_by)
+    if (row.opportunity) ids.add(row.opportunity.posted_by)
   }
 
   const index = buildPersonIndex(
@@ -342,6 +355,16 @@ function buildTarget(row: RawQueueRow, index: Map<string, PersonRef>): ReportTar
         person: personOf(row.target_profile, index),
         status: 'active',
       }
+    case 'event':
+      return row.event ? {
+        kind: 'event', id: row.event.id, title: row.event.title, description: row.event.description,
+        moderationStatus: row.event.moderation_status, author: index.get(row.event.created_by) ?? null,
+      } : null
+    case 'opportunity':
+      return row.opportunity ? {
+        kind: 'opportunity', id: row.opportunity.id, title: row.opportunity.title, description: row.opportunity.description,
+        moderationStatus: row.opportunity.moderation_status, author: index.get(row.opportunity.posted_by) ?? null,
+      } : null
   }
 }
 
@@ -362,6 +385,8 @@ type RawActionRow = {
   project_id: string | null
   idea_id: string | null
   message_id: string | null
+  event_id: string | null
+  opportunity_id: string | null
   actor: RawPerson | null
   target: RawPerson | null
   university: { name: string } | null
@@ -372,6 +397,7 @@ export async function getModerationActions({
   page = 1,
   perPage = ADMIN_PAGE_SIZE,
 }: { page?: number; perPage?: number } = {}): Promise<ReadResult<ModerationActionRow[]>> {
+  if (isLocalMode()) return auditLocal(page, perPage)
   const supabase = await createClient()
   const from = Math.max(0, page - 1) * perPage
 
@@ -380,7 +406,7 @@ export async function getModerationActions({
     .select(
       `
         id, action, reason, created_at, supersedes_id,
-        report_id, university_id, post_id, comment_id, project_id, idea_id, message_id,
+        report_id, university_id, post_id, comment_id, project_id, idea_id, message_id, event_id, opportunity_id,
         actor:profiles!moderation_actions_actor_id_fkey ( id, username, display_name ),
         target:profiles!moderation_actions_target_profile_id_fkey ( id, username, display_name ),
         university:universities!moderation_actions_university_id_fkey ( name )
@@ -431,6 +457,8 @@ function subjectOf(row: RawActionRow): string | null {
   if (row.project_id) return 'a project'
   if (row.idea_id) return 'an idea'
   if (row.message_id) return 'a message'
+  if (row.event_id) return 'an event'
+  if (row.opportunity_id) return 'an opportunity'
   return null
 }
 
@@ -454,6 +482,7 @@ export async function getPendingUniversities({
   page = 1,
   perPage = ADMIN_PAGE_SIZE,
 }: { page?: number; perPage?: number } = {}): Promise<ReadResult<PendingUniversity[]>> {
+  if (isLocalMode()) return pendingUniversitiesLocal(page, perPage)
   const supabase = await createClient()
   const from = Math.max(0, page - 1) * perPage
 
@@ -521,11 +550,13 @@ export type ModerationCounts = {
 export async function getModerationCounts(): Promise<ModerationCounts> {
   if (isLocalMode()) {
     const db = await readStore()
+    const user = await getUser()
+    if (!staffLocal(db, localActor(db, user?.id ?? null))) return { openReports: 0, pendingUniversities: 0 }
     // `reports` exists in the store; `universities.status` does not (the local
     // university rows have no review state), so there is never a pending one.
     return {
       openReports: db.reports.filter((report) => report.status === 'open').length,
-      pendingUniversities: 0,
+      pendingUniversities: db.university_requests.filter(row => row.status === 'pending').length,
     }
   }
 

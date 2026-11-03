@@ -1,17 +1,16 @@
 import Link from 'next/link'
 import { CalendarDays, Github, GraduationCap, Link2, MapPin } from 'lucide-react'
 import { Avatar } from '@/components/ui/avatar'
+import { Alert } from '@/components/ui/alert'
 import { Badge } from '@/components/ui/badge'
 import type { FullProfile } from '@/features/profiles/queries'
 
 /**
  * A profile, as rendered on both /me and /u/[username].
  *
- * The numbers are real. Every one of them is a column maintained by a database
- * trigger on the event it counts -- `posts_sync_profile_count` on insert and
- * delete, `follows_sync_counts`, `connections_sync_counts` -- so they cannot drift
- * from the rows they describe and they are not computed in the page. A count that
- * is zero is shown as zero.
+ * Relationship counts come from the caller-authorized graph reader, with the
+ * same eligible peers as the linked lists. Foreign connections are private.
+ * A failed/unavailable count is not displayed as zero.
  *
  * The sections this file does not own arrive as slots: the connection controls,
  * the skills and the interests are rendered by the features that own those tables
@@ -24,13 +23,22 @@ import type { FullProfile } from '@/features/profiles/queries'
  * themselves.
  */
 
-function Stat({ label, value }: { label: string; value: number }) {
-  return (
-    <div>
-      <p className="font-display text-lg text-ink tabular-nums">{value}</p>
-      <p className="text-2xs tracking-wide text-ink-faint uppercase">{label}</p>
-    </div>
+function Stat({ label, value, href }: { label: string; value: number | null; href?: string }) {
+  const content = (
+    <>
+      <span className="block font-display text-lg text-ink tabular-nums">
+        {value === null ? <><span aria-hidden="true">—</span><span className="sr-only">Count unavailable</span></> : value}
+      </span>
+      {' '}
+      <span className="block text-2xs tracking-wide text-ink-faint uppercase">{label}</span>
+    </>
   )
+  return href ? (
+    <Link href={href} prefetch={false}
+      className="min-h-11 rounded-md px-2 py-1 underline-offset-4 transition-colors hover:bg-paper-sunken hover:underline">
+      {content}
+    </Link>
+  ) : <div className="px-2 py-1">{content}</div>
 }
 
 function MetaLine({ icon: Icon, children }: { icon: typeof MapPin; children: React.ReactNode }) {
@@ -82,10 +90,13 @@ export function ProfileView({
   const study = [profile.degree, profile.semester ? `semester ${profile.semester}` : null]
     .filter(Boolean)
     .join(', ')
+  const showGraph = isSelf || profile.visibility === 'public'
+  const graphBase = isSelf ? '/connections' : `/u/${encodeURIComponent(profile.username)}`
 
   return (
     <div className="space-y-8">
-      <header className="flex flex-col gap-4 sm:flex-row sm:items-start sm:gap-5">
+      <header className="profile-identity p-5 sm:p-7">
+        <div className="flex flex-col gap-4 sm:flex-row sm:items-start sm:gap-5">
         <Avatar name={profile.display_name} src={profile.avatar_url} size="xl" />
 
         <div className="min-w-0 flex-1">
@@ -108,16 +119,35 @@ export function ProfileView({
 
           {actions ? <div className="mt-4">{actions}</div> : null}
         </div>
-      </header>
+        </div>
 
-      <div className="flex flex-wrap gap-x-8 gap-y-4 border-y border-hairline py-4">
+      <div className="mt-6 -mx-2 flex flex-wrap gap-x-5 gap-y-3 border-t border-hairline pt-5">
         <Stat label="Posts" value={profile.post_count} />
         <Stat label="Projects" value={profile.project_count} />
-        <Stat label="Followers" value={profile.follower_count} />
-        <Stat label="Following" value={profile.following_count} />
-        <Stat label="Connections" value={profile.connection_count} />
+        {showGraph ? <>
+          <Stat label="Followers" value={profile.follower_count} href={`${graphBase}/followers`} />
+          <Stat label="Following" value={profile.following_count} href={`${graphBase}/following`} />
+        </> : null}
+        {isSelf ? <Stat label="Connections" value={profile.connection_count} href="/connections" /> : null}
       </div>
+      {profile.graph_counts_error ? (
+        <Alert tone="warning" className="mt-4">{profile.graph_counts_error}</Alert>
+      ) : null}
+      </header>
 
+      <div className="grid gap-8 lg:grid-cols-[minmax(0,1.25fr)_minmax(0,0.9fr)]">
+      {skills || interests || profile.bio ? (
+        <div className="min-w-0 space-y-7">
+          {skills ? <Section title="Skills">{skills}</Section> : null}
+          {interests ? <Section title="Interests">{interests}</Section> : null}
+          {profile.bio ? (
+            <Section title="About">
+              <p className="max-w-prose whitespace-pre-line text-ink">{profile.bio}</p>
+            </Section>
+          ) : null}
+        </div>
+      ) : null}
+      <aside className={skills || interests || profile.bio ? 'min-w-0' : 'min-w-0 lg:col-span-2'}>
       <Section title="Details">
         <ul className="space-y-2">
           {profile.university ? (
@@ -167,16 +197,8 @@ export function ProfileView({
           <MetaLine icon={CalendarDays}>Joined {joined}</MetaLine>
         </ul>
       </Section>
-
-      {skills ? <Section title="Skills">{skills}</Section> : null}
-
-      {interests ? <Section title="Interests">{interests}</Section> : null}
-
-      {profile.bio ? (
-        <Section title="About">
-          <p className="max-w-prose whitespace-pre-line text-ink">{profile.bio}</p>
-        </Section>
-      ) : null}
+      </aside>
+      </div>
 
       {isSelf ? (
         <p className="border-t border-hairline pt-4 text-xs text-ink-faint">

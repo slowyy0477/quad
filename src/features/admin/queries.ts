@@ -1,8 +1,10 @@
 import 'server-only'
 
+import { requireStaffAssurance } from '@/features/auth/staff-mfa'
 import { createClient, getUser } from '@/lib/supabase/server'
-import { isLocalMode } from '@/lib/mode'
+import { assertNotDeployedInLocalMode, isLocalMode } from '@/lib/mode'
 import { readStore } from '@/lib/local/db'
+import { localActor } from '@/lib/local/access'
 
 /**
  * Site operations reads.
@@ -41,35 +43,33 @@ export type StaffRole = 'admin' | 'moderator'
  * protects nothing.
  */
 export async function getStaffRole(): Promise<StaffRole | null> {
-  const user = await getUser()
-  if (!user) return null
+  try {
+    const local = isLocalMode()
+    // A direct page/query invocation must not rely on the proxy to refuse
+    // public-local serving. Do not open its store or session before this check.
+    if (local) assertNotDeployedInLocalMode()
+    const user = await getUser()
+    if (!user) return null
 
-  if (isLocalMode()) {
-    const db = await readStore()
-    const roles = db.user_roles.filter((row) => row.user_id === user.id).map((row) => row.role)
-    if (roles.includes('admin')) return 'admin'
-    if (roles.includes('moderator')) return 'moderator'
+    if (local) {
+      const db = await readStore()
+      if (!localActor(db, user.id)) return null
+      const roles = db.user_roles.filter((row) => row.user_id === user.id).map((row) => row.role)
+      if (roles.includes('admin')) return 'admin'
+      if (roles.includes('moderator')) return 'moderator'
+      return null
+    }
+
+    // Recheck on EVERY call, not only in the layout. The shared cloud boundary
+    // verifies the token, own role, current factors and live-session RPC.
+    const assured = await requireStaffAssurance()
+    if (assured.userId !== user.id) return null
+    return assured.role === 'admin' || assured.role === 'moderator' ? assured.role : null
+  } catch {
+    // Provider failures may contain identifiers or tokens. Refuse silently;
+    // neither raw provider errors nor a stale layout grant authorize this read.
     return null
   }
-
-  const supabase = await createClient()
-  const { data, error } = await supabase
-    .from('user_roles')
-    .select('role')
-    .eq('user_id', user.id)
-    .returns<{ role: string }[]>()
-
-  if (error) {
-    // Fail closed. A guard that returns "allowed" when it cannot tell is not a
-    // guard, and the failure it produces is silent.
-    console.error('[admin:getStaffRole]', error.code, error.message)
-    return null
-  }
-
-  const roles = (data ?? []).map((row) => row.role)
-  if (roles.includes('admin')) return 'admin'
-  if (roles.includes('moderator')) return 'moderator'
-  return null
 }
 
 /** An administrator, for the surfaces only the maintainer should reach. */

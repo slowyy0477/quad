@@ -11,7 +11,10 @@ import {
 } from '@/lib/form-state'
 import { createClient, getUser } from '@/lib/supabase/server'
 import { isLocalMode } from '@/lib/mode'
+import { localFormWrite } from '@/lib/local/write-result'
 import { mutate } from '@/lib/local/db'
+import { localActor } from '@/lib/local/access'
+import { universityRequestLocal } from './local'
 import { claimUniversitySchema, universityRequestSchema } from '@/features/universities/schemas'
 
 /**
@@ -67,7 +70,7 @@ async function setLocalAffiliation(
   universityId: string | null,
 ): Promise<FormState> {
   const outcome = await mutate((db) => {
-    const profile = db.profiles.find((candidate) => candidate.user_id === userId)
+    const profile = localActor(db, userId)
     if (!profile) return 'no-profile' as const
     if (universityId !== null && !db.universities.some((row) => row.id === universityId)) {
       return 'no-university' as const
@@ -251,12 +254,9 @@ export async function requestUniversityAction(
   }
 
   if (isLocalMode()) {
-    return {
-      status: 'error',
-      message:
-        'Local mode cannot file an institution: there is no request table and no moderator to review one, and adding it straight to the directory would be a claim nobody checked. Nothing was saved.',
-      values: echoValues(formData),
-    }
+    const result = await localFormWrite(() => universityRequestLocal(parsed.data), formData)
+    if (result.status === 'success') { revalidatePath('/universities'); revalidatePath('/admin/universities') }
+    return result
   }
 
   const supabase = await createClient()

@@ -4,7 +4,7 @@ import type { Metadata } from 'next'
 import { Alert } from '@/components/ui/alert'
 import { NewOpportunityForm } from '@/features/opportunities/components/new-opportunity-form'
 import { listSkillOptions } from '@/features/opportunities/queries'
-import { isSupabaseConfigured } from '@/lib/env'
+import { isDataConfigured } from '@/lib/env'
 import { getUser } from '@/lib/supabase/server'
 
 export const metadata: Metadata = { title: 'Post a listing' }
@@ -17,7 +17,7 @@ export const metadata: Metadata = { title: 'Post a listing' }
  * the session.
  */
 export default async function NewOpportunityPage() {
-  if (!isSupabaseConfigured()) {
+  if (!isDataConfigured()) {
     return (
       <div className="mx-auto w-full max-w-2xl px-4 py-12">
         <h1 className="text-2xl">Post a listing</h1>

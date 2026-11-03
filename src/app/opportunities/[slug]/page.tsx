@@ -17,7 +17,9 @@ import {
 import { opportunityTypeLabel, workModeLabel } from '@/features/opportunities/constants'
 import { SaveOpportunityButton } from '@/features/opportunities/components/save-button'
 import { getOpportunityBySlug, getOpportunitySave } from '@/features/opportunities/queries'
-import { isSupabaseConfigured } from '@/lib/env'
+import { isDataConfigured } from '@/lib/env'
+import { getUser } from '@/lib/supabase/server'
+import { ReportDialog } from '@/features/moderation/components/report-dialog'
 
 type Params = { slug: string }
 type SearchParams = Record<string, string | string[] | undefined>
@@ -30,7 +32,7 @@ type SearchParams = Record<string, string | string[] | undefined>
  * something it is not.
  */
 export async function generateMetadata({ params }: { params: Promise<Params> }): Promise<Metadata> {
-  if (!isSupabaseConfigured()) return { title: 'Opportunity' }
+  if (!isDataConfigured()) return { title: 'Opportunity' }
 
   const { slug } = await params
   const opportunity = await getOpportunityBySlug(slug)
@@ -53,7 +55,7 @@ export async function generateMetadata({ params }: { params: Promise<Params> }):
  *
  * The page states plainly what it can and cannot do. Applying happens with the
  * organisation: this schema has no applications table, so there is no "apply" form here
- * to fill in, and nothing records that a reader applied. What Quad stores about a reader
+ * to fill in, and nothing records that a reader applied. What Bulla stores about a reader
  * and a listing is a private bookmark, so the control is labelled Save and says what it
  * is for.
  *
@@ -67,7 +69,7 @@ export default async function OpportunityPage({
   params: Promise<Params>
   searchParams: Promise<SearchParams>
 }) {
-  if (!isSupabaseConfigured()) notFound()
+  if (!isDataConfigured()) notFound()
 
   const { slug } = await params
   const opportunity = await getOpportunityBySlug(slug)
@@ -76,13 +78,13 @@ export default async function OpportunityPage({
   const query = await searchParams
   const today = todayInPakistan(new Date())
   const closed = opportunityIsClosed(opportunity, today)
-  const save = await getOpportunitySave(opportunity.id)
+  const [save, user] = await Promise.all([getOpportunitySave(opportunity.id), getUser()])
 
   const required = opportunity.opportunity_skills.filter((row) => row.is_required && row.skill)
   const optional = opportunity.opportunity_skills.filter((row) => !row.is_required && row.skill)
 
   return (
-    <div className="mx-auto w-full max-w-3xl px-4 py-8 sm:px-6">
+    <div className="page-enter mx-auto w-full max-w-3xl px-4 py-8 sm:px-6">
       {query.created ? (
         <Alert tone="success" className="mb-5" title="The listing is live">
           It is on the board now, and it stays there after its closing date — it moves to the closed
@@ -139,6 +141,15 @@ export default async function OpportunityPage({
           <span className="tabular">{formatInstantInPakistan(opportunity.created_at)}</span>
         </div>
       </header>
+
+      <div className="mt-5 flex flex-wrap items-center justify-between gap-3 border-y border-hairline py-3">
+        <p className="max-w-prose text-xs text-ink-muted">
+          Community-submitted, not independently verified by Bulla. Application links leave this site.
+          Never pay an application fee or share passwords with a listing contact.
+        </p>
+        {user ? <ReportDialog kind="opportunity" targetId={opportunity.id} subject="this opportunity"
+          trigger={<Button variant="ghost" size="sm">Report opportunity</Button>} /> : null}
+      </div>
 
       <Surface className="mt-6 p-5">
         <StatRow
@@ -210,12 +221,12 @@ export default async function OpportunityPage({
       <section className="mt-8">
         <SectionHeading
           title="How to apply"
-          description="Applications go to the organisation. Quad does not collect them and does not record who applied."
+          description="Applications go to the organisation. Bulla does not collect them and does not record who applied."
         />
 
         {closed ? (
           <Alert tone="warning" className="mt-3" title={`This listing is closed — ${deadlineLabel(opportunity.deadline, today).toLowerCase()}`}>
-            The route below is the organisation’s own, so it may still be open on their side. Quad has no
+            The route below is the organisation’s own, so it may still be open on their side. Bulla has no
             later information about it.
           </Alert>
         ) : null}
@@ -250,7 +261,7 @@ export default async function OpportunityPage({
           />
           <p className="max-w-prose text-xs text-ink-muted">
             Saving is a private bookmark — the person who posted this cannot see who saved it. There is no
-            “applied” state on Quad, because nothing here stores one.
+            “applied” state on Bulla, because nothing here stores one.
           </p>
         </div>
       </section>

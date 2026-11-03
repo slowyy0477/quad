@@ -1,66 +1,80 @@
 # Testing
 
 ```bash
-npm test          # everything
-npm run verify    # typecheck + lint + test  ← run this before pushing
+npm test          # Vitest: permissions, local actions/security, unit/components
+npm run verify    # typecheck + lint + Vitest (not build/browser/hosted acceptance)
+npm run verify:bulla -- --build --e2e   # D-drive Markdown evidence + local checks
 ```
 
-Current state, measured — not estimated:
+Current results belong in [bulla/STATUS.md](bulla/STATUS.md) and timestamped
+verification reports, not a frozen count in this guide. The recovery verifier
+stores synthetic fixtures, cache/build output and reports under
+`D:\All tasks + Automations\Bulla-Recovery` on this Windows workspace.
 
-```
-Test Files  8 passed (8)
-     Tests  296 passed (296)
-  Duration  ~84s
-```
-
-All 296 are **database permission tests**. That is a deliberate order of work, not an
-oversight: the database is the authorization layer, so it is the layer where a missing
-test is a vulnerability rather than a bug.
+Ordinary Vitest runs can select `BULLA_TEST_TMP_DIR` and `BULLA_TEST_CACHE_DIR`.
+Browser specs use a separate loopback server and isolated data. Never point
+them at an owner's data server or a production endpoint.
 
 ---
 
 ## What is tested
 
-| Suite | Assertions | Covers |
-| --- | --- | --- |
-| `tests/db/schema.test.ts` | 17 | Invariants: every table has RLS + a policy; every function's EXECUTE grants match its declared audience; the 0016 profile backfill |
-| `tests/db/guards.test.ts` | 14 | `is_privileged_role`, `is_trusted_write`, protected-column rejection, `forbid_write` |
-| `tests/db/projects.test.ts` | 33 | Project membership, roles, invitations, collaboration requests |
-| `tests/db/messaging.test.ts` | 34 | Conversation access — the ID-substitution cases in particular |
-| `tests/db/learning.test.ts` | 53 | Courses, entries, goals, semesters, study logs |
-| `tests/db/achievements.test.ts` | 34 | Achievements, certificates, awards |
-| `tests/db/opportunities.test.ts` | 34 | Boards, applications, RSVPs |
-| `tests/db/notifications.test.ts` | 77 | Typed-FK integrity and the non-forgeable write path |
+This is a source inventory, not a claim that every feature or provider journey is
+covered. Passing/failing totals belong in the canonical status and evidence JSON.
+
+| Suite / source examples | Covers |
+| --- | --- |
+| [`tests/db/schema.test.ts`](../tests/db/schema.test.ts), `guards.test.ts` | Ordered migrations, public-table RLS/policies, helper privileges/search paths, protected columns, profile trigger/backfill |
+| [`tests/db/people.test.ts`](../tests/db/people.test.ts), `posts.test.ts`, `ideas.test.ts` | Profiles, universities, graph/skills, posts/comments and ideas permissions |
+| [`tests/db/projects.test.ts`](../tests/db/projects.test.ts), `messaging.test.ts` | Membership, roles, invitations and conversation access/ID substitution |
+| `tests/db/learning.test.ts`, `achievements.test.ts`, `opportunities.test.ts` | Learning records, awards, boards/applications and RSVPs |
+| [`tests/db/notifications.test.ts`](../tests/db/notifications.test.ts), `moderation.test.ts`, `authorization-regressions.test.ts` | Notification writes, reporting/staff decisions/audit/sanctions, limiter boundaries and forward authorization fixes |
+| [`tests/integration/`](../tests/integration/) | Local profile/onboarding persistence and schemas, real local domain actions, timed-suspension regressions |
+| [`tests/security/`](../tests/security/) | Local auth/session/password/redirect/store guards, mocked hosted-settings ownership, proxy/headers, PWA and artifact-check behavior |
+| [`src/components/pwa-controls.test.tsx`](../src/components/pwa-controls.test.tsx), [`attached-object.test.tsx`](../src/features/feed/components/attached-object.test.tsx), other `src/**/*.test.*` | Selected React controls and pure helpers, including mode/env/cursors, dates and board filters |
+| [`tests/e2e/bulla-smoke.spec.ts`](../tests/e2e/bulla-smoke.spec.ts) | Isolated local identity/header, signed-out, responsive/theme and signup→onboard→edit→post/reload→sign-out smoke |
 
 ## How the database tests work
 
-`tests/db/harness.ts` starts **PGlite** — PostgreSQL 18.3 compiled to WASM — and applies
-the real files from `supabase/migrations/` in order. Not a mock, not a fixture, not a
-subset. If a migration is malformed, the suite fails to start.
+[`tests/db/harness.ts`](../tests/db/harness.ts) starts **PGlite** — an in-process
+PostgreSQL build compiled to WASM — applies the platform-object shim in
+[`supabase/tests/bootstrap.sql`](../supabase/tests/bootstrap.sql), then the real
+files from `supabase/migrations/` in filename order. The SQL is real; the shim is
+not a running Supabase service stack. A malformed migration fails setup.
 
-It then lets a test impersonate a role the way PostgREST does:
+It then lets a test select a PostgreSQL role/JWT subject. Illustrative use of the
+actual harness API, after creating fixture users and conversations:
 
 ```ts
-await asUser(alice, async (db) => {
-  await expect(db.query('select * from messages where conversation_id = $1', [bobsChat]))
-    .rejects.toThrow()          // or resolves to zero rows, per the policy
-})
+const rows = await db.asUser(
+  alice,
+  'select * from messages where conversation_id = $1',
+  [bobsChat],
+)
+expect(rows).toEqual([]) // SELECT may filter to no rows rather than throw.
 ```
 
-Setting `request.jwt.claims` and `role` is exactly what PostgREST does per request, so a
-test exercises the same code path a browser does — including
-`app.is_privileged_role()`, which reads both of those signals.
+Setting `request.jwt.claims` and `role` exercises the SQL policy/function code,
+including `app.is_privileged_role()`. It does not emulate all of PostgREST or
+verify real tokens, Auth, HTTP errors, publication delivery or independent
+transaction concurrency. Those require separate integration/staging evidence.
+
+Each PGlite instance reuses one SQL session; serial role-switched calls are not
+independent transaction-concurrency evidence. Local JSON locking tests are a
+different contract again. Playwright owns `tests/e2e`; Vitest intentionally excludes
+those browser specs. See [`vitest.config.ts`](../vitest.config.ts) and
+[`playwright.config.mts`](../playwright.config.mts).
 
 Two consequences worth knowing:
 
-- **No Docker required.** The Supabase local stack needs it; this does not. This project
-  was developed on a machine without Docker.
+- **No Docker required for PGlite tests.** This does not mean the Supabase CLI stack
+  or its Auth/PostgREST/Realtime services were exercised.
 - **`timestamptz` comes back as a `Date`.** Use `toEqual`, not `toBe`.
 
 ### The shape every permission test takes
 
-Each protected operation is asserted from **three** directions, because only the third
-is a real test:
+The permission-test contract calls for **three** directions; review coverage rather
+than assuming every operation already has all three:
 
 1. the owner can do it,
 2. an unrelated user cannot,
@@ -82,36 +96,44 @@ The second one caught the real bug documented in [SECURITY.md](SECURITY.md) §3:
 default privileges grant `EXECUTE` directly to `anon`/`authenticated`, and
 `revoke … from public` does not remove that.
 
-## What is NOT tested
+## Remaining coverage and evidence gaps
 
-Listed plainly, because a coverage number that hides this would be worse than no number:
+Existing tests do not establish complete browser/provider/security acceptance:
 
 | Area | State |
 | --- | --- |
-| Profiles, universities, social graph, skills, posts, comments, ideas | **Schema built, permission tests not written.** The largest gap. |
-| React components | No tests. Testing Library is installed and configured; nothing is written. |
-| Server Actions | No tests. |
-| Zod schemas | No tests. |
-| `safeRedirect` | No tests — and it should have them; it is 6 lines of pure function guarding a phishing vector. |
-| End-to-end flows | **No Playwright specs.** `@playwright/test` is installed, `npm run test:e2e` is wired, `tests/e2e/` is empty. |
-| Anything against a live Supabase project | Nothing. Credentials exist in the git-ignored `.env.local`, but the project they name does not resolve (`getaddrinfo ENOTFOUND`), so no request has ever reached hosted Postgres. |
-| Accessibility | No automated checks. Primitives were built to be accessible (`Field` wires `aria-describedby`/`aria-invalid` through a render prop so it cannot drift); that is design, not verification. |
-| Performance | No measurements. |
+| Components/actions/schemas | Selected component tests, local actions and auth/profile schema regressions exist; they are not comprehensive coverage of every action or form. |
+| Redirect validation | `local-auth-policy.test.ts` and `local-auth.test.ts` cover the hardened local redirect and action redirects. Hosted `safeRedirect` is a separate implementation; local coverage does not prove hosted parity or encoded-input handling. |
+| Browser journeys | Local Playwright smoke exists. Complete two-account permissions, all domains, provider/email/OAuth/recovery and multi-device journeys remain. |
+| Hosted Supabase | Auth, HTTP/PostgREST errors, RLS via the real API, Realtime, storage and independent transactions require staging evidence. Current gates are in [ISSUES.md](bulla/ISSUES.md); this guide makes no current credential or DNS claim. |
+| CI parity | The existing [workflow](../.github/workflows/ci.yml) can skip its secret scan when the value is empty and has no browser job (R21). The local verifier's nonempty-canary and browser checks do not establish CI parity. |
+| Accessibility | Selected control and viewport/theme assertions exist. Full automated/manual WCAG, keyboard, screen-reader and device acceptance is pending. |
+| Performance/recovery | Test duration or a successful local build is not load/soak, query-plan, backup/restore or 50,000-account evidence. See [PLAN.md](bulla/PLAN.md). |
 
-`tests/integration/` and `tests/security/` exist as empty directories — placeholders for
-the suites the structure anticipates.
+`tests/integration/` and `tests/security/` contain real suites, not empty placeholders.
+“Integration” in those paths includes local adapters and mocked clients; the name
+does not mean a hosted project was contacted.
 
 ## Adding a database test
 
+Illustrative skeleton using the current harness; add fixtures, legitimate writes,
+negative reads/writes and ID-substitution assertions for the domain:
+
 ```ts
 import { describe, expect, it } from 'vitest'
-import { withDatabase } from './harness'
+import { createTestDb } from './harness'
 
 describe('widgets', () => {
   it('lets the owner update, and nobody else', async () => {
-    await withDatabase(async (db, { alice, bob }) => {
-      // ...
-    })
+    const db = await createTestDb()
+    try {
+      const alice = await db.createUser()
+      const bob = await db.createUser()
+      expect(alice).not.toBe(bob)
+      // Add domain fixtures and permission assertions via db.asUser().
+    } finally {
+      await db.close()
+    }
   })
 })
 ```
@@ -124,6 +146,8 @@ feature works, not that it is safe.
 - Vitest, with `vite-tsconfig-paths` so `@/` resolves.
 - Test names state the rule, not the mechanism: "a non-member cannot read a private
   project", not "test policy 4".
-- The database suite is slow (~84s) because each file boots a Postgres. That is
-  acceptable for a suite that runs on push; do not optimise it by sharing state between
-  tests, which would make failures order-dependent.
+- Database files create isolated PGlite instances; local suites use owned temporary
+  workspaces. Do not trade fixture isolation for speed. Runtime and totals vary by
+  checkout/environment and belong in timestamped reports.
+- The recovery verifier is a one-off command, not a recurring schedule. Run only one
+  at a time; a passing local report does not establish hosted acceptance.

@@ -5,6 +5,7 @@ import { redirect } from 'next/navigation'
 import type { Database } from '@/lib/db/database.types'
 import { isSupabaseConfigured } from '@/lib/env'
 import { isLocalMode } from '@/lib/mode'
+import { localFormWrite } from '@/lib/local/write-result'
 import { id, mutate, now, type LocalEvent } from '@/lib/local/db'
 import { describeWriteError, echoValues, fieldErrorsOf, type FormState } from '@/lib/form-state'
 import { createClient, getUser } from '@/lib/supabase/server'
@@ -117,7 +118,7 @@ export async function createEventAction(_previous: FormState, formData: FormData
     capacity: parsed.data.capacity ?? null,
   }
 
-  if (isLocalMode()) return createEventLocal(user.id, parsed.data, startsAt, endsAt, formData)
+  if (isLocalMode()) return localFormWrite(() => createEventLocal(user.id, parsed.data, startsAt, endsAt, formData), formData)
 
   const supabase = await createClient()
   const { data, error } = await supabase
@@ -157,7 +158,9 @@ function describeRsvpError(error: { code?: string; message?: string; hint?: stri
     return {
       status: 'error',
       message:
-        error.hint === 'event_cancelled'
+        error.hint === 'event_started'
+          ? 'This event has started, so new or changed RSVPs are closed.'
+          : error.hint === 'event_cancelled'
           ? 'That event has been cancelled, so there is nothing to sign up for.'
           : 'That event is not one you can see, so it cannot be answered.',
     }
@@ -201,7 +204,7 @@ export async function rsvpAction(_previous: FormState, formData: FormData): Prom
     return { status: 'error', message: 'That is not one of the two answers this control offers.' }
   }
 
-  if (isLocalMode()) return rsvpLocal(user.id, eventId, slug, parsed.data.status)
+  if (isLocalMode()) return localFormWrite(() => rsvpLocal(user.id, eventId, slug, parsed.data.status), formData)
 
   const supabase = await createClient()
   const { error } = await supabase
@@ -253,7 +256,7 @@ export async function cancelRsvpAction(_previous: FormState, formData: FormData)
   const user = await getUser()
   if (!user) redirect(`/login?next=/events/${slug}`)
 
-  if (isLocalMode()) return cancelRsvpLocal(user.id, eventId, slug)
+  if (isLocalMode()) return localFormWrite(() => cancelRsvpLocal(user.id, eventId, slug), formData)
 
   const supabase = await createClient()
   const { data, error } = await supabase
@@ -340,12 +343,18 @@ async function createEventLocal(
       status: 'scheduled',
       created_at: now(),
       deleted_at: null,
+      type: data.type,
+      attendance_mode: data.attendanceMode,
+      is_all_day: data.isAllDay,
+      join_url: data.joinUrl ?? null,
+      location_url: data.locationUrl ?? null,
     }
 
     // Push first, then ask the read path what slug this row was given, so the
     // redirect and the detail page cannot disagree about the URL.
     db.events.push(row)
     const slug = localEventSlug(db, row.id)
+    row.slug = slug
 
     return { slug, visibility, requested: data.visibility }
   })
@@ -377,6 +386,7 @@ async function rsvpLocal(
 
     const rows = db.event_attendees.filter((attendee) => attendee.event_id === eventId)
     const existing = rows.find((attendee) => attendee.profile_id === viewer.id)
+    if (Date.parse(event.starts_at) <= Date.now() && existing?.status !== status) return 'started'
 
     // Capacity is what the trigger enforces under a row lock, and only `going`
     // consumes one. A reader switching from going to going is not competing with
@@ -418,6 +428,9 @@ async function rsvpLocal(
       status: 'error',
       message: 'That event has been cancelled, so there is nothing to sign up for.',
     }
+  }
+  if (result === 'started') {
+    return { status: 'error', message: 'This event has started, so new or changed RSVPs are closed.' }
   }
   if (result === 'full') {
     return {

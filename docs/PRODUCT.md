@@ -1,143 +1,165 @@
-# Product
+# Bulla — product and implementation scope
 
-## Name
+Reviewed against the current feature ledger and recovery records on
+31 October 2026. This is a product/source snapshot, not hosted acceptance,
+a security sign-off or a launch announcement.
 
-The working brand is **Quad** — the campus green where students actually meet.
+## Public identity and current plan
 
-> Note: this document originally said the name lives in `src/lib/config/brand.ts`. That
-> file does not exist. The name currently appears in the layout metadata, the logo
-> component and the footer. Centralising it is worth doing before any rebrand, and is
-> not worth doing before then.
+The public product name is **Bulla**: a campus community for people, work and
+learning. The shared identity lives in
+[`src/lib/brand.ts`](../src/lib/brand.ts), used by the app metadata, wordmark
+and PWA manifest.
 
-## The five questions
+The active source path remains `E:\Uni-Social-Network` intentionally.
+Operational paths, existing data/session identifiers and historical URLs are
+compatibility/provenance, not instructions to rename or move the checkout.
+The August prototypes are requirements/UI references, not alternative active apps;
+see the [archive review](bulla/ARCHIVE-REVIEW.md).
 
-Every screen is judged against these. If a screen answers none of them, it should not
-exist.
+The [Bulla plan](bulla/PLAN.md), [current status](bulla/STATUS.md) and
+[issue register](bulla/ISSUES.md) are the canonical recovery records.
+Earlier `docs/plan/` milestones and implementation counts are not current.
+The product is unfinished and is not cleared for public launch.
 
-1. **Who am I?** → profile, university, skills, achievements
-2. **What am I learning?** → daily log, streak, semester goals
-3. **What am I building?** → projects, ideas, progress
-4. **Who can I build with?** → discovery, follows, connections, team finder, chat
-5. **What should I do next?** → dashboard next-actions, open goals, project help requests,
-   deadlines
+## The core loop
 
-Question 5 is the retention mechanic. A student who opens the app and immediately sees
-"log today's learning · 2 goals due this week · Maria asked to join Orbit" has a reason to
-come back tomorrow. A student who sees an empty feed does not.
+Make a profile → find people or work → share or join something → collaborate
+→ keep a record of progress. Prioritize that loop over adding more feature names.
 
-## What makes this not-just-a-social-network
+Five questions guide the product:
 
-A post on this platform is attached to something real — a project, a goal, a skill, a
-semester. The feed is a byproduct of work, not the product. Concretely:
+1. Who am I? Profile, campus affiliation, self-declared skills and interests.
+2. What am I learning? Semesters, goals, milestones and daily study records.
+3. What am I building? Projects, updates, ideas and collaboration needs.
+4. Who can I build with? People discovery, follows/connections and conversations.
+5. What should I do next? Useful context from real goals, projects and requests.
 
-- Creating a project update *offers* to post it. Posting is the side effect.
-- Completing a goal can be shared. The goal is the primary object.
-- "Looking for teammates" is a structured record with required skills and slot counts, not
-  a text post that decays.
-- A profile is a portfolio with evidence: skills link to the projects that used them.
+These are design goals, not a claim that every journey is finished. The current
+feed can link to real projects/goals; richer privacy-safe portfolio evidence,
+people-by-skill/department discovery and next-action/upcoming-event context
+remain work. Do not imply that every post is attached to an object or that
+automatic goal/project sharing exists everywhere.
 
-## Honesty rules
+## Existing implementation and its limits
 
-These are product rules, enforced in code review. They exist because the failure mode of
-a project this size is a beautiful shell.
+The hand-maintained [`src/lib/build-status.ts`](../src/lib/build-status.ts)
+ledger is rendered at `/status`. Its notes define the scope of each entry.
+Review those notes with source and test evidence; sharing a ledger between
+pages reduces duplication but does not make it automatically accurate.
 
-1. **No invented numbers.** Every count, percentage, streak, and chart is a query over
-   stored rows. If we cannot compute it, we do not show it.
-2. **No decorative controls.** A button either performs its action or is not rendered.
-   Features that are planned but not built are absent, or shown with an explicit
-   "Coming soon" state that is visibly not interactive.
-3. **No simulated activity.** No fake users, fake chat, fake notifications. Development
-   seed data lives behind a flag and is labelled in the UI (`SEED_BANNER`).
-4. **Skill levels are self-declared.** The UI says so. We do not imply verification we
-   cannot perform.
-5. **Unavailable is a valid state.** "Session list requires the Supabase Admin API and is
-   not available on this plan" is a better answer than a fabricated device list.
-
-## Feature status
-
-**The authoritative list is [`src/lib/build-status.ts`](../src/lib/build-status.ts),
-rendered by the running application at `/status`.** It is code so that a placeholder
-page and the status page cannot drift apart — `PlannedFeature` reads its own state from
-the same list. This table is a summary of it and will go stale; the page will not.
-
-Four states, with their exact meanings:
-
-| State | Means |
+| Ledger state | Interpretation |
 | --- | --- |
-| **working** | usable end to end by a real user, once Supabase is configured |
-| **partial** | real but incomplete; the missing part is named on the page itself |
-| **schema-only** | tables, RLS policies and tests exist. **No interface.** Nothing a user can do. |
-| **planned** | designed, not built. The route says so instead of showing a mock-up. |
+| `working` / “Verified scope” | The explicitly recorded implementation/test scope exists; not blanket hosted, security or production verification |
+| `partial` / “Partly complete” | Real implementation exists, but functionality, provider parity or acceptance is unfinished |
+| `schema-only` / “Database only” | Schema/policies/tests without a user interface; do not apply this label to the implemented domains below |
+| `planned` / “Not implemented” | No accepted implementation of the stated deliverable; do not present it as usable |
 
-As of the last measurement: **5 working, 2 partial, 11 schema-only, 7 planned** — 25
-tracked features.
+This summary deliberately avoids frozen migration/test/feature totals:
 
-| Domain | Status | Note |
-|---|---|---|
-| Database schema + RLS | working | 17 migrations, 52 tables, 182 policies, 296 tests |
-| Design system | working | tokens, primitives, accessible `Field` |
-| Auth — email, Google, reset, sign-out | working | not yet run against a live project |
-| Legal + guidelines pages | working | **drafts**, banner-marked, need legal review |
-| Build status page | working | this honesty mechanism itself |
-| Feed + posts | partial | real read/write; no likes/comments UI, no ranking, no pagination |
-| Documentation | partial | 8 of the planned documents exist |
-| Profiles | schema-only | |
-| Universities / faculties / programmes | schema-only | |
-| Social graph (follow, connect, block) | schema-only | |
-| Skills + endorsements | schema-only | |
-| Projects + members + collaboration | schema-only | |
-| Idea vault | schema-only | |
-| Messaging | schema-only | tables + policies tested; no UI, no realtime |
-| Notifications | schema-only | trigger-generated writes work; nothing displays them |
-| Semesters / goals / daily log | schema-only | |
-| Achievements | schema-only | |
-| Opportunities + events | schema-only | |
-| Onboarding | planned | new accounts get a placeholder username |
-| Search | planned | migration `0019_search` reserved, not written (see DATABASE.md) |
-| Reports / moderation | planned | `0020_reports` reserved, not written — **launch blocker** |
-| Bug reports | planned | |
-| Admin + audit log | planned | route gated, no pages |
-| Uploads / storage | planned | `0022_storage` reserved, not written; no upload path exists |
-| Rate limiting | planned | `0021_rate_limits` reserved, not written — **launch blocker** |
+| Domain | Current scope | What remains |
+| --- | --- | --- |
+| Database foundation (`working`, scoped) | Versioned PostgreSQL migrations, RLS, explicit grants and in-process permission tests | Hosted PostgREST behavior, authorization regressions and operational/load acceptance |
+| Accounts/onboarding (`partial`) | Local signup/sign-in/session actions; hosted Auth/OAuth/recovery-request code; onboarding screens/actions | Full hosted identity/email flow, password-reset completion, explicit initial publication choice and provider policy |
+| Profiles/campus/social graph (`partial`) | Profile view/edit, skills/interests, university browsing/requests/review, follow/connect/block controls | Privacy-safe portfolio sections, richer people discovery and cross-mode/two-account acceptance |
+| Feed (`partial`) | Composer, structured posts, ranking/filter queries, permalinks, cursor controls, likes/comments/saves | Ordering, bounded query work, retries/concurrency and write/reload/privacy acceptance |
+| Projects/ideas (`partial`) | Lists/details/forms, members/applications/roles, updates, votes/interest and idea conversion | Ownership/role edges, atomic conversion and complete hosted collaboration journeys |
+| Messages/notifications (`partial`) | Inbox/thread/group actions, read/unread controls, notification list and shell badge; cloud Realtime subscriptions | Departed-history/DM rules, reconnect/idempotency, private delivery and fan-out tests; local mode is not realtime |
+| Learning/achievements (`partial`) | Semesters, courses, goals/milestones, daily logs, stored achievement display and award code | Date/timezone boundaries, real-event award idempotency and provider-parity journeys |
+| Boards/search (`partial`) | Opportunities/events create/detail/list, bookmarks, RSVPs, search queries/results/tabs | Listing trust, board report coverage, RSVP capacity races, people filters/paging and large-dataset query plans |
+| Reports/bugs/admin (`partial`) | Report/decision actions, bug submission/triage, audit/admin and university review screens | Direct-API authorization, abuse protection, board coverage and verified staff operations |
+| Design/PWA/browser coverage (`partial`) | Bulla tokens/identity, light/dark controls, shared shell/navigation, install assets, public offline help and local smoke specs | All-screen redesign, real device/keyboard/accessibility/state QA and comprehensive two-account/hosted tests |
+| Operations | Rate limiting is `partial`; safe uploads, account export/deletion and capacity/recovery proof are `planned` | Mandatory write budgets, private validated media, reauthenticated lifecycle/cleanup, monitoring and recorded load/restore evidence |
 
-Nothing in this table is rounded up. A feature with a beautiful page and no working
-action is `planned`, not `partial`.
+The existence of a screen, migration, action or test file does not establish
+that its complete user journey passed. Current results and issue states belong
+in the recovery records, not assumptions made from this table.
 
+## Private development versus hosted service
 
-## Deliberately out of MVP scope
+With `NEXT_PUBLIC_DATA_MODE=local`, accounts and content are stored in a private
+JSON file on the developer's machine (`LOCAL_DATA_PATH`, or `data/local.json`
+when unset). This adapter supports review without a Supabase project. Local
+sample content exists; it is not real student activity, verified identity or
+evidence of adoption.
 
-Schema and module boundaries leave room for these; none of them block launch.
+Local access/session checks are application code, not database RLS. Local mode
+does not offer Google OAuth, email verification/recovery or cloud Realtime.
+Keep it loopback-bound; a private production-build override does not make it
+safe for public use. Preserve existing data and compatibility paths.
 
-GitHub sync · AI assistant/mentor · mentorship matching · video calls · university email
-verification · clubs and organisations · course communities · resource library ·
-internship tracker · certificates · reputation scores · native mobile app.
+Supabase mode is the intended hosted architecture: Auth, PostgreSQL/RLS,
+authorized Realtime and a future safe private-storage pipeline. Hosted
+configuration and complete Auth/PostgREST/Realtime/storage journeys are still
+release gates. Choosing the provider does not prove authorization or capacity.
+See the [README setup/commands](../README.md) for the two modes.
 
-## Monetisation posture
+The PWA provides install assets and public offline help. It does not promise
+offline messaging, offline authenticated content or queued offline writes.
+The service worker is designed not to cache account pages, APIs or private RSC
+payloads; real-device/provider testing remains part of acceptance.
 
-No ad code ships until the site meets programme policy, and none ships at all while the
-platform has no users.
+## Product honesty requirements
 
-> Note: this document originally described `components/shared/AdSlot.tsx`. It does not
-> exist, and there are no ad slots in the current layout — which is the correct state
-> for now. When they are added the constraints are: structurally forbidden in
-> `/messages`, in `/admin`, and on any moderation surface; never positioned where a
-> mis-tap hits an ad instead of the control beside it; reserved regions that render
-> `null` rather than a placeholder, so an empty slot costs the layout nothing.
+These are acceptance requirements, not an assertion that a full audit has passed:
 
-## Honesty rules — status
+1. Show only counts and progress with a defined data source. Do not describe
+   seeded/sample counts as live usage, verified mastery or measured capacity.
+2. Controls must perform their stated action and show pending/error/empty/access
+   states. Missing functionality must be absent or explicitly non-operational.
+3. Campus affiliation and skill levels are self-declared unless an actual
+   verification process exists. Do not import prototype percentages or “active
+   now” claims as measurements.
+4. Respect visibility, blocking, roles and membership in queries/actions and
+   the hosted database boundary, not just hidden controls. Explicit onboarding
+   publication choice remains unfinished; current defaults are not consent proof.
+5. Describe recovery, uploads, export/deletion and session controls by what
+   users can actually complete. In particular, a reset email request currently
+   targets the missing `/settings/password` route.
+6. Opportunity bookmarks do not prove applications. Reviewed listings,
+   application tracking and broader event/opportunity reporting cannot be
+   advertised as complete when their workflows are missing.
+7. Draft legal pages need human review. Local tests, a dependency audit,
+   redesigned shared components or an installable PWA do not constitute legal,
+   security, full-redesign or production readiness.
 
-The five rules above are held, and here is the evidence rather than the assertion:
+## Release gates and the 50,000-user target
 
-- No number anywhere in the UI is invented. The only counts rendered are
-  `like_count`/`comment_count` on a post, which are trigger-maintained columns, and the
-  feature counts on `/status`, which are computed from the feature list and carry the
-  caveat that they count list entries, not usage.
-- No decorative controls: unbuilt routes render `PlannedFeature`, which states the
-  feature's real status and offers no fake affordance. Post like/comment counts render as
-  **static text**, not as buttons, precisely because clicking them does nothing yet.
-- With Supabase unconfigured, every form renders `disabled` under an explanation, rather
-  than looking operational and failing.
-- No seed data exists, so no fake user can leak into production.
-- Skill levels are described as self-declared in the schema comments; the UI that will
-  display them is not built, and must repeat it when it is.
+The target is **50,000 registered accounts**, not 50,000 concurrent users.
+No measured capacity benchmark or successful restore drill has been recorded
+in the current ledger. Proposed traffic, latency, accessibility and recovery
+budgets are targets until evidence demonstrates them.
+
+Before a public launch or broader campus rollout:
+
+- Close database/server authorization gates for personal settings, conversation
+  roles, report eligibility, departed history, DM policy and mandatory abuse
+  budgets; verify rejected direct-API attempts as well as legitimate flows.
+- Complete recovery/account management, safe uploads, export/deletion and
+  ownership/retention cleanup; reconcile email/password policy and staff MFA.
+- Finish the core two-student journeys, board trust/reporting and staffed
+  moderation; verify privacy, blocking and ownership across both providers.
+- Finish per-screen design and loading/error/empty/access states, plus real
+  device, keyboard, contrast and accessibility checks against the Bulla
+  [design contract](bulla/DESIGN.md).
+- Record hosted staging, forward-migration rehearsal, Auth/OAuth/email,
+  PostgREST/RLS, Realtime/reconnect, private-storage and independent concurrency
+  evidence. Embedded PGlite/local tests alone cannot supply this proof.
+- Measure realistic isolated-staging load/soak/spike workloads, query plans,
+  failure recovery and an actual backup restore under the
+  [capacity test contract](bulla/PLAN.md#6-capacity-test-contract).
+
+Use [ISSUES.md](bulla/ISSUES.md) for exact defects and current fix states and
+[PLAN.md](bulla/PLAN.md) for milestone acceptance. This document does not close
+those issues or authorize deployments, live migrations or load against an
+external service.
+
+## Deferred scope
+
+AI assistants, GitHub sync, mentorship matching, video calls, verified
+university identity, broader clubs/course communities, resource libraries,
+application tracking, certificates/reputation scores and native mobile clients
+are not completed MVP capabilities. Defer expansion until the web/PWA core and
+release gates are reliable. Monetisation is not a recovery milestone; sample
+data cannot justify adoption, engagement, revenue or infrastructure-cost claims.
 

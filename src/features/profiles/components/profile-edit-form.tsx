@@ -2,12 +2,15 @@
 
 import { useActionState } from 'react'
 import { Alert } from '@/components/ui/alert'
+import { FormErrorSummary } from '@/components/ui/form-error-summary'
 import { Field } from '@/components/ui/field'
 import { Input, Select, Textarea } from '@/components/ui/input'
 import { SubmitButton } from '@/components/ui/submit-button'
+import { useRetainedForm } from '@/components/ui/use-retained-form'
 import { updateProfileAction } from '@/features/profiles/actions'
 import { emptyProfileState } from '@/features/profiles/form-state'
 import type { FullProfile, UniversityOption } from '@/features/profiles/queries'
+import { UniversityDepartmentFields } from './university-department-fields'
 
 /**
  * Profile editing.
@@ -29,17 +32,29 @@ export function ProfileEditForm({
   universities: UniversityOption[]
 }) {
   const [state, action] = useActionState(updateProfileAction, emptyProfileState)
+  const formRef = useRetainedForm()
   const value = (key: string, fallback: string | number | null) =>
     state.values?.[key] ?? (fallback === null ? '' : String(fallback))
 
   return (
-    <form action={action} className="space-y-5" noValidate>
+    <form ref={formRef} action={action} className="space-y-5" noValidate>
       {state.status === 'success' ? (
         <Alert tone="success">{state.message ?? 'Saved.'}</Alert>
       ) : null}
-      {state.message && state.status === 'error' ? (
-        <Alert tone="danger">{state.message}</Alert>
-      ) : null}
+      <FormErrorSummary state={state} fields={{
+        displayName: { id: 'displayName', label: 'Your name' },
+        headline: { id: 'headline', label: 'Headline' },
+        bio: { id: 'bio', label: 'About you' },
+        universityId: { id: 'universityId', label: 'University' },
+        departmentId: { id: 'departmentId', label: 'Department' },
+        degree: { id: 'degree', label: 'Degree or programme' },
+        semester: { id: 'semester', label: 'Current semester' },
+        graduationYear: { id: 'graduationYear', label: 'Expected graduation' },
+        location: { id: 'location', label: 'Where you are' },
+        website: { id: 'website', label: 'Website' },
+        githubUsername: { id: 'githubUsername', label: 'GitHub username' },
+        visibility: { id: 'visibility', label: 'Profile visibility' },
+      }} />
 
       <Field id="displayName" label="Your name" error={state.fieldErrors?.displayName} required>
         {(field) => (
@@ -72,23 +87,15 @@ export function ProfileEditForm({
       <div className="space-y-4 border-t border-hairline pt-5">
         <h2 className="text-sm font-medium text-ink">Where you study</h2>
 
-        <Field id="universityId" label="University" error={state.fieldErrors?.universityId}>
-          {(field) => (
-            <Select
-              {...field}
-              name="universityId"
-              defaultValue={value('universityId', profile.university_id)}
-            >
-              <option value="">Not saying</option>
-              {universities.map((university) => (
-                <option key={university.id} value={university.id}>
-                  {university.name}
-                  {university.country ? ` — ${university.country}` : ''}
-                </option>
-              ))}
-            </Select>
-          )}
-        </Field>
+        <UniversityDepartmentFields
+          universities={universities}
+          state={state}
+          currentUniversityId={profile.university_id}
+          currentUniversityName={profile.university?.name}
+          currentDepartmentId={profile.department_id}
+          currentDepartmentName={profile.department?.name}
+          legacyDepartment={profile.legacy_department}
+        />
 
         <Field id="degree" label="Degree or programme" error={state.fieldErrors?.degree}>
           {(field) => (

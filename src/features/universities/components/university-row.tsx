@@ -1,4 +1,6 @@
 import { Badge } from '@/components/ui/badge'
+import Link from 'next/link'
+import { ArrowUpRight, GraduationCap } from 'lucide-react'
 import { Count } from '@/components/ui/stat-row'
 import { ClaimUniversityControl } from '@/features/universities/components/claim-university-control'
 import type { UniversityListItem } from '@/features/universities/queries'
@@ -22,20 +24,32 @@ export function UniversityRow({
   signedIn: boolean
 }) {
   const place = [university.city, university.country].filter(Boolean).join(', ')
+  const monogram = university.short_name?.split(' ')[0]?.slice(0, 4)
+  const discoveryHref = `/search?type=people&university=${encodeURIComponent(university.id)}`
 
   return (
-    <li className="flex flex-col gap-3 py-4 sm:flex-row sm:items-start sm:justify-between sm:gap-6">
+    <li className="university-card interactive-card" data-campus-selected={isMine ? 'true' : undefined}>
       <div className="min-w-0">
-        <div className="flex flex-wrap items-baseline gap-x-2 gap-y-1">
-          <h3 className="text-base text-ink">{university.name}</h3>
-          {university.short_name ? <Badge tone="outline">{university.short_name}</Badge> : null}
+        <div className="flex items-start gap-3">
+          <span className="university-mark" aria-hidden="true">
+            {monogram || <GraduationCap className="size-5" />}
+          </span>
+          <div className="min-w-0">
+          <h3 className="text-base text-ink">
+            <Link href={discoveryHref} className="underline-offset-4 hover:text-accent-700 hover:underline">
+              {university.name}
+            </Link>
+          </h3>
+          {university.short_name ? <p className="mt-1 text-xs text-ink-muted">{university.short_name}</p> : null}
+          {isMine ? <p className="mt-1 text-xs font-medium text-accent-700">Your campus</p> : null}
           {university.status === 'pending' ? (
             <Badge tone="highlight">Awaiting review — visible to you only</Badge>
           ) : null}
           {university.status === 'rejected' ? <Badge tone="danger">Not accepted</Badge> : null}
+          </div>
         </div>
 
-        {place ? <p className="mt-0.5 text-sm text-ink-muted">{place}</p> : null}
+        {place ? <p className="mt-4 text-sm text-ink-muted">{place}</p> : null}
 
         <p className="mt-1.5 flex flex-wrap items-center gap-x-3 gap-y-1 text-xs text-ink-faint">
           {/* Both numbers are stored counters. Neither is computed for the page. */}
@@ -54,7 +68,11 @@ export function UniversityRow({
         </p>
       </div>
 
-      <div className="shrink-0">
+      <div className="mt-auto flex flex-wrap items-center justify-between gap-3 border-t border-hairline pt-4">
+        <Link href={discoveryHref}
+          className="inline-flex min-h-11 items-center gap-1 text-sm font-medium text-accent-700">
+          Find people<ArrowUpRight className="size-4" aria-hidden="true" />
+        </Link>
         <ClaimUniversityControl
           universityId={university.id}
           universityName={university.name}

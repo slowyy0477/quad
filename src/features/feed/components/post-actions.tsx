@@ -2,10 +2,11 @@
 
 import Link from 'next/link'
 import { useState, useTransition } from 'react'
-import { Bookmark, Heart, Link2, MessageSquare } from 'lucide-react'
+import { Bookmark, Flag, Heart, Link2, MessageSquare } from 'lucide-react'
 import { toast } from 'sonner'
 import { cn } from '@/lib/utils'
 import { setPostLikeAction, setPostSaveAction } from '@/features/feed/actions'
+import { ReportDialog } from '@/features/moderation/components/report-dialog'
 
 /**
  * The controls on a post: like, comment, save, copy link.
@@ -172,6 +173,16 @@ export function PostActions({
             <span>Copy link</span>
           </button>
         ) : null}
+
+        <ReportDialog kind="post" targetId={postId} subject="this post"
+          trigger={
+            <button type="button" aria-label="Report this post"
+              className="ml-auto inline-flex min-h-9 items-center gap-1.5 rounded px-2 text-xs text-ink-faint hover:bg-paper-sunken hover:text-ink">
+              <Flag className="size-3.5" aria-hidden="true" />
+              <span>Report</span>
+            </button>
+          }
+        />
 
         {/* The controls stay enabled while a write is in flight — disabling them
             would drop a control out of the tab order mid-interaction — and this

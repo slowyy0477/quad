@@ -1,6 +1,7 @@
 import { defineConfig } from 'vitest/config'
 import react from '@vitejs/plugin-react'
 import tsconfigPaths from 'vite-tsconfig-paths'
+import { fileURLToPath } from 'node:url'
 
 /**
  * Two test environments in one config, split by file location:
@@ -14,11 +15,19 @@ import tsconfigPaths from 'vite-tsconfig-paths'
  * try to execute browser specs.
  */
 export default defineConfig({
+  cacheDir: process.env.BULLA_TEST_CACHE_DIR || process.env.QUAD_TEST_CACHE_DIR || 'node_modules/.vite',
   plugins: [react(), tsconfigPaths()],
   test: {
+    // Next resolves this optional marker internally; Vite needs a test-only
+    // module before vi.mock. Production's server/client guard is unchanged.
+    alias: {
+      'server-only': fileURLToPath(new URL(
+        './node_modules/next/dist/compiled/server-only/empty.js', import.meta.url,
+      )),
+    },
     globals: true,
     setupFiles: ['./tests/setup.ts'],
-    exclude: ['**/node_modules/**', '**/dist/**', '**/.next/**', 'tests/e2e/**'],
+    exclude: ['**/node_modules/**', '**/dist/**', '**/.next/**', '**/.next-*/**', 'tests/e2e/**'],
     // A cold PGlite boot plus twenty migrations is a second or two; the default
     // 5s timeout makes that look like a hang.
     testTimeout: 30_000,

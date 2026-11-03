@@ -13,11 +13,10 @@ import { emptyFormState } from '@/lib/form-state'
  *
  * This is the one control on the page whose consequences are not obvious, so it states
  * them before it is pressed rather than after: what is created, what carries across,
- * who is invited, and that it happens once. Every number in the list is a stored value
- * — `interest_count` over `idea_interest` rows and the `idea_skills` the idea already
- * has — so "3 people will be invited" is a fact about rows, not a promise.
+ * who may be invited, and that it happens once. Interest counts are recorded
+ * offers, not guarantees: current privacy, blocks and write limits still apply.
  *
- * The conversion itself runs `public.convert_idea_to_project`, which creates the project
+ * The conversion runs `public.convert_idea_to_project_with_invites`, which creates the project
  * and marks the idea converted in one transaction and refuses a second run. The invites
  * are real `project_invites` rows, so the existing notification trigger tells each
  * person; nothing is faked with a message.
@@ -78,8 +77,8 @@ export function ConvertForm({
           </li>
           <li>
             {interestCount > 0
-              ? `${interestCount} ${interestCount === 1 ? 'person who said they would help is' : 'people who said they would help are'} invited to join.`
-              : 'Nobody has said they would help yet, so nobody is invited.'}
+              ? `${interestCount} ${interestCount === 1 ? 'person has' : 'people have'} offered to help. Eligible people will be invited, subject to privacy, blocks and limits.`
+              : 'No offers are currently recorded. Invitation eligibility is checked when you convert.'}
           </li>
           <li className="text-ink-muted">
             This happens once. The idea is marked as converted and cannot be converted again.

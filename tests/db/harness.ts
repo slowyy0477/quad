@@ -17,6 +17,7 @@
  * simulation of it.
  */
 import { readdir, readFile } from 'node:fs/promises'
+import { randomUUID } from 'node:crypto'
 import { join } from 'node:path'
 import { PGlite } from '@electric-sql/pglite'
 import { pg_trgm } from '@electric-sql/pglite/contrib/pg_trgm'
@@ -38,7 +39,7 @@ export type TestDb = {
   asAnon: <T = Record<string, unknown>>(sql: string, params?: unknown[]) => Promise<T[]>
   /** Run SQL with full privileges. Use only for fixtures, never for assertions. */
   asService: <T = Record<string, unknown>>(sql: string, params?: unknown[]) => Promise<T[]>
-  /** Create an auth user; the DB trigger creates the matching profile row. */
+  /** Create a published synthetic fixture; raw signup tests insert auth.users directly. */
   createUser: (opts?: CreateUserOpts) => Promise<string>
   close: () => Promise<void>
 }
@@ -49,6 +50,7 @@ export type CreateUserOpts = {
   /** Set the profile username directly, skipping the onboarding flow. */
   username?: string
   universityId?: string
+  /** Fixture consent defaults to public, not the production signup default. */
   visibility?: 'public' | 'university' | 'connections' | 'private'
   role?: 'admin' | 'moderator'
 }
@@ -99,6 +101,12 @@ export async function createTestDb(): Promise<TestDb> {
   }
 
   let userSeq = 0
+  // Existing staff-domain scenarios intentionally use already-verified fixture
+  // operators with an explicitly enrolled synthetic factor. Raw claim tests
+  // independently exercise no-factor state, AAL1, expiry and revocation.
+  // This affects only the synthetic DB, never production authentication.
+  const verifiedStaffFixtures = new Set<string>()
+  const staffFixtureSessions = new Map<string, string>()
 
   const runAs = async <T>(
     role: 'anon' | 'authenticated' | 'service',
@@ -109,9 +117,56 @@ export async function createTestDb(): Promise<TestDb> {
     // reset first: PGlite reuses one session, so a leftover role or claim from a
     // previous statement would silently change what the next one is allowed to do.
     await pg.exec('reset role;')
+    let staffClaims: Record<string, unknown> = {}
+    if (role === 'authenticated' && userId && verifiedStaffFixtures.has(userId)) {
+      let sessionId = staffFixtureSessions.get(userId)
+      if (!sessionId) {
+        await pg.exec(`create table if not exists auth.sessions (
+          id uuid primary key,
+          user_id uuid not null references auth.users(id) on delete cascade
+        );
+        do $fixture$
+        begin
+          create type auth.factor_status as enum ('unverified', 'verified');
+        exception when duplicate_object then null;
+        end;
+        $fixture$;
+        do $fixture$
+        begin
+          create type auth.factor_type as enum ('totp', 'webauthn');
+        exception when duplicate_object then null;
+        end;
+        $fixture$;
+        create table if not exists auth.mfa_factors (
+          id uuid primary key,
+          user_id uuid not null references auth.users(id) on delete cascade,
+          status auth.factor_status not null,
+          factor_type auth.factor_type not null,
+          created_at timestamptz not null,
+          updated_at timestamptz not null,
+          secret text
+        );
+        revoke all on auth.sessions, auth.mfa_factors
+          from public, anon, authenticated, service_role;`)
+        sessionId = randomUUID()
+        await pg.query('insert into auth.sessions(id, user_id) values ($1, $2)', [sessionId, userId])
+        await pg.query(
+          `insert into auth.mfa_factors(id, user_id, status, factor_type, created_at, updated_at)
+           values ($1, $2, 'verified', 'totp', clock_timestamp(), clock_timestamp())`,
+          [randomUUID(), userId],
+        )
+        staffFixtureSessions.set(userId, sessionId)
+      }
+      // Enroll ONCE on first asUser(), not createUser()/asClaims(). Never
+      // recreate a deleted/downgraded factor or session: replay stays refused.
+      staffClaims = {
+        session_id: sessionId, aal: 'aal2', is_anonymous: false,
+        amr: [{ method: 'totp', timestamp: Math.floor(Date.now() / 1000) }],
+      }
+    }
     await pg.query('select set_config($1, $2, false)', [
       'request.jwt.claims',
-      userId ? JSON.stringify({ sub: userId, role: 'authenticated' }) : '',
+      userId ? JSON.stringify({ sub: userId, role: 'authenticated', ...staffClaims }) : '',
     ])
     await pg.query('select set_config($1, $2, false)', [
       'request.jwt.claim.sub',
@@ -165,10 +220,11 @@ export async function createTestDb(): Promise<TestDb> {
         params.push(opts.universityId)
         updates.push(`university_id = $${params.length}`)
       }
-      if (opts.visibility) {
-        params.push(opts.visibility)
-        updates.push(`visibility = $${params.length}`)
-      }
+      // Existing domain scenarios concern published, already-onboarded users.
+      // Make their publication explicit now that genuine signup defaults private.
+      // Tests of Auth's actual signup hook must use direct auth.users INSERTs.
+      params.push(opts.visibility ?? 'public')
+      updates.push(`visibility = $${params.length}`)
 
       if (updates.length > 0) {
         await asService(
@@ -182,6 +238,7 @@ export async function createTestDb(): Promise<TestDb> {
           `insert into public.user_roles (user_id, role) values ($1, $2)`,
           [id, opts.role],
         )
+        verifiedStaffFixtures.add(id)
       }
 
       return id

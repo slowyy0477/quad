@@ -25,11 +25,14 @@
 
 export type Draft = {
   body: string
+  /** Kept with the exact body across retries/reloads; changed text gets a new send. */
+  clientNonce: string | null
   /** True when the body came back from an earlier visit in this session. */
   restored: boolean
 }
 
-const EMPTY: Draft = { body: '', restored: false }
+const EMPTY: Draft = { body: '', clientNonce: null, restored: false }
+const NONCE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i
 
 const cache = new Map<string, Draft>()
 const readers = new Map<string, () => Draft>()
@@ -39,17 +42,40 @@ function storageKey(conversationId: string): string {
   return `quad.messages.draft.${conversationId}`
 }
 
-function readStored(conversationId: string): string {
+function newNonce(): string {
+  return globalThis.crypto.randomUUID()
+}
+
+function readStored(conversationId: string): Draft {
   try {
-    return window.sessionStorage.getItem(storageKey(conversationId)) ?? ''
+    const stored = window.sessionStorage.getItem(storageKey(conversationId))
+    if (!stored) return EMPTY
+    try {
+      const parsed: unknown = JSON.parse(stored)
+      if (parsed && typeof parsed === 'object' &&
+          'body' in parsed && typeof parsed.body === 'string' &&
+          'clientNonce' in parsed && typeof parsed.clientNonce === 'string' &&
+          NONCE.test(parsed.clientNonce)) {
+        return parsed.body.trim() ? {
+          body: parsed.body, clientNonce: parsed.clientNonce, restored: true,
+        } : EMPTY
+      }
+    } catch {
+      // Legacy drafts were plain text. Preserve them without guessing their format.
+    }
+    return stored.trim() ? { body: stored, clientNonce: newNonce(), restored: true } : EMPTY
   } catch {
-    return ''
+    return EMPTY
   }
 }
 
-function writeStored(conversationId: string, body: string) {
+function writeStored(conversationId: string, draft: Draft) {
   try {
-    if (body.trim().length > 0) window.sessionStorage.setItem(storageKey(conversationId), body)
+    // One storage write keeps the accepted-send nonce and body inseparable.
+    if (draft.body.trim().length > 0) window.sessionStorage.setItem(
+      storageKey(conversationId),
+      JSON.stringify({ body: draft.body, clientNonce: draft.clientNonce }),
+    )
     else window.sessionStorage.removeItem(storageKey(conversationId))
   } catch {
     // Storage unavailable. The draft is lost on reload and nothing else breaks.
@@ -84,9 +110,9 @@ export function snapshotReader(conversationId: string): () => Draft {
     const cached = cache.get(conversationId)
     if (cached) return cached
 
-    const stored = readStored(conversationId)
-    const draft: Draft = stored.trim().length > 0 ? { body: stored, restored: true } : EMPTY
+    const draft = readStored(conversationId)
     cache.set(conversationId, draft)
+    if (draft !== EMPTY) writeStored(conversationId, draft)
     return draft
   }
 
@@ -104,8 +130,11 @@ export function setDraftBody(conversationId: string, body: string) {
   const current = snapshotReader(conversationId)()
   if (current.body === body) return
 
-  cache.set(conversationId, { body, restored: current.restored })
-  writeStored(conversationId, body)
+  const next: Draft = body.trim()
+    ? { body, clientNonce: newNonce(), restored: current.restored }
+    : { body, clientNonce: null, restored: current.restored }
+  cache.set(conversationId, next)
+  writeStored(conversationId, next)
   emit()
 }
 
@@ -115,6 +144,6 @@ export function clearDraft(conversationId: string) {
   if (current === EMPTY) return
 
   cache.set(conversationId, EMPTY)
-  writeStored(conversationId, '')
+  writeStored(conversationId, EMPTY)
   emit()
 }

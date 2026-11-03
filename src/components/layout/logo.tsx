@@ -1,14 +1,14 @@
 import { cn } from '@/lib/utils'
+import { BRAND } from '@/lib/brand'
 
 /**
  * The wordmark.
  *
- * Drawn rather than set: four squares for the four sides of a quad, with the
- * courtyard left open in the middle. It is a shape a university student would
- * read as a building plan, which is more or less the idea.
+ * An original lowercase b with an open conversation-tail detail.
+ * This is a code-native vector, not a generated raster or copied brand asset.
  *
  * `aria-hidden` on the mark plus real text beside it means a screen reader gets
- * "Quad, link" instead of a description of a rectangle.
+ * "Bulla, link" instead of a description of the decorative mark.
  */
 export function Logo({
   className,
@@ -18,20 +18,17 @@ export function Logo({
   showWordmark?: boolean
 }) {
   return (
-    <span className={cn('inline-flex items-center gap-2', className)}>
+    <span className={cn('inline-flex items-center gap-2.5', className)}>
       <svg
-        viewBox="0 0 24 24"
-        className="size-6 shrink-0 text-accent-600"
+        viewBox="0 0 32 32"
+        className="size-8 shrink-0 text-accent-600"
         aria-hidden="true"
         fill="none"
       >
-        <rect x="2.5" y="2.5" width="7" height="7" rx="1" fill="currentColor" />
-        <rect x="14.5" y="2.5" width="7" height="7" rx="1" fill="currentColor" opacity="0.55" />
-        <rect x="2.5" y="14.5" width="7" height="7" rx="1" fill="currentColor" opacity="0.55" />
-        <rect x="14.5" y="14.5" width="7" height="7" rx="1" fill="currentColor" />
+        <path fill="currentColor" fillRule="evenodd" d="M6 2h5v10c1.5-1.8 3.7-2.7 6.2-2.7 5.8 0 9.8 4.1 9.8 9.8S23 29 17.1 29c-3 0-5.4-1.2-7.3-3.1L6 29V2Zm5 17.2c0 3 2.2 5.2 5.1 5.2s5.2-2.2 5.2-5.2-2.2-5.2-5.2-5.2S11 16.2 11 19.2Z" />
       </svg>
       {showWordmark ? (
-        <span className="font-display text-lg font-semibold tracking-tight text-ink">Quad</span>
+        <span className="font-sans text-2xl font-bold tracking-[-0.055em] text-ink">{BRAND.name}</span>
       ) : null}
     </span>
   )

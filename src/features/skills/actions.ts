@@ -6,6 +6,7 @@ import { isSupabaseConfigured } from '@/lib/env'
 import { describeWriteError, fieldErrorsOf, type FormState } from '@/lib/form-state'
 import { createClient, getUser } from '@/lib/supabase/server'
 import { isLocalMode } from '@/lib/mode'
+import { skillWriteLocal } from './local'
 import {
   attachSkillSchema,
   interestIdSchema,
@@ -51,17 +52,6 @@ const UNAVAILABLE: FormState = {
   message: 'This deployment has no database connection, so nothing can be saved.',
 }
 
-const LOCAL_SKILLS: FormState = {
-  status: 'error',
-  message:
-    'Local mode has no skills catalogue or profile_skills table, so there is nowhere to record a skill. Nothing was changed.',
-}
-
-const LOCAL_INTERESTS: FormState = {
-  status: 'error',
-  message:
-    'Local mode has no interests catalogue or profile_interests table, so there is nowhere to record an interest. Nothing was changed.',
-}
 
 function revalidateProfile() {
   revalidatePath('/me')
@@ -184,7 +174,7 @@ export async function attachSkillAction(
   _previous: FormState,
   formData: FormData,
 ): Promise<FormState> {
-  if (isLocalMode()) return LOCAL_SKILLS
+  if (isLocalMode()) { const result = await skillWriteLocal(formData, 'attach'); if (result.status === 'success') revalidateProfile(); return result }
   if (!isSupabaseConfigured()) return UNAVAILABLE
 
   const parsed = attachSkillSchema.safeParse({
@@ -231,7 +221,7 @@ export async function proposeSkillAction(
   _previous: FormState,
   formData: FormData,
 ): Promise<FormState> {
-  if (isLocalMode()) return LOCAL_SKILLS
+  if (isLocalMode()) { const result = await skillWriteLocal(formData, 'proposeSkill'); if (result.status === 'success') revalidateProfile(); return result }
   if (!isSupabaseConfigured()) return UNAVAILABLE
 
   const parsed = proposeSkillSchema.safeParse({
@@ -290,7 +280,7 @@ export async function updateProfileSkillAction(
   _previous: FormState,
   formData: FormData,
 ): Promise<FormState> {
-  if (isLocalMode()) return LOCAL_SKILLS
+  if (isLocalMode()) { const result = await skillWriteLocal(formData, 'update'); if (result.status === 'success') revalidateProfile(); return result }
   if (!isSupabaseConfigured()) return UNAVAILABLE
 
   const parsed = updateProfileSkillSchema.safeParse({
@@ -325,7 +315,7 @@ export async function removeSkillAction(
   _previous: FormState,
   formData: FormData,
 ): Promise<FormState> {
-  if (isLocalMode()) return LOCAL_SKILLS
+  if (isLocalMode()) { const result = await skillWriteLocal(formData, 'removeSkill'); if (result.status === 'success') revalidateProfile(); return result }
   if (!isSupabaseConfigured()) return UNAVAILABLE
 
   const parsed = skillIdSchema.safeParse({ skillId: String(formData.get('skillId') ?? '') })
@@ -358,7 +348,7 @@ export async function addInterestAction(
   _previous: FormState,
   formData: FormData,
 ): Promise<FormState> {
-  if (isLocalMode()) return LOCAL_INTERESTS
+  if (isLocalMode()) { const result = await skillWriteLocal(formData, 'addInterest'); if (result.status === 'success') revalidateProfile(); return result }
   if (!isSupabaseConfigured()) return UNAVAILABLE
 
   const parsed = interestIdSchema.safeParse({
@@ -391,7 +381,7 @@ export async function proposeInterestAction(
   _previous: FormState,
   formData: FormData,
 ): Promise<FormState> {
-  if (isLocalMode()) return LOCAL_INTERESTS
+  if (isLocalMode()) { const result = await skillWriteLocal(formData, 'proposeInterest'); if (result.status === 'success') revalidateProfile(); return result }
   if (!isSupabaseConfigured()) return UNAVAILABLE
 
   const parsed = proposeInterestSchema.safeParse({
@@ -441,7 +431,7 @@ export async function removeInterestAction(
   _previous: FormState,
   formData: FormData,
 ): Promise<FormState> {
-  if (isLocalMode()) return LOCAL_INTERESTS
+  if (isLocalMode()) { const result = await skillWriteLocal(formData, 'removeInterest'); if (result.status === 'success') revalidateProfile(); return result }
   if (!isSupabaseConfigured()) return UNAVAILABLE
 
   const parsed = interestIdSchema.safeParse({

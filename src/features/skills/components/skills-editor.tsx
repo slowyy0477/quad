@@ -136,7 +136,7 @@ function AddSkillForm({ catalogue }: { catalogue: SkillOption[] }) {
         <Field
           id="skill-add"
           label="Add a skill"
-          hint="The list holds skills other students have claimed too, most used first. Levels are self-declared — Quad does not test them."
+          hint="The list holds skills other students have claimed too, most used first. Levels are self-declared — Bulla does not test them."
           error={attachState.fieldErrors?.skillId}
         >
           {(field) => (

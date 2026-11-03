@@ -8,7 +8,7 @@ import { EventFilters } from '@/features/events/components/event-filters'
 import { EventLenses } from '@/features/events/components/event-lenses'
 import { EventRow } from '@/features/events/components/event-row'
 import { listEvents, type EventPage } from '@/features/events/queries'
-import { isSupabaseConfigured } from '@/lib/env'
+import { isDataConfigured } from '@/lib/env'
 import { getUser } from '@/lib/supabase/server'
 
 export const metadata: Metadata = { title: 'Events' }
@@ -31,7 +31,7 @@ function first(value: string | string[] | undefined): string | undefined {
  * pages still exist for anyone holding the link, saying plainly that they were cancelled.
  */
 export default async function EventsPage({ searchParams }: { searchParams: Promise<SearchParams> }) {
-  if (!isSupabaseConfigured()) {
+  if (!isDataConfigured()) {
     return (
       <div className="mx-auto w-full max-w-2xl px-4 py-12">
         <h1 className="text-2xl">Events</h1>
@@ -60,8 +60,9 @@ export default async function EventsPage({ searchParams }: { searchParams: Promi
   const filtered = Boolean(type || mode)
 
   return (
-    <div className="mx-auto w-full max-w-4xl px-4 py-8 sm:px-6">
+    <div className="page-enter mx-auto w-full max-w-4xl px-4 py-8 sm:px-6">
       <SectionHeading
+        level={1}
         title="Events"
         description="Workshops, hackathons, talks and study groups on campus and online. Times are shown in each event's own zone."
         action={

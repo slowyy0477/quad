@@ -2,6 +2,7 @@ import Link from 'next/link'
 import { formatDistanceToNowStrict } from 'date-fns'
 import { Ban, BellOff, LogOut } from 'lucide-react'
 import { Avatar } from '@/components/ui/avatar'
+import { Alert } from '@/components/ui/alert'
 import { Badge } from '@/components/ui/badge'
 import { EndOfList, LoadMore } from '@/components/ui/pagination'
 import { EmptyState } from '@/components/ui/surface'
@@ -10,6 +11,7 @@ import { describeParticipants } from '@/features/messages/thread-plan'
 import type { ConversationSummary } from '@/features/messages/types'
 import { ConversationActions } from './conversation-actions'
 import { NewConversationForm } from './new-conversation'
+import { MessageReadRetry } from './message-read-retry'
 
 /**
  * The conversation list, and the panel around it.
@@ -33,32 +35,42 @@ export function ConversationList({
   conversations,
   selectedId,
   loadMoreHref,
+  startUsername,
+  startOpen = false,
+  error,
 }: {
   conversations: ConversationSummary[]
   selectedId: string | null
   loadMoreHref: string | null
+  startUsername?: string
+  startOpen?: boolean
+  error?: string | null
 }) {
   return (
     <div className="flex min-h-0 flex-col">
       <div className="border-b border-hairline px-3 py-3">
         <h2 className="font-display text-lg text-ink">Conversations</h2>
-        <details className="mt-2">
+        <details key={startUsername ?? 'new-message'} className="mt-2" open={startOpen || undefined}>
           <summary className="cursor-pointer rounded text-sm text-ink-muted hover:text-ink">
             New message
           </summary>
           <div className="mt-3">
-            <NewConversationForm />
+            <NewConversationForm defaultUsername={startUsername} />
           </div>
         </details>
       </div>
 
-      {conversations.length === 0 ? (
+      {error ? (
+        <div className="space-y-2 p-3">
+          <Alert tone="danger">{error}</Alert>
+          <MessageReadRetry label="Retry conversations" />
+        </div>
+      ) : conversations.length === 0 ? (
         <div className="p-3">
-          <EmptyState title="No conversations yet">
+          <EmptyState title="No conversations to show">
             <p>
-              A conversation starts from someone&rsquo;s profile or from the handle above. There is
-              nothing to show here until one does — no sample threads, and no messages from people
-              you have not spoken to.
+              Readable conversations appear here. Start one from someone&rsquo;s profile or from
+              the handle above.
             </p>
           </EmptyState>
         </div>
@@ -195,6 +207,7 @@ function ConversationRow({
           conversationId={conversation.id}
           isMuted={conversation.is_muted}
           unreadCount={conversation.unread_count}
+          left={conversation.left}
         />
       </div>
     </>

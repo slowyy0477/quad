@@ -1,6 +1,10 @@
 'use server'
 
 import { revalidatePath } from 'next/cache'
+import { isLocalMode } from '@/lib/mode'
+import { localFormWrite } from '@/lib/local/write-result'
+import { reportLocal, decisionLocal } from './local'
+import { universityReviewLocal } from '@/features/universities/local'
 import {
   action,
   ActionError,
@@ -51,6 +55,8 @@ const TARGET_TABLE: Record<ReportInput['kind'], string> = {
   idea: 'ideas',
   message: 'messages',
   profile: 'profiles',
+  event: 'events',
+  opportunity: 'opportunities',
 }
 
 /**
@@ -118,6 +124,7 @@ export async function submitReportAction(
   _previous: ReportFormState,
   formData: FormData,
 ): Promise<ReportFormState> {
+  if (isLocalMode()) { const result = await localFormWrite(() => reportLocal(formData), formData); if (result.status === 'success') revalidatePath('/admin'); return result }
   const result = await fileReport(formInput(formData))
   return toFormState(
     result,
@@ -200,6 +207,7 @@ export async function decideReportAction(
   _previous: ModerationFormState,
   formData: FormData,
 ): Promise<ModerationFormState> {
+  if (isLocalMode()) { const result = await localFormWrite(() => decisionLocal(formData), formData); if (result.status === 'success') { revalidatePath('/admin'); revalidatePath('/admin/audit'); revalidatePath('/feed'); revalidatePath('/projects'); revalidatePath('/ideas'); revalidatePath('/messages'); revalidatePath('/events'); revalidatePath('/opportunities') }; return result }
   const result = await decideReport(formInput(formData))
   return toFormState(result, 'Done.', formData)
 }
@@ -244,6 +252,7 @@ export async function reviewUniversityAction(
   _previous: UniversityReviewFormState,
   formData: FormData,
 ): Promise<UniversityReviewFormState> {
+  if (isLocalMode()) { const result = await localFormWrite(() => universityReviewLocal(formData), formData); if (result.status === 'success') { revalidatePath('/admin/universities'); revalidatePath('/admin/audit'); revalidatePath('/universities') }; return result }
   const result = await reviewUniversity(formInput(formData))
   return toFormState(result, 'Done.', formData)
 }

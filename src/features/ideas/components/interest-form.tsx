@@ -35,7 +35,7 @@ export function InterestForm({
     return (
       <div className="space-y-3">
         <Alert tone="success" title="Your offer is with the author">
-          {interestState.message ?? 'They can read it, and you will be invited if the idea becomes a project.'}
+          {interestState.message ?? 'They can read your offer. If the idea becomes a project, eligible participants may receive an invitation; joining is always your choice.'}
         </Alert>
 
         {ownInterest?.message || ownInterest?.offering ? (

@@ -1,239 +1,70 @@
 import Link from 'next/link'
-import {
-  ArrowRight,
-  CalendarDays,
-  FolderGit2,
-  GraduationCap,
-  Lightbulb,
-  MessagesSquare,
-  Target,
-  Users,
-} from 'lucide-react'
+import { ArrowRight, ArrowUpRight, Compass, FolderKanban, Target } from 'lucide-react'
 import { Alert } from '@/components/ui/alert'
 import { Button } from '@/components/ui/button'
-import { isSupabaseConfigured } from '@/lib/env'
+import { CampusArtwork } from '@/components/ui/campus-artwork'
+import { isDataConfigured } from '@/lib/env'
+import { isLocalMode } from '@/lib/mode'
 import { getUser } from '@/lib/supabase/server'
 
-/**
- * Landing page.
- *
- * Deliberately makes no claims it cannot back. No "10,000 students", no "trusted
- * by", no counter animating up from zero -- there is no one on this platform yet
- * and inventing a number would be the most straightforwardly dishonest thing on
- * the page. What it does instead is describe what the thing is for, and link to a
- * build-status page that says which parts actually work.
- *
- * Layout is a broadsheet: a wide measure for the lead, a rule under the masthead,
- * a three-column grid of departments below. Not a hero image with a gradient.
- */
-const sections = [
-  {
-    icon: GraduationCap,
-    title: 'A profile that says something',
-    body: 'University, department, programme, semester. Skills you declare, projects you have actually shipped, and what you are studying right now — instead of a job title you do not have yet.',
-  },
-  {
-    icon: FolderGit2,
-    title: 'Projects, not just posts',
-    body: 'Publish coursework, side projects and research with a real write-up, links, and the people who worked on it. Mark a project as looking for collaborators and let people apply.',
-  },
-  {
-    icon: Lightbulb,
-    title: 'Ideas before they are projects',
-    body: 'Post a half-formed idea, see who is interested, and convert it into a project with its collaborators attached when it stops being hypothetical.',
-  },
-  {
-    icon: Users,
-    title: 'People at your university',
-    body: 'Connections, follows, and a feed that knows the difference between your course, your university, and everyone. Search by skill, department or programme.',
-  },
-  {
-    icon: MessagesSquare,
-    title: 'Conversations that stay private',
-    body: 'Direct and group messages. Private means private: message access is enforced in the database, not by hiding a button.',
-  },
-  {
-    icon: Target,
-    title: 'Learning you can see',
-    body: 'Semester goals, a daily study log, and a streak that counts days you actually logged. Progress you set yourself, measured against what you said you would do.',
-  },
-  {
-    icon: CalendarDays,
-    title: 'Opportunities and events',
-    body: 'Internships, scholarships, competitions, hackathons and society events, posted by students and staff at your university rather than scraped from somewhere else.',
-  },
-]
+const destinations = [
+  { href: '/search', title: 'Find your people', Icon: Compass },
+  { href: '/projects', title: 'Build something together', Icon: FolderKanban },
+  { href: '/goals', title: 'Make room to learn', Icon: Target },
+] as const
 
+/** Describe the real product without invented members, metrics or security promises. */
 export default async function HomePage() {
-  const configured = isSupabaseConfigured()
+  const local = isLocalMode()
+  const configured = isDataConfigured()
   const user = configured ? await getUser() : null
-
   return (
-    <div className="mx-auto w-full max-w-6xl px-4 sm:px-6">
-      {!configured ? (
-        <div className="pt-6">
-          <Alert tone="warning" title="This deployment has no database connected">
-            <p>
-              You are seeing the interface, not a working platform. Sign-in, profiles, posts and
-              messages need Supabase credentials before they do anything.{' '}
-              <Link href="/setup">See what is missing and how to set it up</Link>.
-            </p>
-          </Alert>
-        </div>
-      ) : null}
-
-      {/* ------------------------------------------------------------------ */}
-      {/* Lead                                                                */}
-      {/* ------------------------------------------------------------------ */}
-      <section className="border-b border-rule py-14 sm:py-20">
-        <div className="grid gap-10 lg:grid-cols-[minmax(0,1.35fr)_minmax(0,1fr)] lg:gap-16">
-          <div>
-            <p className="font-sans text-2xs font-semibold tracking-[0.14em] text-accent-700 uppercase">
-              For university students
-            </p>
-
-            <h1 className="mt-4 text-4xl text-balance sm:text-5xl">
-              Your degree is more than a transcript.
-            </h1>
-
-            <p className="mt-5 max-w-2xl text-lg text-ink-muted">
-              Quad is a network built around what students actually do: study something specific,
-              build things, work with people, and get slowly better at a craft. One profile that
-              holds all of it — and a community from your own university attached to it.
-            </p>
-
-            <div className="mt-8 flex flex-col gap-3 sm:flex-row sm:items-center">
-              {user ? (
-                <Button asChild variant="primary" size="lg">
-                  <Link href="/feed">
-                    Go to your feed
-                    <ArrowRight aria-hidden="true" />
-                  </Link>
-                </Button>
-              ) : (
-                <>
-                  <Button asChild variant="primary" size="lg" className="w-full sm:w-auto">
-                    <Link href="/signup">Create your profile</Link>
-                  </Button>
-                  <Button asChild variant="secondary" size="lg" className="w-full sm:w-auto">
-                    <Link href="/login">Sign in</Link>
-                  </Button>
-                </>
-              )}
-            </div>
-
-            <p className="mt-4 text-sm text-ink-faint">
-              Free while in development. No adverts in private messages, ever.
-            </p>
+    <div className="page-enter mx-auto w-full max-w-7xl px-4 sm:px-6">
+      {!configured ? <Alert tone="warning" title="Account service is not connected" className="mt-6"><p>Accounts and student content are unavailable on this deployment. <Link href="/setup">View configuration steps</Link>.</p></Alert> : null}
+      <section className="landing-hero">
+        <div className="min-w-0">
+          <p className="commons-note">The campus commons, online</p>
+          <h1 className="landing-title mt-6">Your campus.<br /><span className="text-accent-700">A little closer.</span></h1>
+          <p className="mt-6 max-w-md text-lg text-ink-muted">Meet people who get your ideas. Make something together. Keep a little space for what you want to learn.</p>
+          <div className="mt-8 flex flex-col gap-3 sm:flex-row">
+            {user ? <Button asChild variant="primary" size="lg"><Link href="/feed">Back to your feed<ArrowRight aria-hidden="true" /></Link></Button> : <>
+              <Button asChild variant="primary" size="lg"><Link href="/signup">Find your place<ArrowRight aria-hidden="true" /></Link></Button>
+              <Button asChild variant="secondary" size="lg"><Link href="/login">Sign in</Link></Button>
+            </>}
           </div>
-
-          {/* A statement of intent rather than a screenshot of invented data. */}
-          <aside className="lg:border-l lg:border-hairline lg:pl-10">
-            <h2 className="font-sans text-2xs font-semibold tracking-[0.14em] text-ink-faint uppercase">
-              What this is not
-            </h2>
-            <ul className="mt-4 space-y-4 text-sm text-ink-muted">
-              <li>
-                <span className="font-medium text-ink">Not a job board.</span> Nobody is asking you
-                for eight years of experience. Skill levels here are what you say they are, and the
-                interface says so.
-              </li>
-              <li>
-                <span className="font-medium text-ink">Not an engagement machine.</span> No infinite
-                doomscroll, no notification invented to pull you back, no metric that rewards
-                posting for its own sake.
-              </li>
-              <li>
-                <span className="font-medium text-ink">Not finished.</span> Quad is being built in
-                the open, and the{' '}
-                <Link href="/status" className="text-accent-700 underline underline-offset-2">
-                  status page
-                </Link>{' '}
-                lists every feature and whether it works yet.
-              </li>
-            </ul>
-          </aside>
+          <p className="mt-5 max-w-lg text-xs text-ink-muted">{local ? 'Private preview · your data stays on this computer.' : 'An independent student community, in development.'}</p>
+        </div>
+        <aside className="campus-canvas" aria-labelledby="workspace-map-heading">
+          <div className="flex items-center justify-between gap-4">
+            <h2 id="workspace-map-heading" className="text-base">A campus. More possibilities.</h2>
+            <span className="text-xs text-ink-faint">Bulla</span>
+          </div>
+          <CampusArtwork className="my-4" />
+          <nav aria-label="Explore Bulla">
+            {destinations.map(({ href, title, Icon }) => <Link key={href} href={href} className="campus-destination">
+              <Icon className="size-[1.125rem] shrink-0 text-accent-700" aria-hidden="true" />
+              <span className="min-w-0 flex-1">{title}</span>
+              <ArrowUpRight className="size-4 shrink-0" aria-hidden="true" />
+            </Link>)}
+          </nav>
+        </aside>
+      </section>
+      <section className="py-8 sm:py-12" aria-labelledby="student-life-heading">
+        <div className="mb-8"><p className="eyebrow">Outside the timetable</p><h2 id="student-life-heading" className="mt-3 text-3xl">People. Projects. A little progress.</h2></div>
+        <div className="grid gap-7 md:grid-cols-3">
+          {[
+            ['01', 'An idea doesn’t need to start big.', 'Share the thing you’re working on. Say what you need help with. Find someone who wants to figure it out with you.', '/projects', 'Find a project'],
+            ['02', 'Progress is easier to see when you keep it.', 'Set a learning goal and write a small study log. Come back to what you’ve done, not just what’s still on your list.', '/goals', 'Make a learning goal'],
+            ['03', 'Campus life isn’t all in one group chat.', 'Look for student events and opportunities. Meet people through the things you care about, and take the next conversation from there.', '/events', 'Look around campus'],
+          ].map(([number, title, body, href, label]) => <article key={number} className="home-feature">
+            <span aria-hidden="true" className="inline-block w-6 font-mono text-xs whitespace-nowrap text-accent-700">{number}</span><div className="mt-3 min-w-0"><h3 className="text-xl">{title}</h3><p className="mt-3 text-sm text-ink-muted">{body}</p><Link href={href} className="mt-3 inline-flex min-h-11 items-center gap-2 text-sm font-semibold text-accent-700">{label}<ArrowRight className="size-4" aria-hidden="true" /></Link></div>
+          </article>)}
         </div>
       </section>
-
-      {/* ------------------------------------------------------------------ */}
-      {/* Departments                                                         */}
-      {/* ------------------------------------------------------------------ */}
-      <section className="py-14 sm:py-16">
-        <div className="flex flex-wrap items-baseline justify-between gap-3">
-          <h2 className="text-2xl">What is inside</h2>
-          <p className="text-2xs uppercase tracking-[0.14em] text-ink-faint">In active development</p>
-        </div>
-
-        <div className="mt-8 grid gap-x-10 gap-y-8 sm:grid-cols-2 lg:grid-cols-3">
-          {sections.map(({ icon: Icon, title, body }) => (
-            <article key={title} className="border-t border-hairline pt-4">
-              <div className="flex items-center gap-2">
-                <Icon className="size-4 shrink-0 text-accent-600" aria-hidden="true" />
-                <h3 className="text-lg">{title}</h3>
-              </div>
-              <p className="mt-1.5 text-sm text-ink-muted">{body}</p>
-            </article>
-          ))}
-        </div>
+      <section className="mb-12 flex flex-col items-start justify-between gap-6 border-y border-rule py-8 sm:mb-16 sm:flex-row sm:items-center sm:py-10">
+        <div><h2 className="text-2xl">Start with yourself.</h2><p className="mt-3 max-w-lg text-sm text-ink-muted">A name, your university, a few interests. The rest can grow from there.</p></div>
+        <Button asChild variant={user ? 'secondary' : 'primary'} size="lg" className="w-full shrink-0 sm:w-auto"><Link href={user ? '/me' : '/signup'}>{user ? 'Your profile' : 'Join Bulla'}<ArrowRight aria-hidden="true" /></Link></Button>
       </section>
-
-      {/* ------------------------------------------------------------------ */}
-      {/* Privacy — the part students actually ask about                      */}
-      {/* ------------------------------------------------------------------ */}
-      <section className="border-t border-rule py-14 sm:py-16">
-        <div className="grid gap-10 lg:grid-cols-[minmax(0,1fr)_minmax(0,1.1fr)] lg:gap-16">
-          <div>
-            <h2 className="text-2xl">Privacy that is enforced, not promised</h2>
-            <p className="mt-4 text-ink-muted">
-              Every profile, post, project and message on Quad has a visibility setting, and every
-              one of them is checked inside the database by row-level security. Hiding a button is
-              not a permission model: if you are not allowed to read a row, the query returns
-              nothing, whether it came from this website or from anywhere else.
-            </p>
-            <p className="mt-4 text-ink-muted">
-              There are 52 tables and every one of them has policies. The rules are covered by an
-              automated test suite that signs in as each kind of user and checks what they can and
-              cannot reach.
-            </p>
-          </div>
-
-          <dl className="grid gap-6 sm:grid-cols-2">
-            {[
-              ['Public', 'Anyone, including people who are not signed in.'],
-              ['University', 'Only students verified at the same university as you.'],
-              ['Connections', 'Only people whose connection request you accepted.'],
-              ['Private', 'Only you.'],
-            ].map(([term, definition]) => (
-              <div key={term} className="border-t border-hairline pt-3">
-                <dt className="font-display text-base font-semibold text-ink">{term}</dt>
-                <dd className="mt-1 text-sm text-ink-muted">{definition}</dd>
-              </div>
-            ))}
-          </dl>
-        </div>
-      </section>
-
-      {/* ------------------------------------------------------------------ */}
-      {/* Close                                                               */}
-      {/* ------------------------------------------------------------------ */}
-      {!user ? (
-        <section className="border-t border-rule py-14 text-center sm:py-16">
-          <h2 className="text-2xl">Start with a profile</h2>
-          <p className="mx-auto mt-3 max-w-xl text-ink-muted">
-            Takes a minute. Add your university, pick a handle, and put one project on it — you can
-            fill in the rest as the semester goes.
-          </p>
-          <div className="mt-7 flex justify-center">
-            <Button asChild variant="primary" size="lg">
-              <Link href="/signup">
-                Create your profile
-                <ArrowRight aria-hidden="true" />
-              </Link>
-            </Button>
-          </div>
-        </section>
-      ) : null}
     </div>
   )
 }

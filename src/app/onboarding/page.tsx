@@ -5,7 +5,7 @@ import { Alert } from '@/components/ui/alert'
 import { Surface } from '@/components/ui/surface'
 import { OnboardingForm } from '@/features/profiles/components/onboarding-form'
 import { getMyProfile, listUniversities } from '@/features/profiles/queries'
-import { isSupabaseConfigured } from '@/lib/env'
+import { isDataConfigured } from '@/lib/env'
 import { getUser } from '@/lib/supabase/server'
 
 export const metadata: Metadata = { title: 'Set up your profile' }
@@ -22,7 +22,7 @@ export const metadata: Metadata = { title: 'Set up your profile' }
  * edit page is where changes belong.
  */
 export default async function OnboardingPage() {
-  if (!isSupabaseConfigured()) {
+  if (!isDataConfigured()) {
     return (
       <div className="mx-auto w-full max-w-md px-4 py-12">
         <h1 className="text-3xl">Set up your profile</h1>
@@ -40,6 +40,17 @@ export default async function OnboardingPage() {
   if (!user) redirect('/login?next=/onboarding')
 
   const result = await getMyProfile()
+  if (result.state === 'signed-out') redirect('/login?next=/onboarding')
+  if (result.state === 'error') {
+    return (
+      <div className="mx-auto w-full max-w-lg px-4 py-12">
+        <h1 className="text-3xl">Set up your profile</h1>
+        <Alert tone="danger" title="Your profile could not be loaded" className="mt-6">
+          {result.message} Your existing details have not been changed.
+        </Alert>
+      </div>
+    )
+  }
 
   if (result.state === 'missing') {
     return (
@@ -91,7 +102,8 @@ export default async function OnboardingPage() {
       <h1 className="mt-2 text-3xl">Set up your profile</h1>
       <p className="mt-2 max-w-prose text-ink-muted">
         Your account exists. This is the part that makes it yours — a handle people can find you by,
-        and as much or as little else as you want to say.
+        and as much or as little else as you want to say. Choose who can see your profile before
+        finishing; keeping it private is an option.
       </p>
 
       <Surface className="mt-6 p-5 sm:p-6">

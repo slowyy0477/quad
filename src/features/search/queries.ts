@@ -3,6 +3,7 @@ import 'server-only'
 import { decodeCursor, type Cursor } from '@/lib/cursor'
 import { readStore, type LocalIdea, type LocalProfile, type Tables } from '@/lib/local/db'
 import { isLocalMode } from '@/lib/mode'
+import { canReadContent, localActor } from '@/lib/local/access'
 import { createClient, getUser } from '@/lib/supabase/server'
 import { localCanViewPost } from '@/features/feed/queries'
 import { canViewEvent, localEventSlug } from '@/features/events/queries'
@@ -14,39 +15,22 @@ import {
   type ProfileSummary,
 } from '@/features/profiles/queries'
 import { canSeeProject, type ProjectListItem } from '@/features/projects/queries'
+import { discoverPeople, type DiscoveryPerson } from './people'
+import { PEOPLE_QUERY_MAX, type PeopleFilters } from './filters'
+import { boundedPageSize } from './paging'
 
 /**
  * Search reads.
  *
- * There is one call here — `public.search_all` — and it is a Postgres function
- * rather than a chain of PostgREST filters, because a relevance question cannot be
- * expressed as one. PostgREST can filter a table by a column and order by a column;
- * it cannot order by `similarity(column, $query)`, and it cannot ask six tables in
- * one round trip.
+ * People delegate to `discoverPeople`: forward 0028 provides literal filters,
+ * recency keysets and readable lookahead without profile counts. The local
+ * adapter uses the same public contract and ordinary profile access predicates.
  *
- * The migration behind it (0019_search.sql) is where the interesting decisions are
- * written down: which columns are searched and which indexes serve them, why the
- * score is trigram similarity and nothing else, and why the function is
- * `security invoker`. This module's job is to hand it a query and shape the answer.
- *
- * **There is no visibility filter in the Supabase path**, and that is the same
- * decision the feed and project modules make. The function runs as the reader, so
- * row-level security filters every row inside Postgres: a private project is
- * invisible to a non-member, a blocked reader sees nothing from the blocker or the
- * blocked, a `university`-scoped profile is invisible across institutions, and a
- * profile with `searchable = false` is not in the index of the findable. Repeating
- * any of that here would create a second copy of the rule that an attacker can skip
- * by calling PostgREST directly, and the copy that matters is the one they cannot.
- *
- * LOCAL MODE
- * ----------
- * `NEXT_PUBLIC_DATA_MODE=local` selects `localSearchAll`, at the bottom of this
- * file: there is no Postgres to hold `public.search_all`, so the function is written
- * out in TypeScript over `data/local.json`. With no policy to lean on, that path
- * *has* to apply visibility itself — and it does it by calling the owning feature's
- * exported predicate (projects, feed, ideas, opportunities, events, profiles) rather
- * than by keeping a sixth copy of each rule here. The Supabase body above is
- * untouched and is still what the deployment runs.
+ * Other kinds retain `public.search_all` (0019): relevance ranking, its existing
+ * boundary semantics and visible content counts. Hosted reads execute under the
+ * caller's RLS. Local content search delegates permissions to the owning feature
+ * predicates, but its prefix/substring ranking is not Postgres fuzzy ranking.
+ * Those legacy content-search differences do not describe people discovery.
  */
 
 /** The six kinds, in the order the tabs appear. Singular, and used in the URL. */
@@ -131,6 +115,11 @@ export function kindSpec(kind: SearchKind): SearchKindSpec {
  */
 export function parseKind(value: string | string[] | undefined): SearchKind {
   const raw = Array.isArray(value) ? value[0] : value
+  const types: Record<string, SearchKind> = {
+    people: 'person', projects: 'project', posts: 'post', ideas: 'idea',
+    opportunities: 'opportunity', events: 'event',
+  }
+  if (raw && Object.hasOwn(types, raw)) return types[raw]
   return SEARCH_KINDS.includes(raw as SearchKind) ? (raw as SearchKind) : DEFAULT_KIND
 }
 
@@ -152,11 +141,11 @@ export function parseQuery(value: string | string[] | undefined): string {
  * a post has counts and no slug, and the components that draw them take the
  * narrowed type rather than the union.
  *
- * Every field here is a column the function returned, which in turn is a stored
- * column. Nothing is derived, estimated or counted in the browser.
+ * The query layer supplies every field. Nothing is estimated in the browser;
+ * people never carry content/learning totals or inferred activity.
  */
 export type SearchResult =
-  | { kind: 'person'; id: string; created_at: string; person: ProfileSummary }
+  | { kind: 'person'; id: string; created_at: string; person: ProfileSummary | DiscoveryPerson }
   | { kind: 'project'; id: string; created_at: string; project: ProjectListItem }
   | { kind: 'post'; id: string; created_at: string; post: SearchPost }
   | { kind: 'idea'; id: string; created_at: string; idea: SearchIdea }
@@ -215,14 +204,14 @@ export type SearchResultsPage = {
   /** `null` when the request failed. An empty array is a real empty result. */
   results: SearchResult[] | null
   /**
-   * The exact number of visible matches, from `count(*)` inside the function.
+   * Legacy content search's visible count. People discovery never requests counts.
    *
-   * `null` means "not known", and it has one cause: a page fetched with a cursor
-   * that came back empty, where there is no row to carry the count. The page then
-   * renders "that is everything" rather than inventing a zero.
+   * `null` means no count is supplied: always for people, or for an empty legacy
+   * content page with a cursor and no row to carry its visible count.
    */
   total: number | null
-  nextCursor: Cursor | null
+  /** People use a filter-bound token; legacy content search uses its existing tuple. */
+  nextCursor: Cursor | string | null
   error: string | null
 }
 
@@ -395,7 +384,8 @@ function toResult(row: SearchRow): SearchResult | null {
 }
 
 /**
- * One page of one kind of result.
+ * One page of one kind of result. People use the filter-bound, count-free
+ * discovery API; the remaining description applies only to legacy content.
  *
  * The cursor is `(created_at, id)` — the shape `src/lib/cursor.ts` encodes — and
  * only its `id` is sent to the function. The third part of the sort key, the
@@ -419,12 +409,34 @@ export async function searchAll({
   kind = DEFAULT_KIND,
   cursor,
   limit = PAGE_SIZE,
+  universityId,
+  department,
+  skill,
 }: {
   query: string
   kind?: SearchKind
   cursor?: string | string[] | undefined
   limit?: number
+  universityId?: PeopleFilters['universityId']
+  department?: string
+  skill?: string
 }): Promise<SearchResultsPage> {
+  if (kind === 'person') {
+    const page = await discoverPeople({ query, universityId, department, skill, cursor, limit })
+    return {
+      results: page.people?.map((person) => ({
+        kind: 'person', id: person.id, created_at: person.created_at, person,
+      })) ?? null,
+      total: null,
+      nextCursor: page.nextCursor,
+      error: page.error,
+    }
+  }
+  query = query.trim()
+  limit = boundedPageSize(limit)
+  if (query.length > PEOPLE_QUERY_MAX) {
+    return { results: null, total: null, nextCursor: null, error: 'Use a search term of 120 characters or fewer.' }
+  }
   const decoded = decodeCursor(firstParam(cursor))
 
   // Checked here as well as in the function, so that a one-character search costs
@@ -445,9 +457,8 @@ export async function searchAll({
   })
 
   if (error) {
-    // Logged in full, reported as a sentence: a PostgREST error message names
-    // tables, columns and sometimes constraint text, which is a free schema map.
-    console.error('[search:searchAll]', error.code, error.message)
+    // Keep database messages/constraint details out of logs and public errors.
+    console.error('[search:searchAll]', error.code)
     return {
       results: null,
       total: null,
@@ -485,10 +496,9 @@ export async function searchAll({
 // Local mode
 // =============================================================================
 //
-// `public.search_all` transcribed over `data/local.json`. The branches, the
-// filters, the ordering and the count are the function's; the visibility each
-// branch would get from RLS is asked of the feature that owns the row, so a
-// private project stays private by the same code that hides it everywhere else.
+// Legacy content search over the local store. People bypass this path entirely.
+// Access is delegated to the feature that owns the row; the following ranking
+// and content-count differences concern the retained 0019 contract only.
 //
 // WHAT IS GENUINELY DIFFERENT
 // ---------------------------
@@ -658,49 +668,18 @@ function isBelowBoundary(candidate: LocalMatch, boundary: LocalMatch): boolean {
 }
 
 /**
- * `ideas_select` / `app.can_view_idea`, in TypeScript.
- *
- * This is the body of `canSeeIdea` in `features/ideas/queries`, which is
- * module-private. The order matters and is the policy's: `deleted_at` first, then
- * the author (who is admitted regardless of visibility), then the switch.
- *
- * `connections` collapses to "author only": the local store has no connections
- * table, so nobody is connected to anybody, and broadening it to "everyone" would
- * publish ideas their authors wrote for a smaller audience.
+ * Delegate to the local content contract, including blocks, accepted
+ * connections, moderation and account state.
  */
 function localCanSeeIdea(db: Tables, idea: LocalIdea, reader: LocalProfile | null): boolean {
-  if (idea.deleted_at) return false
-  if (reader && idea.author_id === reader.id) return true
-
-  switch (idea.visibility) {
-    case 'public':
-      return true
-    case 'university': {
-      const author = db.profiles.find((profile) => profile.id === idea.author_id)
-      return Boolean(
-        reader?.university_id && author?.university_id && author.university_id === reader.university_id,
-      )
-    }
-    case 'connections':
-    case 'private':
-    default:
-      return false
-  }
+  return canReadContent(db, idea, idea.author_id, reader, 'idea')
 }
 
 /**
  * One branch per kind, exactly the six `union all` branches of the function.
  *
- * Each starts with the two filters the migration applies to every reader,
- * `deleted_at is null` and `moderation_status = 'active'`, because those are not
- * access-control questions — the policies deliberately leave a hidden row readable
- * so a moderator can review it, and search is not the moderation queue. Where the
- * store has no such column there is nothing to check: `moderation_status` exists on
- * posts only, and profiles have neither.
- *
- * The visibility call after it is the branch's RLS, delegated to the feature that
- * owns the predicate. `blocks` is absent for the same reason `connections` is:
- * neither table exists locally, so nobody is blocked and nobody is connected.
+ * This is ordinary search, not a moderation queue. Owning predicates include
+ * local moderation/account state and the current block/connection tables.
  */
 function localMatches(
   db: Tables,
@@ -780,7 +759,7 @@ function localMatches(
         if (post.moderation_status !== 'active') continue
 
         const author = profileOf(post.author_id)
-        if (!localCanViewPost(post, reader, author)) continue
+        if (!localCanViewPost(post, reader, author, db)) continue
 
         const tier = matchTier([post.body], needle)
         if (tier === null) continue
@@ -989,7 +968,7 @@ async function localSearchAll({
   // it has something in it.
   const user = await getUser()
   const db = await readStore()
-  const reader = user ? (db.profiles.find((profile) => profile.user_id === user.id) ?? null) : null
+  const reader = localActor(db, user?.id ?? null)
   const viewer = localViewer(db, user?.id ?? null)
 
   const decoded = decodeLocalCursor(cursor)
@@ -1000,9 +979,7 @@ async function localSearchAll({
   const boundary = decoded ? matches.find((match) => match.row.id === decoded.id) : undefined
   const page = (boundary ? matches.filter((match) => isBelowBoundary(match, boundary)) : matches).slice(
     0,
-    // The function clamps to 1..50; a caller asking for more gets 50 rows and, as in
-    // the Supabase path, no next cursor, because the page it got is shorter than the
-    // limit it asked for.
+    // Defense in depth; searchAll has already clamped the requested page size.
     Math.min(Math.max(limit, 1), MAX_PAGE_SIZE),
   )
 

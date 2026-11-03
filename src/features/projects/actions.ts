@@ -11,6 +11,9 @@ import {
 } from '@/lib/form-state'
 import { createClient, getUser } from '@/lib/supabase/server'
 import { isLocalMode } from '@/lib/mode'
+import { localFormWrite } from '@/lib/local/write-result'
+import { projectParticipationLocal } from './local'
+import { canReadContent, localActor, validLocalId, blockedPair } from '@/lib/local/access'
 import { id, mutate, now, type LocalProject, type Tables } from '@/lib/local/db'
 import { canManageProject, clampVisibility } from '@/features/projects/queries'
 import {
@@ -67,22 +70,6 @@ const NOT_FOUND: FormState = {
   message: 'That project could not be found, or it is not one you can change.',
 }
 
-/**
- * The local store has no `project_stars`, `project_applications` or
- * `project_invites` table. Those actions answer with one of these rather than
- * reporting success for a row nothing wrote.
- */
-const NO_STARS: FormState = {
-  status: 'error',
-  message:
-    'Stars are not stored in local mode yet — the local store has no project_stars table. Nothing was saved.',
-}
-
-const NO_APPLICATIONS: FormState = {
-  status: 'error',
-  message:
-    'Join requests are not stored in local mode yet — the local store has no project_applications table. Nothing was saved.',
-}
 
 /** The columns a create and an edit both write, in the shape Postgres wants. */
 function projectRow(data: {
@@ -150,7 +137,7 @@ export async function createProjectAction(
     return { status: 'error', fieldErrors: fieldErrorsOf(parsed.error), values: echoValues(formData) }
   }
 
-  if (isLocalMode()) return createProjectLocal(user.id, parsed.data, formData)
+  if (isLocalMode()) return localFormWrite(() => createProjectLocal(user.id, parsed.data, formData), formData)
 
   const supabase = await createClient()
   const { data, error } = await supabase
@@ -204,7 +191,7 @@ export async function updateProjectAction(
     return { status: 'error', fieldErrors: fieldErrorsOf(parsed.error), values: echoValues(formData) }
   }
 
-  if (isLocalMode()) return updateProjectLocal(user.id, slug, parsed.data, formData)
+  if (isLocalMode()) return localFormWrite(() => updateProjectLocal(user.id, slug, parsed.data, formData), formData)
 
   const supabase = await createClient()
   const { data, error } = await supabase
@@ -258,7 +245,7 @@ export async function deleteProjectAction(
   const user = await getUser()
   if (!user) redirect('/login')
 
-  if (isLocalMode()) return deleteProjectLocal(user.id, slug)
+  if (isLocalMode()) return localFormWrite(() => deleteProjectLocal(user.id, slug))
 
   const supabase = await createClient()
   const { data, error } = await supabase
@@ -309,7 +296,7 @@ export async function toggleStarAction(
   // No `project_stars` table in the local store: a star has nowhere to go, and
   // `hasStarred` always answers false, so the button would flip back on the next
   // render even if this reported success.
-  if (isLocalMode()) return NO_STARS
+  if (isLocalMode()) { const result = await localFormWrite(() => projectParticipationLocal(formData, 'star'), formData); if (result.status === 'success') { revalidatePath('/projects'); revalidatePath(`/projects/${slug}`) }; return result }
 
   const supabase = await createClient()
 
@@ -369,10 +356,9 @@ export async function requestToJoinAction(
     return { status: 'error', fieldErrors: fieldErrorsOf(parsed.error) }
   }
 
-  // No `project_applications` table in the local store, so the request cannot be
-  // recorded. Refusing is the only honest answer: a success message would send the
-  // applicant away believing the owners could see a note that does not exist.
-  if (isLocalMode()) return NO_APPLICATIONS
+  // The local transaction persists the application with its verified applicant
+  // and applies the same project access and participation checks.
+  if (isLocalMode()) { const result = await localFormWrite(() => projectParticipationLocal(formData, 'apply'), formData); if (result.status === 'success') revalidatePath(`/projects/${slug}`); return result }
 
   const supabase = await createClient()
   const { error } = await supabase.from('project_applications').insert({
@@ -404,7 +390,7 @@ export async function withdrawApplicationAction(
   const user = await getUser()
   if (!user) redirect(`/login?next=/projects/${slug}`)
 
-  if (isLocalMode()) return NO_APPLICATIONS
+  if (isLocalMode()) { const result = await localFormWrite(() => projectParticipationLocal(formData, 'withdraw'), formData); if (result.status === 'success') revalidatePath(`/projects/${slug}`); return result }
 
   const supabase = await createClient()
   const { data, error } = await supabase
@@ -446,8 +432,8 @@ export async function reviewApplicationAction(
   const user = await getUser()
   if (!user) redirect(`/login?next=/projects/${slug}`)
 
-  // No applications were ever written locally, so there is nothing to answer.
-  if (isLocalMode()) return NO_APPLICATIONS
+  // The local transaction accepts only a live request this account can manage.
+  if (isLocalMode()) { const result = await localFormWrite(() => projectParticipationLocal(formData, 'review'), formData); if (result.status === 'success') revalidatePath(`/projects/${slug}`); return result }
 
   const supabase = await createClient()
   const { data, error } = await supabase
@@ -494,7 +480,7 @@ export async function changeMemberRoleAction(
   const user = await getUser()
   if (!user) redirect(`/login?next=/projects/${slug}`)
 
-  if (isLocalMode()) return changeMemberRoleLocal(user.id, slug, projectId, profileId, role)
+  if (isLocalMode()) return localFormWrite(() => changeMemberRoleLocal(user.id, slug, projectId, profileId, role), formData)
 
   const supabase = await createClient()
   const { data, error } = await supabase
@@ -528,7 +514,7 @@ export async function removeMemberAction(
   const user = await getUser()
   if (!user) redirect(`/login?next=/projects/${slug}`)
 
-  if (isLocalMode()) return removeMemberLocal(user.id, slug, projectId, profileId)
+  if (isLocalMode()) return localFormWrite(() => removeMemberLocal(user.id, slug, projectId, profileId), formData)
 
   const supabase = await createClient()
   const { data, error } = await supabase
@@ -570,7 +556,7 @@ export async function transferOwnershipAction(
   const user = await getUser()
   if (!user) redirect(`/login?next=/projects/${slug}`)
 
-  if (isLocalMode()) return transferOwnershipLocal(user.id, slug, projectId, newOwner)
+  if (isLocalMode()) return localFormWrite(() => transferOwnershipLocal(user.id, slug, projectId, newOwner), formData)
 
   const supabase = await createClient()
   const { error } = await supabase.rpc('transfer_project_ownership', {
@@ -629,12 +615,12 @@ export async function saveSeekingAction(
     return { status: 'error', fieldErrors: fieldErrorsOf(parsed.error) }
   }
 
-  const parsedSkills = skillIdList.safeParse(formData.getAll('skillIds'))
+  const parsedSkills = skillIdList.safeParse(isLocalMode() ? [] : formData.getAll('skillIds'))
   if (!parsedSkills.success) {
     return { status: 'error', message: parsedSkills.error.issues[0]?.message ?? 'Those skills could not be read.' }
   }
 
-  if (isLocalMode()) return saveSeekingLocal(user.id, slug, parsed.data, formData)
+  if (isLocalMode()) return localFormWrite(() => saveSeekingLocal(user.id, slug, parsed.data, formData), formData)
 
   const supabase = await createClient()
 
@@ -747,7 +733,7 @@ export async function postUpdateAction(
     return { status: 'error', fieldErrors: fieldErrorsOf(parsed.error), values: echoValues(formData) }
   }
 
-  if (isLocalMode()) return postUpdateLocal(user.id, slug, parsed.data.body, share)
+  if (isLocalMode()) return localFormWrite(() => postUpdateLocal(user.id, slug, parsed.data.body, share), formData)
 
   const supabase = await createClient()
 
@@ -834,7 +820,7 @@ async function createProjectLocal(
   formData: FormData,
 ): Promise<FormState> {
   const created = await mutate((db) => {
-    const owner = db.profiles.find((profile) => profile.user_id === userId)
+    const owner = localActor(db, userId)
     if (!owner) return null
 
     // `projects_before_write`'s clamp: a project is never more visible than its
@@ -900,7 +886,7 @@ async function updateProjectLocal(
   formData: FormData,
 ): Promise<FormState> {
   const updated = await mutate((db) => {
-    const viewer = db.profiles.find((profile) => profile.user_id === userId)
+    const viewer = localActor(db, userId)
     if (!viewer) return false
 
     const project = db.projects.find((entry) => entry.slug === slug && entry.deleted_at === null)
@@ -945,7 +931,7 @@ async function updateProjectLocal(
 
 async function deleteProjectLocal(userId: string, slug: string): Promise<FormState> {
   const deleted = await mutate((db) => {
-    const viewer = db.profiles.find((profile) => profile.user_id === userId)
+    const viewer = localActor(db, userId)
     if (!viewer) return false
 
     const project = db.projects.find((entry) => entry.slug === slug && entry.deleted_at === null)
@@ -974,9 +960,9 @@ async function changeMemberRoleLocal(
   role: 'member' | 'maintainer',
 ): Promise<FormState> {
   const changed = await mutate((db) => {
-    const viewer = db.profiles.find((profile) => profile.user_id === userId)
-    const project = db.projects.find((entry) => entry.id === projectId && entry.deleted_at === null)
-    if (!viewer || !project || !canManageProject(db, project, viewer.id)) return false
+      const viewer = localActor(db, userId)
+      const project = db.projects.find((entry) => entry.id === projectId && entry.deleted_at === null)
+      if (!viewer || !project || project.slug !== slug || !validLocalId(profileId) || !canManageProject(db, project, viewer.id) || blockedPair(db, viewer.id, profileId)) return false
 
     const member = db.project_members.find(
       (entry) => entry.project_id === projectId && entry.profile_id === profileId,
@@ -1004,7 +990,7 @@ async function removeMemberLocal(
   profileId: string,
 ): Promise<FormState> {
   const removed = await mutate((db) => {
-    const viewer = db.profiles.find((profile) => profile.user_id === userId)
+    const viewer = localActor(db, userId)
     const project = db.projects.find((entry) => entry.id === projectId && entry.deleted_at === null)
     if (!viewer || !project) return 'not-found'
 
@@ -1045,7 +1031,7 @@ async function transferOwnershipLocal(
   newOwner: string,
 ): Promise<FormState> {
   const result = await mutate((db) => {
-    const viewer = db.profiles.find((profile) => profile.user_id === userId)
+    const viewer = localActor(db, userId)
     if (!viewer) return 'not-found'
 
     const project = db.projects.find((entry) => entry.id === projectId && entry.deleted_at === null)
@@ -1094,7 +1080,7 @@ async function saveSeekingLocal(
   formData: FormData,
 ): Promise<FormState> {
   const saved = await mutate((db) => {
-    const viewer = db.profiles.find((profile) => profile.user_id === userId)
+    const viewer = localActor(db, userId)
     if (!viewer) return null
 
     const project = db.projects.find((entry) => entry.slug === slug && entry.deleted_at === null)
@@ -1103,11 +1089,12 @@ async function saveSeekingLocal(
     // The trigger's rule, repeated for the same reason it exists: a private
     // project cannot advertise, so the form is told what was actually stored.
     const wantsSeeking = project.visibility === 'private' ? false : data.isSeekingMembers
+    const wanted = [...new Set(formData.getAll('skillIds').map(String))]
+    if (wanted.length > 20 || wanted.some(skillId => !validLocalId(skillId) || !db.skills.some(skill => skill.id === skillId && (skill.is_approved || skill.created_by === viewer.id)))) return null
     project.is_seeking_members = wantsSeeking
     project.team_size_target = data.teamSizeTarget ?? null
-
-    // `looking_for` has no local column, and there is no `project_skills` table,
-    // so neither the prose nor the chosen skill ids are stored here.
+    db.project_skills = db.project_skills.filter(row => row.project_id !== project.id || (!row.is_required && !wanted.includes(row.skill_id)))
+    for (const skillId of wanted) db.project_skills.push({ id: id('psk'), project_id: project.id, skill_id: skillId, is_required: true, created_at: now() })
     return project.visibility
   })
 
@@ -1132,7 +1119,7 @@ async function postUpdateLocal(
   share: boolean,
 ): Promise<FormState> {
   const result = await mutate((db) => {
-    const viewer = db.profiles.find((profile) => profile.user_id === userId)
+    const viewer = localActor(db, userId)
     if (!viewer) return 'not-found'
 
     const project = db.projects.find((entry) => entry.slug === slug && entry.deleted_at === null)
@@ -1144,7 +1131,7 @@ async function postUpdateLocal(
     const isMember = db.project_members.some(
       (member) => member.project_id === project.id && member.profile_id === viewer.id,
     )
-    if (!isMember) return 'not-member'
+    if (!isMember || !canReadContent(db, project, project.owner_id, viewer, 'project')) return 'not-member'
 
     const visibility = share && project.visibility !== 'private' ? 'university' : 'private'
 

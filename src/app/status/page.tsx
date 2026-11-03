@@ -3,6 +3,7 @@ import type { Metadata } from 'next'
 import { Badge } from '@/components/ui/badge'
 import {
   FEATURES,
+  LAST_REVIEWED,
   STATUS_LABELS,
   featuresByArea,
   statusCounts,
@@ -11,7 +12,7 @@ import {
 
 export const metadata: Metadata = {
   title: 'Build status',
-  description: 'Which parts of Quad work, which are database-only, and which are not built yet.',
+  description: 'Which parts of Bulla work, which are database-only, and which are not built yet.',
 }
 
 const tones: Record<FeatureStatus, 'success' | 'highlight' | 'accent' | 'neutral'> = {
@@ -36,9 +37,9 @@ export default function StatusPage() {
     <div className="mx-auto w-full max-w-4xl px-4 py-12 sm:px-6">
       <h1 className="text-3xl">Build status</h1>
       <p className="mt-3 max-w-2xl text-ink-muted">
-        Quad is under construction. This page lists every feature and says plainly whether it works,
-        whether only its database layer exists, or whether it has not been built. It is updated as
-        part of the work rather than afterwards.
+        Bulla is under construction and is not cleared for a public launch. This ledger separates
+        tested scope, partly complete implementations and work that is still missing.
+        A working interface does not prove hosted behavior or production capacity.
       </p>
 
       <dl className="mt-8 grid grid-cols-2 gap-4 border-y border-rule py-5 sm:grid-cols-4">
@@ -52,7 +53,7 @@ export default function StatusPage() {
 
       <p className="mt-4 text-xs text-ink-faint">
         {FEATURES.length} tracked features. Counts are of features listed on this page, not of
-        anything measured about usage — nobody is using Quad yet.
+        user numbers or measured capacity. Reviewed {LAST_REVIEWED}.
       </p>
 
       <div className="mt-10 space-y-10">
@@ -79,7 +80,8 @@ export default function StatusPage() {
       <section className="mt-12 border-t border-rule pt-6">
         <h2 className="text-xl">Running this yourself</h2>
         <p className="mt-2 text-sm text-ink-muted">
-          Anything above that needs a database needs Supabase credentials first.{' '}
+          Local mode is a private development preview and does not need cloud credentials.
+          A public deployment needs a configured and verified Supabase backend.{' '}
           <Link href="/setup" className="text-accent-700 underline underline-offset-2">
             The setup page
           </Link>{' '}

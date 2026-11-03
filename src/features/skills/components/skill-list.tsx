@@ -56,7 +56,7 @@ export function SkillList({
       </ul>
 
       <p className="mt-3 text-xs text-ink-faint">
-        Levels are self-declared. Quad does not test skills, and nothing on this page is a
+        Levels are self-declared. Bulla does not test skills, and nothing on this page is a
         verification.
       </p>
     </div>

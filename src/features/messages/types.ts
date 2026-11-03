@@ -15,6 +15,7 @@
  */
 
 import type { Cursor } from '@/lib/cursor'
+import type { FormState } from '@/lib/form-state'
 
 /** A person as the thread and the list render them. */
 export type MessageAuthor = {
@@ -48,8 +49,8 @@ export type ThreadMessage = {
 /**
  * A conversation row in the list.
  *
- * `unread_count` and `last_message_preview` are read from the columns the
- * database maintains with triggers (`app.messages_after_insert`). Nothing here is
+ * `unread_count` and `last_message_preview` come from the authorized server
+ * summary, never raw global previews or post-departure counters. Nothing here is
  * recomputed in the browser: a badge that says 3 because three rows happened to be
  * fetched is exactly the invented number PRODUCT.md rule 1 forbids.
  *
@@ -84,8 +85,8 @@ export type ConversationSummary = {
   /**
    * True when the reader has left this conversation (`left_at` is set).
    *
-   * Leaving does not delete history: the select policies use
-   * `was_conversation_participant`, so the thread still renders. Nothing can be
+   * Leaving does not delete history: selects retain only the union of actual
+   * joined_at..left_at intervals, so the permitted thread still renders. Nothing can be
    * written to it — `messages_insert_participant` requires `left_at is null` — so
    * the composer is replaced by an explanation rather than by a refused action.
    */
@@ -116,7 +117,34 @@ export type ConversationPane = {
    * same as "read everything".
    */
   last_read_at: string | null
+  /** Local PROFILE id differs from the session's user id. */
+  reader_profile_id?: string
+  /** Bounded, current member controls. Never attached to a departed pane. */
+  group?: GroupManagementPane | null
 }
+
+export type GroupMember = {
+  profile_id: string
+  role: 'admin' | 'member'
+  left: boolean
+  available: boolean
+  profile: MessageAuthor | null
+}
+
+export type GroupManagementPane = {
+  role: 'admin' | 'member'
+  active_count: number
+  admin_count: number
+  recorded_count: number
+  has_more: boolean
+  members: GroupMember[]
+}
+
+/** Creation returns only a safe link/counts; skip copy is retained beside it. */
+export type GroupCreateState = FormState & { conversationId?: string }
+export type GroupChangeOutcome =
+  | { ok: true; message: string }
+  | { ok: false; message: string }
 
 export type ThreadPage = {
   messages: ThreadMessage[] | null
@@ -162,3 +190,5 @@ export type MarkReadOutcome =
   | { ok: false; message: string }
 
 export type MuteOutcome = { ok: true; muted: boolean } | { ok: false; message: string }
+
+export type LeaveOutcome = { ok: true; left: true } | { ok: false; message: string }

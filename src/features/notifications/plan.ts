@@ -231,7 +231,7 @@ function sentence(type: string, who: string, family: Family, subject: string): s
     case 'content_removed':
       return 'A moderator removed something you posted.'
     default:
-      return `${who} did something on Quad.`
+      return `${who} did something on Bulla.`
   }
 }
 
@@ -262,6 +262,11 @@ export function resolveTarget(
       return { target: { href: `/post/${row.post_id}${anchor}`, label: 'Open the post' }, unavailable: false }
     }
     case 'project': {
+      if (row.type === 'project_invite') {
+        // The private recipient inbox is always reachable. A pending invite
+        // must not need or silently grant access to the project's full content.
+        return { target: { href: '/projects/invitations', label: 'Review invitation' }, unavailable: false }
+      }
       if (!row.project_id) return { target: null, unavailable: false }
       const slug = index.projects.get(row.project_id)
       if (!slug) return { target: null, unavailable: true }
@@ -318,7 +323,7 @@ export function resolveTarget(
 /** One row, turned into the view the list renders. Pure. */
 export function toNotificationView(row: NotificationInput, index: TargetIndex): NotificationView {
   const family = familyOf(row.type)
-  const known = family !== 'none' || row.type.length > 0
+  const known = family !== 'none'
   const who = row.actor?.display_name ?? 'Someone'
 
   // The title, when the reader is allowed to have it. `projects` was selected with
@@ -334,7 +339,9 @@ export function toNotificationView(row: NotificationInput, index: TargetIndex): 
     is_read: row.is_read,
     created_at: row.created_at,
     text: sentence(row.type, who, family, subject),
-    detail: row.body,
+    // Message and unknown types never expose an unclassified body. Keep this
+    // guard even for callers which did not use the sanitized query.
+    detail: !known || row.type === 'message' ? null : row.body,
     actorName: row.actor?.display_name ?? null,
     actorAvatar: row.actor?.avatar_url ?? null,
     target,

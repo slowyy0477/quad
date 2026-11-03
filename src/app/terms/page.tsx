@@ -23,15 +23,15 @@ export default function TermsPage() {
 
       <Alert tone="warning" title="Draft — requires legal review before launch" className="mt-6">
         <p>
-          This is a plain-English description of how Quad works, written by the people building it.
+          This is a plain-English description of how Bulla works, written by the people building it.
           It has not been reviewed by a lawyer and is not a contract. It must be replaced with a
-          reviewed document before Quad is opened to real users.
+          reviewed document before Bulla is opened to real users.
         </p>
       </Alert>
 
       <div className="mt-8 space-y-6 text-sm text-ink-muted">
         <section>
-          <h2 className="text-lg text-ink">Who can use Quad</h2>
+          <h2 className="text-lg text-ink">Who can use Bulla</h2>
           <p className="mt-1.5">
             Current university students and staff. You need a working email address, and one account
             per person.
@@ -41,7 +41,7 @@ export default function TermsPage() {
         <section>
           <h2 className="text-lg text-ink">Your content stays yours</h2>
           <p className="mt-1.5">
-            You keep ownership of everything you post. You grant Quad permission to store it and to
+            You keep ownership of everything you post. You grant Bulla permission to store it and to
             show it to the audience you chose in that item&rsquo;s visibility setting, and nothing
             wider. Deleting content removes it from the platform; backups are retained for a limited
             period for recovery, and are not readable by other users.
@@ -63,7 +63,7 @@ export default function TermsPage() {
         <section>
           <h2 className="text-lg text-ink">Skills and achievements are self-declared</h2>
           <p className="mt-1.5">
-            Quad records what you say about your own abilities. It does not test them and makes no
+            Bulla records what you say about your own abilities. It does not test them and makes no
             representation to anyone — including any employer — that a stated skill level is
             accurate. Achievements are awarded automatically for actions taken on the platform and
             mean only that: that the action happened here.
@@ -73,8 +73,8 @@ export default function TermsPage() {
         <section>
           <h2 className="text-lg text-ink">The service is in development</h2>
           <p className="mt-1.5">
-            Quad is unfinished and provided as-is. Features may change or be removed, and data loss
-            during development is possible. Do not use Quad as the only copy of anything you need.
+            Bulla is unfinished and provided as-is. Features may change or be removed, and data loss
+            during development is possible. Do not use Bulla as the only copy of anything you need.
           </p>
         </section>
 

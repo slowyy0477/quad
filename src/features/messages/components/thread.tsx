@@ -7,10 +7,13 @@ import { ScrollArea } from '@/components/ui/scroll-area'
 import { EmptyState } from '@/components/ui/surface'
 import { buildThreadRenderPlan } from '@/features/messages/thread-plan'
 import type { ConversationPane, ThreadPage } from '@/features/messages/types'
+import { FINAL_GROUP_ADMIN_COPY } from '../group-contract'
+import { GroupMembers } from './group-members'
 import { ConversationActions } from './conversation-actions'
 import { MarkConversationRead } from './mark-conversation-read'
 import { DaySeparator, MessageBubble, ParticipantName, UnreadDivider } from './message-bubble'
 import { MessageComposer } from './message-composer'
+import { MessageReadRetry } from './message-read-retry'
 import { ThreadRealtime } from './thread-realtime'
 import { BackToNewest, ThreadPagination } from './thread-pagination'
 
@@ -82,7 +85,7 @@ export function Thread({
         />
 
         <div className="min-w-0 flex-1">
-          <h2 id="thread-heading" className="flex items-center gap-2 text-base">
+          <h2 id="thread-heading" tabIndex={-1} className="flex items-center gap-2 text-base">
             {title ? (
               <span className="truncate font-display text-base text-ink">{title}</span>
             ) : (
@@ -100,18 +103,30 @@ export function Thread({
           </p>
         </div>
 
-        <ThreadRealtime conversationId={pane.id} />
+        <ThreadRealtime conversationId={pane.id} readerProfileId={pane.reader_profile_id ?? meId} active={!pane.left} />
 
         <ConversationActions
           conversationId={pane.id}
           isMuted={pane.is_muted}
           unreadCount={pane.unread_count}
+          left={pane.left}
+          leaveBlockedReason={!pane.left && pane.group?.role === 'admin' && pane.group.admin_count <= 1
+            ? FINAL_GROUP_ADMIN_COPY : undefined}
         />
       </header>
 
+      {!pane.left && pane.group ? <GroupMembers key={pane.id} conversationId={pane.id} group={pane.group} /> : null}
+      {!pane.left && pane.type === 'group' && pane.group === null ? (
+        <div className="space-y-2 px-3 py-2">
+          <Alert tone="info">Member controls could not be loaded.</Alert>
+          <MessageReadRetry label="Retry member controls" />
+        </div>
+      ) : null}
+
       {page.error ? (
-        <div className="px-3 py-3">
+        <div className="space-y-2 px-3 py-3">
           <Alert tone="danger">{page.error}</Alert>
+          <MessageReadRetry label="Retry messages" />
         </div>
       ) : null}
 
@@ -119,7 +134,7 @@ export function Thread({
         <div className="py-2">
           {hasCursor ? <BackToNewest conversationId={pane.id} /> : null}
 
-          {messages.length > 0 ? (
+          {!page.error && messages.length > 0 ? (
             <ThreadPagination
               conversationId={pane.id}
               olderCursor={page.olderCursor}
@@ -127,12 +142,11 @@ export function Thread({
             />
           ) : null}
 
-          {messages.length === 0 ? (
+          {page.error ? null : messages.length === 0 ? (
             <div className="p-3">
-              <EmptyState title="No messages here yet">
+              <EmptyState title="No readable messages in this history">
                 <p>
-                  The conversation exists but nothing has been sent in it. The first message is the
-                  only hard one.
+                  Only messages from your membership intervals are included.
                 </p>
               </EmptyState>
             </div>
@@ -153,7 +167,9 @@ export function Thread({
         </div>
       </ScrollArea>
 
-      <MarkConversationRead conversationId={pane.id} unread={pane.unread_count} />
+      {!pane.left && !hasCursor && !page.error ? (
+        <MarkConversationRead conversationId={pane.id} unread={pane.unread_count} />
+      ) : null}
 
       <div className="sticky bottom-[calc(3.5rem_+_env(safe-area-inset-bottom))] z-10 border-t border-rule bg-paper p-3 sm:static sm:bottom-auto sm:p-4">
         <ComposerArea pane={pane} />
@@ -176,7 +192,8 @@ function ComposerArea({ pane }: { pane: ConversationPane }) {
     return (
       <Alert tone="info" title="You left this conversation">
         <p>
-          Its history stays readable, and nothing new can be sent from here.{' '}
+          Messages sent while you were a participant stay readable. Messages from before you joined
+          or after you left are not included, and nothing new can be sent from here.{' '}
           {pane.type === 'direct' && pane.other ? (
             <>
               To talk again, open{' '}
@@ -207,5 +224,7 @@ function ComposerArea({ pane }: { pane: ConversationPane }) {
     )
   }
 
-  return <MessageComposer conversationId={pane.id} />
+  // Action state belongs to this conversation. A completed send must not clear
+  // the next thread's independently kept draft during a client navigation.
+  return <MessageComposer key={pane.id} conversationId={pane.id} />
 }

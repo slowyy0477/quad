@@ -28,7 +28,7 @@ export function OpportunityRow({
   const closedByDate = opportunity.status === 'open' && closed
 
   return (
-    <Surface as="article" className="p-4 transition-colors hover:border-rule">
+    <Surface as="article" className="interactive-card p-5">
       <div className="flex items-start justify-between gap-3">
         <div className="min-w-0">
           <h3 className="text-base leading-snug">
@@ -47,11 +47,11 @@ export function OpportunityRow({
         </Badge>
       </div>
 
-      <div className="mt-3 flex flex-wrap items-center gap-1.5">
-        <Badge tone="neutral">{opportunityTypeLabel(opportunity.type)}</Badge>
-        <Badge tone="outline">{workModeLabel(opportunity.work_mode)}</Badge>
-        {opportunity.location ? <Badge tone="outline">{opportunity.location}</Badge> : null}
-        {opportunity.compensation ? <Badge tone="outline">{opportunity.compensation}</Badge> : null}
+      <div className="mt-3 flex flex-wrap items-center gap-x-3 gap-y-1 text-xs text-ink-muted">
+        <span>{opportunityTypeLabel(opportunity.type)}</span>
+        <span className="border-l border-rule pl-3">{workModeLabel(opportunity.work_mode)}</span>
+        {opportunity.location ? <span>{opportunity.location}</span> : null}
+        {opportunity.compensation ? <span>{opportunity.compensation}</span> : null}
         {opportunity.saved ? <Badge tone="accent">Saved</Badge> : null}
       </div>
 

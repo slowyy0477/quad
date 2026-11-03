@@ -12,7 +12,7 @@ import { cn } from '@/lib/utils'
  * page never zooms back out.
  */
 const fieldClasses = cn(
-  'w-full rounded border border-rule bg-paper-raised px-3 text-base text-ink',
+  'w-full min-w-0 rounded border border-control-border bg-paper-raised px-3 text-base text-ink',
   'placeholder:text-ink-faint',
   'transition-colors duration-150',
   'hover:border-ink-faint',
@@ -23,7 +23,7 @@ const fieldClasses = cn(
 )
 
 export function Input({ className, type = 'text', ...props }: React.ComponentProps<'input'>) {
-  return <input type={type} className={cn(fieldClasses, 'min-h-11 sm:min-h-10', className)} {...props} />
+  return <input type={type} className={cn(fieldClasses, 'min-h-11', className)} {...props} />
 }
 
 export function Textarea({ className, rows = 4, ...props }: React.ComponentProps<'textarea'>) {
@@ -33,7 +33,7 @@ export function Textarea({ className, rows = 4, ...props }: React.ComponentProps
 export function Select({ className, ...props }: React.ComponentProps<'select'>) {
   return (
     <select
-      className={cn(fieldClasses, 'min-h-11 appearance-none pr-9 sm:min-h-10', className)}
+      className={cn(fieldClasses, 'min-h-11 pr-3', className)}
       {...props}
     />
   )

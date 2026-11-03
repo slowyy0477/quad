@@ -5,7 +5,7 @@ import { SectionHeading, Surface } from '@/components/ui/surface'
 import { BugReportForm } from '@/features/bugs/components/bug-report-form'
 import { BugReportList } from '@/features/bugs/components/bug-report-list'
 import { getOwnBugReports } from '@/features/bugs/queries'
-import { isSupabaseConfigured } from '@/lib/env'
+import { isDataConfigured } from '@/lib/env'
 import { getUser } from '@/lib/supabase/server'
 
 /**
@@ -19,7 +19,7 @@ import { getUser } from '@/lib/supabase/server'
  *
  * What the page is honest about:
  *
- *   * **Who reads this.** One person maintains Quad. There is no support team, no
+ *   * **Who reads this.** One person maintains Bulla. There is no support team, no
  *     ticket number and no response time, and saying so is better than a
  *     reassurance that gets discovered to be false.
  *   * **The list below the form is real.** It is `bug_reports` filtered by the
@@ -41,7 +41,7 @@ export const metadata: Metadata = {
 }
 
 export default async function ReportABugPage() {
-  const configured = isSupabaseConfigured()
+  const configured = isDataConfigured()
   const user = configured ? await getUser() : null
   const signedIn = Boolean(user)
 
@@ -84,7 +84,7 @@ export default async function ReportABugPage() {
 
       <div className="mt-6 space-y-3 text-sm text-ink-muted">
         <p>
-          Reports are read by the one person who maintains Quad, roughly in the order they arrive.
+          Reports are read by the one person who maintains Bulla, roughly in the order they arrive.
           There is no support desk, no ticket number and no promised response time — a report about a
           typo may sit for a month and a report about data loss will not.
         </p>

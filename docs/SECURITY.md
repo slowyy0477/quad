@@ -3,12 +3,15 @@
 The premise of this document: **the interface is not a permission system.** Hiding a
 button prevents nothing, because a client can talk to PostgREST directly with the
 public anon key and never load the application at all. So every access-control
-decision in Quad is made in Postgres, and this document is a record of how — written
+decision in hosted Bulla belongs in Postgres, and this document records the intended model — written
 so that the reasoning survives the person who wrote it.
 
-Status: the database layer described here is built and tested (292 assertions).
-Sections marked **not built** describe an intended design that does not exist yet.
-Nothing here has been exercised against a hosted Supabase project.
+Current security state: [bulla/ISSUES.md](bulla/ISSUES.md), with exact local
+evidence in [STATUS.md](bulla/STATUS.md). SQL, local/session and browser tests
+are separate evidence layers, not a completed security audit. The local JSON
+adapter enforces application access rules but is not a public database.
+Older foundation descriptions below must be cross-checked against actual
+source and forward migrations. Hosted acceptance remains a release gate.
 
 ---
 
@@ -179,10 +182,11 @@ Full detail in [AUTH.md](AUTH.md). The security-relevant points:
   cannot write cookies) and redirects signed-out visitors away from private routes. Its
   redirect protects nothing: a direct PostgREST call skips it entirely. Both facts are
   written in the file so nobody mistakes it for the security layer.
-- **Passwords** are never stored, logged, or read by this codebase. Supabase Auth holds
-  a hash. There is no code path — including admin paths — that can display one, because
-  there is nothing to display. Minimum 12 characters, maximum 72 (bcrypt truncates
-  beyond that, so a longer password would be silently trimmed rather than rejected).
+- **Passwords:** hosted Auth owns its credential hashes; local development uses
+  salted scrypt. New input requires at least 15 characters and is bounded at 128;
+  sign-in preserves compatibility for older accounts. Provider policy/parity is
+  not guaranteed by the form; direct-provider enforcement must be verified.
+  Never log credentials or hashes.
 - **Open-redirect defence** on `?next=`: a destination is accepted only if it starts
   with a single `/`, and is rejected for `//host`, `/\host`, and any C0/DEL control
   character. An open redirect on a login page is a phishing primitive — the victim
@@ -201,7 +205,7 @@ Full detail in [AUTH.md](AUTH.md). The security-relevant points:
 | --- | --- |
 | Anon key | Public by design. Safe only because RLS holds. |
 | Service-role key | No `NEXT_PUBLIC_` prefix; read inside a function rather than at module scope; the only module that uses it starts with `import 'server-only'`, so a client-reachable import **fails the build** instead of shipping it. |
-| Admin bootstrap password | Env var, used once, then deleted. There is no hard-coded password anywhere in this repository, and there must never be one. |
+| Admin bootstrap password | Secret env var for an explicitly authorized bootstrap; remove afterwards. Legacy local demo credentials exist only for private development and must never be treated as production accounts. |
 
 `/setup` reports env vars as present/absent and never prints a value — configuration
 pages get screenshotted into chat windows.
@@ -216,23 +220,23 @@ everything else becomes a generic failure.
 `src/app/error.tsx` renders `error.digest` only — never `error.message`, which in a
 Server Component can contain a query, a path, or a row.
 
-## 8. Not built yet — do not assume these protections exist
+## 8. Unfinished security acceptance — do not assume protection
 
-Stated explicitly so nobody reads this document as a description of a finished system:
+Current source, not merely the original foundation plan:
 
-- **Rate limiting.** Supabase Auth rate-limits its own endpoints; Quad's own actions
-  (posting, messaging, reporting) have none. Migration `0021_rate_limits` is planned.
+- **Rate limiting.** Migration 0021 and wrappers exist; mandatory direct-write
+  budgets, concurrent enforcement and multi-instance behavior remain a launch gate.
 - **Uploads.** No storage buckets, no MIME/extension/size validation, no upload path at
-  all. Planned as `0022_storage`. Until then there is no upload to attack.
-- **Moderation and audit.** `0020_reports` — reports, bug reports, an append-only
-  admin audit log, and the narrow policy letting a moderator read a *reported* message
-  and nothing else — is designed but not written. Today no moderator can read any
-  private message, which is the safe end of that trade.
-- **Admin routes.** `/admin` is gated in `proxy.ts` and has no pages. When it gets
-  pages, every one must re-check `app.is_admin()` server-side; the proxy check is not
-  the boundary.
-- **CSP and security headers.** Not configured. Next's defaults only.
-- **Automated dependency scanning.** Not configured.
+  all. Migration 0022 is Bulla branding, not a reserved storage number.
+- **Moderation and audit.** Reports/decisions/bugs/admin UI exist. Forward 0023
+  guards report readability and participant roles; hosted/direct-API proof,
+  board coverage and staffed operational acceptance remain.
+- **Admin routes.** Pages/actions exist and need staff checks at each boundary,
+  verified role/assurance and audit outcomes. The proxy is not authorization.
+- **CSP and security headers.** Request nonces and headers are implemented.
+  Runtime/build/browser proof and real TLS deployment configuration still matter.
+- **Dependency scanning.** Local production audit is recorded; zero known
+  advisories does not prove application security.
 - **Penetration testing.** None performed.
 
 ## 9. Reporting a vulnerability

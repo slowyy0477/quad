@@ -21,12 +21,13 @@ import {
   listIdeaInterests,
   listIdeaSkills,
 } from '@/features/ideas/queries'
-import { isSupabaseConfigured } from '@/lib/env'
+import { isDataConfigured } from '@/lib/env'
+import { ReportDialog } from '@/features/moderation/components/report-dialog'
 
 type Params = { id: string }
 
 export async function generateMetadata({ params }: { params: Promise<Params> }): Promise<Metadata> {
-  if (!isSupabaseConfigured()) return { title: 'Idea' }
+  if (!isDataConfigured()) return { title: 'Idea' }
 
   const { id } = await params
   const idea = await getIdeaById(id)
@@ -58,7 +59,7 @@ export async function generateMetadata({ params }: { params: Promise<Params> }):
  * disappearing, which is what makes moderation explicable.
  */
 export default async function IdeaPage({ params }: { params: Promise<Params> }) {
-  if (!isSupabaseConfigured()) notFound()
+  if (!isDataConfigured()) notFound()
 
   const { id } = await params
   const idea = await getIdeaById(id)
@@ -83,6 +84,10 @@ export default async function IdeaPage({ params }: { params: Promise<Params> }) 
         <Badge tone="neutral">{categoryLabel(idea.category)}</Badge>
         <Badge tone={isConverted ? 'success' : 'accent'}>{ideaStatusLabel(idea.status)}</Badge>
         <Badge tone="outline">{visibilityLabel(idea.visibility)}</Badge>
+        {viewer.userId ? (
+          <ReportDialog kind="idea" targetId={idea.id} subject="this idea"
+            trigger={<Button variant="ghost" size="sm" aria-label="Report this idea" className="ml-auto">Report</Button>} />
+        ) : null}
       </div>
 
       {idea.moderation_status !== 'active' ? (

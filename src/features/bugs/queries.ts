@@ -2,6 +2,7 @@ import 'server-only'
 
 import { createClient } from '@/lib/supabase/server'
 import { isLocalMode } from '@/lib/mode'
+import { bugsLocal } from './local'
 import type { BugStatus } from '@/features/bugs/schemas'
 
 /**
@@ -84,6 +85,7 @@ function toRow(raw: RawBugRow): BugReportRow {
 
 /** The reader's own reports, newest first. What /report-a-bug lists back. */
 export async function getOwnBugReports(limit = 20): Promise<ReadResult<BugReportRow[]>> {
+  if (isLocalMode()) return bugsLocal({ own: true, perPage: limit })
   const supabase = await createClient()
 
   const { data, error } = await supabase
@@ -117,6 +119,7 @@ export async function getBugReports({
 }: { status?: BugStatus; page?: number; perPage?: number } = {}): Promise<
   ReadResult<BugReportRow[]>
 > {
+  if (isLocalMode()) return bugsLocal({ status, page, perPage })
   const supabase = await createClient()
   const from = Math.max(0, page - 1) * perPage
 
@@ -148,9 +151,7 @@ export async function getBugReports({
  * failure path logs and the number still comes from the database either way.
  */
 export async function countOpenBugReports(): Promise<number> {
-  // Local mode has no bug_reports table. Zero is the honest answer: no report has
-  // been filed, because there is nowhere to file one.
-  if (isLocalMode()) return 0
+  if (isLocalMode()) return (await bugsLocal({ status: 'open', perPage: 1 })).total
 
   const supabase = await createClient()
 

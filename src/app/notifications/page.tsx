@@ -14,6 +14,8 @@ import {
 import { groupNotificationsByDay, toNotificationView } from '@/features/notifications/plan'
 import { NotificationList } from '@/features/notifications/components/notification-list'
 import { MarkAllRead } from '@/features/notifications/components/mark-all-read'
+import { InviteResponse } from '@/features/projects/components/invite-response'
+import { listMyProjectInvitations } from '@/features/projects/invitations'
 
 export const metadata: Metadata = {
   title: 'Notifications',
@@ -69,33 +71,29 @@ export default async function NotificationsPage({
     )
   }
 
-  const [{ notifications, nextCursor, error }, unread] = await Promise.all([
+  const [{ notifications, nextCursor, error }, unread, invitations] = await Promise.all([
     getNotifications({ cursor: params.cursor }),
     getUnreadNotificationCount(),
+    listMyProjectInvitations({
+      cursor: Array.isArray(params.inviteCursor) ? params.inviteCursor[0] : params.inviteCursor,
+      limit: 5,
+    }),
   ])
-
-  if (error) {
-    return (
-      <div className="mx-auto w-full max-w-2xl px-4 py-10 sm:py-14">
-        <h1 className="text-3xl">Notifications</h1>
-        <Alert className="mt-6" tone="danger" title="Notifications could not be loaded">
-          {error}
-        </Alert>
-      </div>
-    )
-  }
 
   const rows = notifications ?? []
   const { index, error: indexError } = await getTargetIndex(rows)
   const days = groupNotificationsByDay(
-    rows.map((row) => toNotificationView(row, index)),
+    rows.map((row) => {
+      const view = toNotificationView(row, index)
+      return indexError ? { ...view, target: null, targetUnavailable: false } : view
+    }),
     // One clock for the whole page, so a page rendered across midnight cannot label two
     // rows from the same instant as different days.
     new Date(),
   )
 
   return (
-    <div className="mx-auto w-full max-w-2xl px-4 py-8 sm:py-12">
+    <div className="page-enter mx-auto w-full max-w-2xl px-4 py-8 sm:py-12">
       <header className="border-b border-rule pb-4">
         <h1 className="text-3xl">Notifications</h1>
         <p className="mt-2 max-w-prose text-sm text-ink-muted">
@@ -104,11 +102,38 @@ export default async function NotificationsPage({
         </p>
         <div className="mt-4 flex flex-wrap items-center justify-between gap-3">
           <p className="text-sm tabular-nums text-ink-muted">
-            {unread === 0 ? 'Nothing unread.' : unread === 1 ? 'One unread.' : `${unread} unread.`}
+            {unread === null ? 'Unread count could not be loaded.' :
+              unread === 0 ? 'Nothing unread.' : unread === 1 ? 'One unread.' : `${unread} unread.`}
           </p>
-          <MarkAllRead unread={unread} />
+          {unread !== null ? <MarkAllRead unread={unread} /> : null}
         </div>
       </header>
+
+      {error ? (
+        <Alert className="mt-6" tone="danger" title="Notifications could not be loaded">{error}</Alert>
+      ) : null}
+
+      {invitations.error ? (
+        <Alert className="mt-6" tone="warning" title="Project invitations could not be loaded">
+          {invitations.error}
+        </Alert>
+      ) : invitations.invitations.length > 0 ? (
+        <section className="mt-6" aria-labelledby="project-invitations-heading">
+          <h2 id="project-invitations-heading" className="mb-3 text-lg font-semibold text-ink">Project invitations</h2>
+          <div className="space-y-3">
+            {invitations.invitations.map((invitation) => (
+              <InviteResponse key={invitation.id} invitation={invitation} />
+            ))}
+          </div>
+          {invitations.nextCursor ? (
+            <p className="mt-3 text-sm">
+              <Link href="/projects/invitations" className="inline-flex min-h-11 items-center text-accent-700 underline underline-offset-4">
+                View all project invitations
+              </Link>
+            </p>
+          ) : null}
+        </section>
+      ) : null}
 
       {indexError ? (
         <Alert className="mt-6" tone="warning" title="Some links could not be checked">
@@ -116,7 +141,7 @@ export default async function NotificationsPage({
         </Alert>
       ) : null}
 
-      {days.length === 0 ? (
+      {days.length === 0 && !error && !invitations.error && invitations.invitations.length === 0 ? (
         <EmptyState
           className="mt-8"
           title="Nothing has happened yet"
@@ -129,11 +154,11 @@ export default async function NotificationsPage({
           When someone replies to you, asks to connect, or a moderator decides something about
           your content, it will appear here.
         </EmptyState>
-      ) : (
+      ) : days.length > 0 ? (
         <div className="mt-7">
           <NotificationList days={days} linksResolved={!indexError} />
         </div>
-      )}
+      ) : null}
 
       {nextCursor ? (
         <div className="mt-8">

@@ -1,6 +1,9 @@
 'use server'
 
 import { revalidatePath } from 'next/cache'
+import { isLocalMode } from '@/lib/mode'
+import { localFormWrite } from '@/lib/local/write-result'
+import { bugWriteLocal } from './local'
 import {
   action,
   ActionError,
@@ -46,7 +49,7 @@ const fileBug = action(bugReportSchema)
 
     return {
       message:
-        'Thank you — it is on the list. Bug reports are read by the person who maintains Quad, in the order they arrive.',
+        'Thank you — it is on the list. Bug reports are read by the person who maintains Bulla, in the order they arrive.',
     }
   })
 
@@ -54,10 +57,11 @@ export async function submitBugReportAction(
   _previous: BugFormState,
   formData: FormData,
 ): Promise<BugFormState> {
+  if (isLocalMode()) { const result = await localFormWrite(() => bugWriteLocal(formData), formData); if (result.status === 'success') { revalidatePath('/report-a-bug'); revalidatePath('/admin/bug-reports') }; return result }
   const result = await fileBug(formInput(formData))
   return toFormState(
     result,
-    'Thank you — it is on the list. Bug reports are read by the person who maintains Quad, in the order they arrive.',
+    'Thank you — it is on the list. Bug reports are read by the person who maintains Bulla, in the order they arrive.',
     formData,
   )
 }
@@ -104,6 +108,7 @@ export async function triageBugReportAction(
   _previous: BugTriageFormState,
   formData: FormData,
 ): Promise<BugTriageFormState> {
+  if (isLocalMode()) { const result = await localFormWrite(() => bugWriteLocal(formData, true), formData); if (result.status === 'success') { revalidatePath('/report-a-bug'); revalidatePath('/admin/bug-reports') }; return result }
   const result = await triageBug(formInput(formData))
   return toFormState(result, 'Saved.', formData)
 }

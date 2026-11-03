@@ -1,8 +1,11 @@
 # Database
 
-PostgreSQL, on Supabase. **17 migrations, 52 tables, 182 policies, 132 functions in the `app`
-schema, ~10,500 lines of SQL.** The schema is the authorization layer, not a storage
-detail — read [SECURITY.md](SECURITY.md) alongside this.
+Bulla's hosted system of record is PostgreSQL on Supabase. The schema is an
+authorization boundary, not just storage. See [current issues](bulla/ISSUES.md)
+and [SECURITY.md](SECURITY.md). Local JSON is a private development adapter.
+
+Reviewed source: 31 October 2026. The migration files exist locally; this
+document does not assert that they have been applied to any hosted project.
 
 ---
 
@@ -16,16 +19,19 @@ migrations are never renumbered.**
 
 | # | File | State |
 | --- | --- | --- |
-| 0001–0017 | extensions and helpers through university reference data | **applied** |
-| 0018 | `0018_feed_ranking.sql` | reserved — feed ranking function (see `app.rank_feed`) |
-| 0019 | `0019_search.sql` | reserved — search over people, projects, posts (trigram indexes exist) |
-| 0020 | `0020_reports.sql` | reserved — reports, moderator actions, audit log (**launch blocker**) |
-| 0021 | `0021_rate_limits.sql` | reserved — Postgres fixed-window limiter (**launch blocker**) |
-| 0022 | `0022_storage.sql` | reserved — buckets, upload policies, MIME and size limits |
+| 0001–0017 | extensions/helpers through university reference data | Files exist; full sequence exercised by local schema tests |
+| 0018 | `0018_feed_ranking.sql` | Implemented; query budgets/load remain acceptance work |
+| 0019 | `0019_search.sql` | Implemented invoker-scoped search; large-dataset query plans remain |
+| 0020 | `0020_reports.sql` | Implemented reports/moderation; direct target authorization is hardened by 0023 |
+| 0021 | `0021_rate_limits.sql` | Implemented limiter; mandatory direct-write budgets remain a launch gate |
+| 0022 | `0022_bulla_brand.sql` | Forward Bulla naming/reserved-handle change; not a storage migration |
+| 0023 | `0023_authorization_hardening.sql` | Forward participant-role and report-readability guards; hosted acceptance pending |
 
-The next free number is **0023** once the reserved ones are written. If you are adding a
-migration and your number is taken, take the next free one and update this table in the
-same commit — this table is the only place the numbering is allowed to live.
+The next free number at this review is **0024**, but inspect the actual migration
+directory and applied history before reserving any number. Do not reuse 0022 or
+0023 for uploads, alter applied history, or mistake file existence for deployment.
+Later schema explanations below are foundation rationale; cross-check actual
+migrations and generated schema before making a change.
 
 ---
 

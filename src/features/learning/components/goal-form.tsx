@@ -1,11 +1,14 @@
 'use client'
 
-import { useActionState } from 'react'
+import { useActionState, useState } from 'react'
+import { FormErrorSummary } from '@/components/ui/form-error-summary'
 import { Alert } from '@/components/ui/alert'
 import { Badge } from '@/components/ui/badge'
+import { Button } from '@/components/ui/button'
 import { Field } from '@/components/ui/field'
 import { Input, Select, Textarea } from '@/components/ui/input'
 import { SubmitButton } from '@/components/ui/submit-button'
+import { useRetainedForm } from '@/components/ui/use-retained-form'
 import { VISIBILITIES } from '@/features/projects/constants'
 import { GOAL_CATEGORIES } from '@/features/learning/constants'
 import { createGoalAction } from '@/features/learning/actions'
@@ -23,22 +26,52 @@ import { emptyFormState } from '@/lib/form-state'
  * `targetValue` is required and above zero because the column is: a goal without a number
  * to count towards cannot be met, and a goal that cannot be met is a note.
  */
-export function GoalForm({
-  semesters,
-  defaultSemesterId,
-}: {
+type GoalFormProps = {
   semesters: { id: string; label: string }[]
   defaultSemesterId: string | null
-}) {
+}
+
+export function GoalForm(props: GoalFormProps) {
+  const [version, setVersion] = useState(0)
+  return <GoalEntryForm key={version} {...props} onCreateAnother={() => setVersion((current) => current + 1)} />
+}
+
+function GoalEntryForm({
+  semesters,
+  defaultSemesterId,
+  onCreateAnother,
+}: GoalFormProps & { onCreateAnother: () => void }) {
   const [state, action] = useActionState(createGoalAction, emptyFormState)
+  const formRef = useRetainedForm()
+  // React resets native forms after actions, including expected refusals.
+  // Controlled choices keep the author's publication and term intent intact.
+  const [choices, setChoices] = useState({
+    category: 'skill',
+    semesterId: defaultSemesterId ?? '',
+    visibility: 'private',
+  })
+
+  if (state.status === 'success') {
+    return (
+      <div className="space-y-3">
+        <Alert tone="success">{state.message ?? 'Goal created.'}</Alert>
+        <Button variant="secondary" type="button" onClick={onCreateAnother}>Add another goal</Button>
+      </div>
+    )
+  }
 
   return (
-    <form action={action} className="space-y-5">
-      {state.status === 'error' && state.message ? (
-        <Alert tone="danger" title="The goal was not saved">
-          {state.message}
-        </Alert>
-      ) : null}
+    <form ref={formRef} action={action} className="space-y-5">
+      <FormErrorSummary state={state} title="The goal was not saved" fields={{
+        title: { id: 'goal-title', label: 'The goal' },
+        description: { id: 'goal-description', label: 'What counts as done' },
+        category: { id: 'goal-category', label: 'Kind' },
+        semesterId: { id: 'goal-semester', label: 'Term' },
+        targetValue: { id: 'goal-target', label: 'Target' },
+        unit: { id: 'goal-unit', label: 'Unit' },
+        targetDate: { id: 'goal-date', label: 'Target date' },
+        visibility: { id: 'goal-visibility', label: 'Who can see it' },
+      }} />
 
       <Field
         id="goal-title"
@@ -81,7 +114,11 @@ export function GoalForm({
             <Select
               {...props}
               name="category"
-              defaultValue={state.values?.category ?? 'academic'}
+              value={choices.category}
+              onChange={(event) => {
+                const category = event.currentTarget.value
+                setChoices((current) => ({ ...current, category }))
+              }}
             >
               {GOAL_CATEGORIES.map((option) => (
                 <option key={option.value} value={option.value}>
@@ -94,7 +131,11 @@ export function GoalForm({
 
         <Field id="goal-semester" label="Term" hint="Leave unset for a goal outside a term.">
           {(props) => (
-            <Select {...props} name="semesterId" defaultValue={state.values?.semesterId ?? defaultSemesterId ?? ''}>
+            <Select {...props} name="semesterId" value={choices.semesterId}
+              onChange={(event) => {
+                const semesterId = event.currentTarget.value
+                setChoices((current) => ({ ...current, semesterId }))
+              }}>
               <option value="">No term</option>
               {semesters.map((semester) => (
                 <option key={semester.id} value={semester.id}>
@@ -152,7 +193,11 @@ export function GoalForm({
         hint="A public goal appears on your profile. A private one is yours alone."
       >
         {(props) => (
-          <Select {...props} name="visibility" defaultValue={state.values?.visibility ?? 'public'}>
+          <Select {...props} name="visibility" value={choices.visibility}
+            onChange={(event) => {
+              const visibility = event.currentTarget.value
+              setChoices((current) => ({ ...current, visibility }))
+            }}>
             {VISIBILITIES.map((option) => (
               <option key={option.value} value={option.value}>
                 {option.label}

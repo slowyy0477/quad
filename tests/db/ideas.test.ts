@@ -19,7 +19,7 @@
  * should be able to does, an unrelated person cannot, and an unrelated person who
  * substitutes the owner's own id still cannot.
  */
-import { beforeAll, afterAll, describe, expect, it } from 'vitest'
+import { beforeAll, beforeEach, afterAll, describe, expect, it } from 'vitest'
 import { createTestDb, expectRejection, REJECTS, type TestDb } from './harness'
 
 let db: TestDb
@@ -55,6 +55,12 @@ beforeAll(async () => {
   outsider = await db.createUser({ username: 'idea_outsider' })
   classmate = await db.createUser({ username: 'idea_classmate', universityId })
 }, 120_000)
+
+beforeEach(async () => {
+  // Independent scenarios reuse actors in this synthetic database.
+  // Reset only its ledger; setup and client actions within each test still spend budgets.
+  await db.asService('delete from app.rate_limit_windows')
+})
 
 afterAll(async () => {
   await db?.close()

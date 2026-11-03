@@ -2,6 +2,7 @@ import 'server-only'
 
 import type { Database } from '@/lib/db/database.types'
 import { isLocalMode } from '@/lib/mode'
+import { localActor } from '@/lib/local/access'
 import { readStore, type LocalGoal, type LocalMilestone, type LocalLog } from '@/lib/local/db'
 import { createClient, getUser } from '@/lib/supabase/server'
 import { databaseToday, streakFromLogDates } from '@/features/learning/streak'
@@ -539,7 +540,14 @@ export async function listMyAchievements(): Promise<{
   const user = await getUser()
   if (!user) return { achievements: [], error: null }
 
-  if (isLocalMode()) return { achievements: [], error: null }
+  if (isLocalMode()) {
+    const db = await readStore(); const me = localActor(db, user.id)
+    const achievements = db.profile_achievements.filter(row => row.profile_id === me?.id).flatMap(row => {
+      const definition = db.achievement_definitions.find(definition => definition.key === row.achievement_key && definition.is_active)
+      return definition ? [{ key: definition.key, name: definition.name, description: definition.description, criteria: definition.criteria, category: definition.category, tier: definition.tier, icon: definition.icon, sort_order: definition.sort_order, awarded_at: row.awarded_at, awarded_value: row.awarded_value, is_pinned: row.is_pinned }] : []
+    }).sort((a,b) => a.category.localeCompare(b.category) || a.sort_order - b.sort_order)
+    return { achievements, error: null }
+  }
 
   const supabase = await createClient()
   const { data, error } = await supabase

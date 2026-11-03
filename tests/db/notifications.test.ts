@@ -1577,9 +1577,12 @@ describe('scheduled reminders', () => {
          (title, organisation, description, type, apply_url, deadline)
        values ($1, 'Kleinbetrieb GmbH',
                'Six months building an ingest pipeline. Rust or Go.',
-               'internship', 'https://example.test/apply', $2)
+               'internship', 'https://example.test/apply', current_date + 1)
        returning id`,
-      [uniqueTitle('Closing Internship'), new Date(Date.now() + 12 * 60 * 60 * 1000).toISOString()],
+      // deadline is a DATE, not a timestamp. Casting "now + 12h" to DATE can
+      // become this morning's midnight and already be expired. Use the DB's
+      // next calendar day so this fixture stays future/within 48h at any hour.
+      [uniqueTitle('Closing Internship')],
     )
     const opportunity = opportunities[0]!.id
 

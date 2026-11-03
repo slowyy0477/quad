@@ -1,13 +1,17 @@
 # Plan — completing Quad
 
+> Historical snapshot, superseded on 31 October 2026 by
+> [the Bulla recovery plan](../bulla/PLAN.md) and [current status](../bulla/STATUS.md).
+> Preserve the measurements below as dated evidence. They are not current
+> feature states, migration reservations, instructions or authority to deploy.
+
 **Written:** 14 October 2026, from a full read of the repository and measurements run on
 this machine (every number below came from a command, not from a document).
 **Scope:** what is actually finished, what is not, in what order to finish it, and what
 "finished" is allowed to mean at each point.
 
-This document supersedes the counts in [README.md](../../README.md) and
-[docs/PRODUCT.md](../PRODUCT.md) where they disagree — both were written before the last
-two weeks of work and have drifted (§2, F4).
+At the time of writing this document superseded earlier README/product counts.
+The active README/product documents and Bulla records have since been refreshed.
 
 ---
 

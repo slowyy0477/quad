@@ -1,6 +1,7 @@
 'use server'
 
 import { revalidatePath } from 'next/cache'
+import { unstable_rethrow } from 'next/navigation'
 import { z } from 'zod'
 import { isSupabaseConfigured } from '@/lib/env'
 import { isLocalMode } from '@/lib/mode'
@@ -77,15 +78,19 @@ function profileOf(db: { profiles: { id: string; user_id: string }[] }, userId: 
  * form inside the server-rendered list: no client component, no JavaScript, and the
  * button still works with the page hydrated or not.
  */
-export async function markOneReadAction(formData: FormData): Promise<void> {
-  const raw = String(formData.get('id') ?? '')
+async function markOneRead(formData: FormData): Promise<MarkReadOutcome> {
+  const values = formData.getAll('id')
+  if (values.length !== 1 || typeof values[0] !== 'string') {
+    return { ok: false, message: 'That notification could not be updated.' }
+  }
+  const raw = values[0]
 
   if (isLocalMode()) {
     const parsedLocal = localIdSchema.safeParse(raw)
-    if (!parsedLocal.success) return
+    if (!parsedLocal.success) return { ok: false, message: 'That notification could not be updated.' }
 
     const user = await getUser()
-    if (!user) return
+    if (!user) return { ok: false, message: 'Sign in again to mark this as read.' }
 
     const marked = await mutate<number>((db) => {
       const profile = profileOf(db, user.id)
@@ -105,36 +110,93 @@ export async function markOneReadAction(formData: FormData): Promise<void> {
       return changed
     })
 
-    if (marked > 0) revalidateNotificationSurfaces()
-    return
+    // A legitimate zero-change request also refreshes stale data from another
+    // tab. It never claims that an already-read, missing or foreign row changed.
+    revalidateNotificationSurfaces()
+    return { ok: true, marked }
   }
 
-  if (!isSupabaseConfigured()) return
+  if (!isSupabaseConfigured()) return { ok: false, message: UNAVAILABLE }
 
   const parsed = idSchema.safeParse(raw)
-  if (!parsed.success) return
+  if (!parsed.success) return { ok: false, message: 'That notification could not be updated.' }
 
   const user = await getUser()
-  if (!user) return
+  if (!user) return { ok: false, message: 'Sign in again to mark this as read.' }
 
   const supabase = await createClient()
   const { data, error } = await supabase
     .from('notifications')
     .update({ is_read: true })
+    .eq('recipient_id', user.id)
     .eq('id', parsed.data)
     .eq('is_read', false)
     .select('id')
 
-  if (error) {
-    console.error('[notifications:markOne]', error.code, error.message)
-    return
+  if (error !== null) {
+    if (!error) {
+      return { ok: false, message: 'The read status could not be confirmed. Please try again.' }
+    }
+    console.error('[notifications:markOne] provider write failed')
+    return { ok: false, message: 'That could not be marked as read. Please try again.' }
   }
 
-  if ((data ?? []).length > 0) revalidateNotificationSurfaces()
+  // Null/malformed provider data is not proof of zero changed rows.
+  if (!Array.isArray(data) || data.length > 1 ||
+    data.some(row => !row || row.id !== parsed.data)) {
+    return { ok: false, message: 'The read status could not be confirmed. Please try again.' }
+  }
+  revalidateNotificationSurfaces()
+  return { ok: true, marked: data.length }
 }
 
-/** Mark every unread notification read. Returns what the database actually changed. */
-export async function markAllReadAction(): Promise<MarkReadOutcome> {
+/** Compatible plain-form entry point retained for existing callers. */
+export async function markOneReadAction(formData: FormData): Promise<void> {
+  await markOneRead(formData)
+}
+
+/** Progressive form outcome; previous client state is never authorization. */
+export async function markOneReadFormAction(
+  _previous: MarkReadOutcome | null,
+  formData: FormData,
+): Promise<MarkReadOutcome> {
+  try {
+    return await markOneRead(formData)
+  } catch (error) {
+    unstable_rethrow(error)
+    console.error('[notifications:markOne] request failed')
+    return { ok: false, message: 'That could not be marked as read. Please try again.' }
+  }
+}
+
+const BULK_FAILED = 'Those could not be marked as read. Please try again.'
+const BULK_UNCONFIRMED = 'The read status could not be confirmed. Please try again.'
+
+// The actual update selects only `id`. No recipient/actor/sender projection or
+// arbitrary-pair helper is assumed. Empty arrays are valid; every nonempty row
+// must have its own UUID `id` and no extra own fields.
+function bulkReceiptCount(data: unknown): number | null {
+  if (!Array.isArray(data)) return null
+  const rows: unknown[] = data
+  const ids = new Set<string>()
+  for (const row of rows) {
+    if (!row || typeof row !== 'object' || Array.isArray(row) ||
+      !Object.hasOwn(row, 'id') || !('id' in row) || Reflect.ownKeys(row).length !== 1) {
+      return null
+    }
+    const parsed = idSchema.safeParse(row.id)
+    if (!parsed.success) return null
+
+    // UUID case does not create a distinct row. Never inflate the count by
+    // accepting repeated or case-varied representations of an ID.
+    const id = parsed.data.toLowerCase()
+    if (ids.has(id)) return null
+    ids.add(id)
+  }
+  return ids.size
+}
+
+async function markAllRead(): Promise<MarkReadOutcome> {
   if (isLocalMode()) {
     const user = await getUser()
     if (!user) return { ok: false, message: 'Sign in again to mark these as read.' }
@@ -154,8 +216,12 @@ export async function markAllReadAction(): Promise<MarkReadOutcome> {
       return changed
     })
 
-    if (marked > 0) revalidateNotificationSurfaces()
-    // Zero is a success: another tab may have marked them first. Same contract as above.
+    if (!Number.isSafeInteger(marked) || marked < 0) {
+      return { ok: false, message: BULK_UNCONFIRMED }
+    }
+    // Another tab may have completed the write. A genuine zero still reconciles
+    // the stale list and root-layout badge without inventing changed rows.
+    revalidateNotificationSurfaces()
     return { ok: true, marked }
   }
 
@@ -165,18 +231,57 @@ export async function markAllReadAction(): Promise<MarkReadOutcome> {
   if (!user) return { ok: false, message: 'Sign in again to mark these as read.' }
 
   const supabase = await createClient()
-  const { data, error } = await supabase
+  const response: unknown = await supabase
     .from('notifications')
     .update({ is_read: true })
+    .eq('recipient_id', user.id)
     .eq('is_read', false)
     .select('id')
 
-  if (error) {
-    console.error('[notifications:markAll]', error.code, error.message)
-    return { ok: false, message: 'Those could not be marked as read. Try again.' }
+  // A missing/falsy error field is not the provider's explicit success envelope.
+  // Keep the response unknown until its actual shape has been checked.
+  if (!response || typeof response !== 'object' || Array.isArray(response) ||
+    !Object.hasOwn(response, 'error') || !('error' in response)) {
+    return { ok: false, message: BULK_UNCONFIRMED }
+  }
+  if (response.error !== null) {
+    if (!response.error) return { ok: false, message: BULK_UNCONFIRMED }
+    console.error('[notifications:markAll] provider write failed')
+    return { ok: false, message: BULK_FAILED }
   }
 
-  const marked = (data ?? []).length
-  if (marked > 0) revalidateNotificationSurfaces()
+  if (!Object.hasOwn(response, 'data') || !('data' in response)) {
+    return { ok: false, message: BULK_UNCONFIRMED }
+  }
+  const marked = bulkReceiptCount(response.data)
+  if (marked === null) {
+    return { ok: false, message: BULK_UNCONFIRMED }
+  }
+
+  revalidateNotificationSurfaces()
   return { ok: true, marked }
+}
+
+/** Compatible no-argument API, now with safe failures and validated receipts. */
+export async function markAllReadAction(): Promise<MarkReadOutcome> {
+  try {
+    return await markAllRead()
+  } catch (error) {
+    unstable_rethrow(error)
+    console.error('[notifications:markAll] request failed')
+    // The write might have committed before a response/refresh failed. Do not
+    // claim either a changed count or that nothing was saved.
+    return { ok: false, message: BULK_UNCONFIRMED }
+  }
+}
+
+/** Native progressive form entry point; neither argument supplies authority. */
+export async function markAllReadFormAction(
+  _previous: MarkReadOutcome | null,
+  _formData: FormData,
+): Promise<MarkReadOutcome> {
+  // These arguments carry form state, never recipient scope or authority.
+  void _previous
+  void _formData
+  return markAllReadAction()
 }

@@ -1,19 +1,18 @@
 import { Flag, GraduationCap } from 'lucide-react'
+import Link from 'next/link'
 import type { AttachedGoal, AttachedProject } from '@/features/feed/queries'
 
 /**
  * The object a post is attached to, as a rule-bounded block.
  *
- * This is the part of a Quad post that stops the feed being a decontextualised
+ * This is the part of a Bulla post that stops the feed being a decontextualised
  * timeline: PRODUCT.md's claim is that a post is *about* something, and this block
  * is where that claim is visible. It is deliberately not a card: the design
  * language says objects are separated with rules and only things that genuinely
  * leave the page get elevation, so the block is a left rule and a label.
  *
- * There is no link on the title yet, and that is a decision rather than an
- * oversight: `/project/[slug]` is M4 and does not exist, and an anchor to a route
- * that 404s is a worse affordance than plain text. The title is the project's own
- * stored title, never a summary invented here.
+ * The project title links to the implemented detail route using its stored slug.
+ * Hidden attachments stay null in the permission-aware query.
  */
 export function AttachedObject({
   project,
@@ -31,7 +30,7 @@ export function AttachedObject({
           <Flag className="size-3" aria-hidden="true" />
           Project update
         </p>
-        <p className="mt-0.5 text-sm font-medium text-ink">{project.title}</p>
+        <Link href={`/projects/${encodeURIComponent(project.slug)}`} className="mt-0.5 inline-flex min-h-11 items-center text-sm font-medium text-accent-700 underline underline-offset-4">{project.title}</Link>
         {project.tagline ? (
           <p className="text-xs text-ink-muted">{project.tagline}</p>
         ) : null}

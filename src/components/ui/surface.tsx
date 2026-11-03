@@ -20,7 +20,7 @@ export function Surface({
 }: React.ComponentProps<'div'> & { as?: React.ElementType }) {
   return (
     <Component
-      className={cn('rounded-md border border-hairline bg-paper-raised', className)}
+      className={cn('min-w-0 rounded-md border border-hairline bg-paper-raised shadow-raised', className)}
       {...props}
     />
   )
@@ -38,13 +38,13 @@ export function SectionHeading({
   description?: string
   action?: React.ReactNode
   className?: string
-  level?: 2 | 3
+  level?: 1 | 2 | 3
 }) {
-  const Heading = level === 2 ? 'h2' : 'h3'
+  const Heading = level === 1 ? 'h1' : level === 2 ? 'h2' : 'h3'
   return (
     <div className={cn('flex flex-wrap items-end justify-between gap-3 pb-3', className)}>
       <div className="min-w-0 space-y-1">
-        <Heading className={cn(level === 2 ? 'text-xl' : 'text-lg', 'text-ink')}>{title}</Heading>
+        <Heading className={cn(level === 1 ? 'text-3xl' : level === 2 ? 'text-xl' : 'text-lg', 'text-ink')}>{title}</Heading>
         {description ? <p className="max-w-prose text-sm text-ink-muted">{description}</p> : null}
       </div>
       {action}
@@ -73,7 +73,7 @@ export function EmptyState({
   return (
     <div
       className={cn(
-        'rounded-md border border-dashed border-rule px-6 py-10 text-center',
+        'rounded-lg bg-paper-sunken/60 px-6 py-12 text-center',
         className,
       )}
     >

@@ -1,18 +1,25 @@
 import 'server-only'
 
+import { unstable_rethrow } from 'next/navigation'
 import { createClient, getUser } from '@/lib/supabase/server'
 import { decodeCursor, type Cursor } from '@/lib/cursor'
 import { isLocalMode } from '@/lib/mode'
-import { readStore, type LocalNotification, type Tables } from '@/lib/local/db'
-import { type TargetIndex } from '@/features/notifications/plan'
+import { readStore, type LocalNotification, type LocalProfile, type Tables } from '@/lib/local/db'
+import { emptyTargetIndex, type TargetIndex } from '@/features/notifications/plan'
+import { blockedPair, canReadProfile, canReadContent, localActor, contentActive } from '@/lib/local/access'
+import { localCanViewPost } from '@/features/feed/queries'
+import {
+  canReadConversationActivityLocal,
+  canReadConversationHistoryLocal,
+} from '@/features/messages/local-access'
 
 /**
  * Notification reads.
  *
  * The writes are not here and must not be: notifications are created in the database by
  * triggers through `app.create_notification`, de-duplicated by a unique constraint with
- * `nulls not distinct`, and 77 tests assert that a client cannot forge one. The reader's
- * job is to display them truthfully and to count them once.
+ * `nulls not distinct`. Local message activity is emitted within its accepted-send
+ * transaction, not here. The reader's job is to display it truthfully and count it once.
  *
  * The unread count is a real `count` query rather than `rows.length` of a limited page.
  * A badge that says "9" because that is how many fitted in the fetch is the exact kind of
@@ -56,14 +63,23 @@ const NOTIFICATION_SELECT = `
   actor:profiles!notifications_actor_id_fkey ( id, username, display_name, avatar_url )
 `
 
+function notificationVisibleLocal(row: LocalNotification, db: Tables, viewer: LocalProfile | null) {
+  if (!viewer || row.recipient_id !== viewer.id || blockedPair(db, viewer.id, row.actor_id)) return false
+  return row.type !== 'message' || Boolean(row.conversation_id &&
+    canReadConversationActivityLocal(db, row.conversation_id, row.created_at, viewer))
+}
+
 /** One store notification, with its actor resolved the way the embed resolves it. */
 function toNotificationRow(row: LocalNotification, db: Tables): NotificationRow {
   const actor = row.actor_id ? (db.profiles.find((profile) => profile.id === row.actor_id) ?? null) : null
+  const viewer = db.profiles.find(profile => profile.id === row.recipient_id) ?? null
 
   return {
     id: row.id,
     type: row.type,
-    body: row.body,
+    // Legacy activity rows may contain text. Never serialize a private message
+    // body through notifications; the authorized thread is its only read path.
+    body: row.type === 'message' ? null : row.body,
     is_read: row.is_read,
     created_at: row.created_at,
     post_id: row.post_id,
@@ -73,7 +89,7 @@ function toNotificationRow(row: LocalNotification, db: Tables): NotificationRow 
     event_id: row.event_id,
     opportunity_id: row.opportunity_id,
     conversation_id: row.conversation_id,
-    actor: actor
+    actor: actor && canReadProfile(db, actor, viewer)
       ? {
           id: actor.id,
           username: actor.username,
@@ -120,17 +136,27 @@ function decodeLocalCursor(raw: string | string[] | undefined): Cursor | null {
   return { createdAt, id }
 }
 
-export async function getUnreadNotificationCount(): Promise<number> {
+/** Null is a failed/unknown count, never an invented zero unread badge. */
+export async function getUnreadNotificationCount(): Promise<number | null> {
+  try {
+    return await readUnreadNotificationCount()
+  } catch (error) {
+    unstable_rethrow(error)
+    return null
+  }
+}
+
+async function readUnreadNotificationCount(): Promise<number | null> {
   if (isLocalMode()) {
     const user = await getUser()
     if (!user) return 0
 
     const db = await readStore()
-    const profile = db.profiles.find((candidate) => candidate.user_id === user.id)
+    const profile = localActor(db, user.id)
     if (!profile) return 0
 
     // Every unread row addressed to this profile — not the first page of them.
-    return db.notifications.filter((row) => row.recipient_id === profile.id && !row.is_read).length
+    return db.notifications.filter(row => !row.is_read && notificationVisibleLocal(row, db, profile)).length
   }
 
   const supabase = await createClient()
@@ -140,14 +166,8 @@ export async function getUnreadNotificationCount(): Promise<number> {
     .select('id', { count: 'exact', head: true })
     .eq('is_read', false)
 
-  if (error) {
-    // A missing badge is a cosmetic failure; a thrown error would take the whole page
-    // down for it. The failure is logged and reported as zero.
-    console.error('[notifications:unreadCount]', error.code, error.message)
-    return 0
-  }
-
-  return count ?? 0
+  return !error && typeof count === 'number' && Number.isSafeInteger(count) && count >= 0
+    ? count : null
 }
 
 export async function getNotifications({
@@ -158,18 +178,35 @@ export async function getNotifications({
   nextCursor: Cursor | null
   error: string | null
 }> {
+  try {
+    const size = Number.isFinite(limit) ? Math.max(1, Math.min(50, Math.trunc(limit))) : 30
+    return await readNotifications({ limit: size, cursor })
+  } catch (error) {
+    unstable_rethrow(error)
+    return { notifications: null, nextCursor: null, error: 'Your notifications could not be loaded.' }
+  }
+}
+
+async function readNotifications({
+  limit,
+  cursor,
+}: { limit: number; cursor?: string | string[] }): Promise<{
+  notifications: NotificationRow[] | null
+  nextCursor: Cursor | null
+  error: string | null
+}> {
   if (isLocalMode()) {
     const user = await getUser()
     if (!user) return { notifications: [], nextCursor: null, error: null }
 
     const db = await readStore()
-    const profile = db.profiles.find((candidate) => candidate.user_id === user.id)
+    const profile = localActor(db, user.id)
     if (!profile) return { notifications: [], nextCursor: null, error: null }
 
     const decoded = decodeLocalCursor(cursor)
 
     const rows = db.notifications
-      .filter((row) => row.recipient_id === profile.id)
+      .filter(row => notificationVisibleLocal(row, db, profile))
       // Keyset, not offset: the page boundary has to hold while rows are being written.
       // Same predicate as the `or` in the Supabase path — strictly older, or the same
       // instant with a smaller id.
@@ -212,18 +249,59 @@ export async function getNotifications({
 
   const { data, error } = await query.returns<NotificationRow[]>()
 
-  if (error) {
-    console.error('[notifications:list]', error.code, error.message)
+  if (error || !Array.isArray(data) || data.length > limit) {
     return { notifications: null, nextCursor: null, error: 'Your notifications could not be loaded.' }
   }
 
-  const rows = data ?? []
+  // Cloud message activity is bodyless too. Strip unexpected legacy payloads
+  // before they reach a Server/Client Component, not just while rendering text.
+  const parsed = data.map(notificationRecord)
+  if (parsed.some(row => row === null)) {
+    return { notifications: null, nextCursor: null, error: 'Your notifications could not be loaded.' }
+  }
+  const rows = parsed as NotificationRow[]
   const last = rows.at(-1)
 
   return {
     notifications: rows,
     nextCursor: rows.length === limit && last ? { createdAt: last.created_at, id: last.id } : null,
     error: null,
+  }
+}
+
+function notificationRecord(value: unknown): NotificationRow | null {
+  if (!value || typeof value !== 'object' || Array.isArray(value)) return null
+  const row = value as Record<string, unknown>
+  if (typeof row.id !== 'string' || !row.id ||
+      typeof row.type !== 'string' || typeof row.is_read !== 'boolean' ||
+      typeof row.created_at !== 'string' || !Number.isFinite(Date.parse(row.created_at))) return null
+  for (const key of [
+    'post_id', 'comment_id', 'project_id', 'idea_id', 'event_id',
+    'opportunity_id', 'conversation_id',
+  ]) {
+    if (!(row[key] === null || typeof row[key] === 'string')) return null
+  }
+  if (row.type !== 'message' && !(row.body === null || typeof row.body === 'string')) return null
+  let actor: NotificationRow['actor'] = null
+  if (row.actor !== null) {
+    if (!row.actor || typeof row.actor !== 'object' || Array.isArray(row.actor)) return null
+    const person = row.actor as Record<string, unknown>
+    if (typeof person.id !== 'string' || !person.id ||
+        typeof person.username !== 'string' || !person.username ||
+        typeof person.display_name !== 'string' ||
+        !(person.avatar_url === null || typeof person.avatar_url === 'string')) return null
+    actor = {
+      id: person.id, username: person.username, display_name: person.display_name,
+      avatar_url: person.avatar_url,
+    }
+  }
+  const record = row as unknown as NotificationRow
+  return {
+    id: record.id, type: record.type, is_read: record.is_read, created_at: record.created_at,
+    body: record.type === 'message' ? null : record.body, actor,
+    post_id: record.post_id, comment_id: record.comment_id, project_id: record.project_id,
+    idea_id: record.idea_id, event_id: record.event_id, opportunity_id: record.opportunity_id,
+    conversation_id: record.conversation_id,
   }
 }
 
@@ -262,9 +340,9 @@ const NO_PROJECTS = { data: [] as ProjectIdRow[], error: null }
  * LOCAL MODE does the same seven lookups with `.filter()`: the id has to be present and
  * `deleted_at` has to be null. Two notes on what is deliberately not reproduced here.
  *
- *   * `conversations` has no `deleted_at`, and its policy is participant-scoped, so it is
- *     filtered to the reader's `conversation_participants` rows — a conversation the reader
- *     is not in is not in the index.
+ *   * `conversations` has no `deleted_at`. Actual membership intervals authorize
+ *     retained history links after leaving; message activity outside those intervals
+ *     is not entitled to a link or an unread notification.
  *   * The full visibility rule for posts, projects, ideas, events and opportunities
  *     (university, connections, private) lives in each of those domains and is not copied
  *     into this file, where it would be a second copy that could drift from the one those
@@ -272,7 +350,21 @@ const NO_PROJECTS = { data: [] as ProjectIdRow[], error: null }
  *     place, so what is checked is the thing this file is responsible for: the row exists
  *     and it has not been soft-deleted.
  */
+const TARGET_ERROR = 'The links on this page could not be resolved just now. The notifications themselves are accurate.'
+
 export async function getTargetIndex(rows: NotificationRow[]): Promise<{
+  index: TargetIndex
+  error: string | null
+}> {
+  try {
+    return await readTargetIndex(rows)
+  } catch (error) {
+    unstable_rethrow(error)
+    return { index: emptyTargetIndex(), error: TARGET_ERROR }
+  }
+}
+
+async function readTargetIndex(rows: NotificationRow[]): Promise<{
   index: TargetIndex
   /** Set when a select failed, so the page can say so instead of claiming things vanished. */
   error: string | null
@@ -291,7 +383,7 @@ export async function getTargetIndex(rows: NotificationRow[]): Promise<{
   if (isLocalMode()) {
     const db = await readStore()
     const user = await getUser()
-    const profile = user ? (db.profiles.find((candidate) => candidate.user_id === user.id) ?? null) : null
+    const profile = localActor(db, user?.id ?? null)
 
     const wanted = (ids: string[]) => new Set(ids)
 
@@ -303,33 +395,34 @@ export async function getTargetIndex(rows: NotificationRow[]): Promise<{
       )
     }
 
-    const mineConversations = profile
-      ? new Set(
-          db.conversation_participants
-            .filter((participant) => participant.profile_id === profile.id)
-            .map((participant) => participant.conversation_id),
-        )
-      : new Set<string>()
-
     const askedProjects = wanted(projectIds)
-    const askedConversations = wanted(conversationIds)
+    const askedConversations = wanted(rows
+      .filter(row => row.type !== 'message' || Boolean(row.conversation_id &&
+        canReadConversationActivityLocal(db, row.conversation_id, row.created_at, profile)))
+      .map(row => row.conversation_id)
+      .filter((value): value is string => typeof value === 'string'))
 
     return {
       index: {
-        posts: live(postIds, db.posts),
-        comments: live(commentIds, db.comments),
+        posts: live(postIds, db.posts.filter(post =>
+          localCanViewPost(post, profile, db.profiles.find(author => author.id === post.author_id), db))),
+        comments: live(commentIds, db.comments.filter(row => {
+          const post = db.posts.find(post => post.id === row.post_id)
+          const parent = row.parent_id ? db.comments.find(comment => comment.id === row.parent_id) : null
+          return contentActive(db, 'comment', row.id) && !blockedPair(db, profile?.id, row.author_id) && post && localCanViewPost(post, profile, db.profiles.find(author => author.id === post.author_id), db) && (!row.parent_id || (parent && !parent.deleted_at && contentActive(db, 'comment', parent.id) && !blockedPair(db, profile?.id, parent.author_id)))
+        })),
         projects: new Map(
           db.projects
-            .filter((project) => askedProjects.has(project.id) && project.deleted_at === null)
+            .filter((project) => askedProjects.has(project.id) && canReadContent(db, project, project.owner_id, profile, 'project'))
             .map((project) => [project.id, project.slug]),
         ),
-        ideas: live(ideaIds, db.ideas),
-        events: live(eventIds, db.events),
-        opportunities: live(opportunityIds, db.opportunities),
+        ideas: live(ideaIds, db.ideas.filter(row => canReadContent(db, row, row.author_id, profile, 'idea'))),
+        events: live(eventIds, db.events.filter(row => canReadContent(db, row, row.created_by, profile, 'event'))),
+        opportunities: live(opportunityIds, db.opportunities.filter(row => canReadContent(db, row, row.posted_by, profile, 'opportunity'))),
         conversations: new Set(
           db.conversations
             .filter((conversation) => askedConversations.has(conversation.id))
-            .filter((conversation) => mineConversations.has(conversation.id))
+            .filter(conversation => canReadConversationHistoryLocal(db, conversation.id, profile))
             .map((conversation) => conversation.id),
         ),
       },
@@ -391,44 +484,40 @@ export async function getTargetIndex(rows: NotificationRow[]): Promise<{
             .is('deleted_at', null)
             .returns<IdRow[]>()
         : NO_IDS,
-      // `conversations` has no `deleted_at`: a conversation is never soft-deleted, and a
-      // reader who is not a participant simply does not see the row.
+      // Raw conversation SELECTs intentionally deny departed readers to protect
+      // global previews. The thread's caller-scoped summary is the readable
+      // history target, including after leave; select only its authorized ID.
       conversationIds.length
-        ? supabase.from('conversations').select('id').in('id', conversationIds).returns<IdRow[]>()
+        ? supabase.from('message_conversation_summaries').select('id').in('id', conversationIds).returns<IdRow[]>()
         : NO_IDS,
     ])
 
-  const failures = [
-    ['posts', posts.error],
-    ['comments', comments.error],
-    ['projects', projects.error],
-    ['ideas', ideas.error],
-    ['events', events.error],
-    ['opportunities', opportunities.error],
-    ['conversations', conversations.error],
+  const targets = [
+    [posts, postIds], [comments, commentIds], [projects, projectIds],
+    [ideas, ideaIds], [events, eventIds], [opportunities, opportunityIds],
+    [conversations, conversationIds],
   ] as const
-
-  let failed = false
-  for (const [label, error] of failures) {
-    if (!error) continue
-    failed = true
-    console.error(`[notifications:targets:${label}]`, error.code, error.message)
+  const validIds = (data: unknown, asked: readonly string[]): data is IdRow[] =>
+    Array.isArray(data) && data.length <= asked.length &&
+    data.every(row => row && typeof row === 'object' && !Array.isArray(row) &&
+      typeof row.id === 'string' && asked.includes(row.id)) &&
+    new Set(data.map(row => row.id)).size === data.length
+  if (targets.some(([result, asked]) => result.error || !validIds(result.data, asked)) ||
+      !projects.data?.every(row => typeof row.slug === 'string' && row.slug.length > 0)) {
+    return { index: emptyTargetIndex(), error: TARGET_ERROR }
   }
-
-  const ids = (result: { data: IdRow[] | null }) => new Set((result.data ?? []).map((row) => row.id))
+  const ids = (result: { data: IdRow[] | null }) => new Set(result.data!.map(row => row.id))
 
   return {
     index: {
       posts: ids(posts),
       comments: ids(comments),
-      projects: new Map((projects.data ?? []).map((row) => [row.id, row.slug])),
+      projects: new Map(projects.data.map(row => [row.id, row.slug])),
       ideas: ids(ideas),
       events: ids(events),
       opportunities: ids(opportunities),
       conversations: ids(conversations),
     },
-    error: failed
-      ? 'The links on this page could not be resolved just now. The notifications themselves are accurate.'
-      : null,
+    error: null,
   }
 }

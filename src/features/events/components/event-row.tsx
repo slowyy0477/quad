@@ -2,7 +2,7 @@ import Link from 'next/link'
 import { Badge } from '@/components/ui/badge'
 import { Surface } from '@/components/ui/surface'
 import { attendanceModeLabel, eventTypeLabel, rsvpLabel } from '@/features/events/constants'
-import { formatEventDay, formatEventTime } from '@/features/events/when'
+import { formatEventDay, formatEventTime, safeZone } from '@/features/events/when'
 import type { EventBoardRow } from '@/features/events/queries'
 
 /**
@@ -19,11 +19,21 @@ import type { EventBoardRow } from '@/features/events/queries'
 export function EventRow({ event }: { event: EventBoardRow }) {
   const remaining = event.capacity == null ? null : Math.max(0, event.capacity - event.attendee_count)
   const full = remaining === 0
+  const dateParts = new Intl.DateTimeFormat('en-GB', {
+    timeZone: safeZone(event.time_zone), day: 'numeric', month: 'short',
+  }).formatToParts(new Date(event.starts_at))
+  const day = dateParts.find(part => part.type === 'day')?.value
+  const month = dateParts.find(part => part.type === 'month')?.value
 
   return (
-    <Surface as="article" className="p-4 transition-colors hover:border-rule">
+    <Surface as="article" className="interactive-card p-5">
       <div className="flex items-start justify-between gap-3">
-        <div className="min-w-0">
+        <div className="flex min-w-0 items-start gap-4">
+          <div className="event-date-tile hidden sm:flex" aria-hidden="true">
+            <span className="text-xs font-semibold uppercase">{month}</span>
+            <span className="text-2xl font-bold tabular-nums">{day}</span>
+          </div>
+          <div className="min-w-0">
           <p className="text-2xs font-semibold tracking-[0.12em] text-ink-faint uppercase">
             {formatEventDay(event.starts_at, event.time_zone)}
           </p>
@@ -35,6 +45,7 @@ export function EventRow({ event }: { event: EventBoardRow }) {
           <p className="mt-1 text-sm text-ink-muted tabular">
             {event.is_all_day ? 'All day' : formatEventTime(event.starts_at, event.time_zone)}
           </p>
+          </div>
         </div>
 
         <div className="flex shrink-0 flex-col items-end gap-1.5">
@@ -43,10 +54,10 @@ export function EventRow({ event }: { event: EventBoardRow }) {
         </div>
       </div>
 
-      <div className="mt-3 flex flex-wrap items-center gap-1.5">
-        <Badge tone="neutral">{eventTypeLabel(event.type)}</Badge>
-        <Badge tone="outline">{attendanceModeLabel(event.attendance_mode)}</Badge>
-        {event.location ? <Badge tone="outline">{event.location}</Badge> : null}
+      <div className="mt-3 flex flex-wrap items-center gap-x-3 gap-y-1 text-xs text-ink-muted">
+        <span>{eventTypeLabel(event.type)}</span>
+        <span className="border-l border-rule pl-3">{attendanceModeLabel(event.attendance_mode)}</span>
+        {event.location ? <span>{event.location}</span> : null}
       </div>
 
       <div className="mt-4 flex flex-wrap items-center justify-between gap-2 border-t border-hairline pt-3 text-xs text-ink-muted">

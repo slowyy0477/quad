@@ -2,7 +2,7 @@ import Link from 'next/link'
 import { Avatar } from '@/components/ui/avatar'
 import { notificationTime } from '@/features/notifications/plan'
 import type { NotificationView } from '@/features/notifications/types'
-import { markOneReadAction } from '@/features/notifications/actions'
+import { NotificationReadControl } from './notification-read-control'
 
 /**
  * One notification.
@@ -15,8 +15,8 @@ import { markOneReadAction } from '@/features/notifications/actions'
  * neither a link (which might 404) nor "no longer available" (which would be a claim we
  * cannot support) — only the sentence, which is still true.
  *
- * A server component: the mark-as-read control is a plain form posting a server action, so
- * the list works before hydration and without JavaScript.
+ * Server-owned text/targets with a small progressive read form. Only the read
+ * control needs client state; the authorized list is not fetched in the browser.
  */
 export function NotificationRow({
   view,
@@ -40,11 +40,12 @@ export function NotificationRow({
         }
       />
 
-      <Avatar name={view.actorName ?? 'Quad'} src={view.actorAvatar} className="size-8 shrink-0" />
+      <Avatar name={view.actorName ?? 'Bulla'} src={view.actorAvatar} className="size-8 shrink-0" />
 
       <div className="min-w-0 flex-1">
         <div className="flex items-baseline justify-between gap-3">
-          <p className={view.is_read ? 'text-sm text-ink-muted' : 'text-sm text-ink'}>
+          <p tabIndex={-1} data-notification-message
+            className={view.is_read ? 'text-sm text-ink-muted' : 'text-sm text-ink'}>
             {view.is_read ? null : <span className="sr-only">Unread. </span>}
             {view.text}
           </p>
@@ -77,17 +78,7 @@ export function NotificationRow({
             </span>
           ) : null}
 
-          {view.is_read ? null : (
-            <form action={markOneReadAction}>
-              <input type="hidden" name="id" value={view.id} />
-              <button
-                type="submit"
-                className="text-xs text-ink-faint underline-offset-4 hover:text-ink hover:underline"
-              >
-                Mark as read
-              </button>
-            </form>
-          )}
+          <NotificationReadControl key={view.id} id={view.id} isRead={view.is_read} />
         </div>
       </div>
     </li>

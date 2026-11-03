@@ -1,7 +1,10 @@
 import Link from 'next/link'
 import { formatDistanceToNowStrict } from 'date-fns'
 import { Avatar } from '@/components/ui/avatar'
+import { Button } from '@/components/ui/button'
+import { LoadMore } from '@/components/ui/pagination'
 import { CommentComposer } from '@/features/feed/components/comment-composer'
+import { ReportDialog } from '@/features/moderation/components/report-dialog'
 import type { CommentPost } from '@/features/feed/queries'
 
 /**
@@ -57,11 +60,17 @@ function CommentRow({
 
           <p className="mt-1 text-sm whitespace-pre-wrap text-ink">{comment.body}</p>
 
-          <p className="mt-1 text-xs text-ink-faint">
-            <span className="tabular">{comment.like_count}</span>{' '}
-            <span className="sr-only">likes. </span>
-            {comment.like_count === 1 ? 'like' : 'likes'}
-          </p>
+          <div className="mt-1 flex flex-wrap items-center gap-2">
+            <p className="text-xs text-ink-faint">
+              <span className="tabular">{comment.like_count}</span>{' '}
+              <span className="sr-only">likes. </span>
+              {comment.like_count === 1 ? 'like' : 'likes'}
+            </p>
+            {signedIn ? (
+              <ReportDialog kind="comment" targetId={comment.id} subject="this comment"
+                trigger={<Button variant="ghost" size="sm" aria-label="Report this comment">Report</Button>} />
+            ) : null}
+          </div>
 
           {signedIn && !isReply ? (
             <details className="mt-2">
@@ -91,11 +100,13 @@ export function CommentThread({
   comments,
   replies,
   signedIn,
+  replyLinks = {},
 }: {
   postId: string
   comments: CommentPost[]
   replies: CommentPost[]
   signedIn: boolean
+  replyLinks?: Record<string, { next: string | null; first: string | null }>
 }) {
   const byParent = new Map<string, CommentPost[]>()
   for (const reply of replies) {
@@ -110,7 +121,7 @@ export function CommentThread({
       {comments.map((comment) => {
         const children = byParent.get(comment.id) ?? []
         return (
-          <li key={comment.id} className="space-y-3">
+          <li key={comment.id} id={`replies-${comment.id}`} className="scroll-mt-24 space-y-3">
             <CommentRow comment={comment} postId={postId} signedIn={signedIn} />
             {children.length > 0 ? (
               <ol className="ml-6 space-y-3">
@@ -125,6 +136,17 @@ export function CommentThread({
                   </li>
                 ))}
               </ol>
+            ) : null}
+            {replyLinks[comment.id]?.next ? (
+              <LoadMore href={replyLinks[comment.id].next!} label="Next replies in this thread" className="py-2" />
+            ) : null}
+            {replyLinks[comment.id]?.first ? (
+              <p className="ml-6 text-xs">
+                <Link href={replyLinks[comment.id].first!} scroll={false}
+                  className="inline-flex min-h-9 items-center text-accent-700 underline underline-offset-2">
+                  Back to the first replies
+                </Link>
+              </p>
             ) : null}
           </li>
         )

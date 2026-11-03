@@ -1,8 +1,13 @@
 import 'server-only'
 
+import { unstable_rethrow } from 'next/navigation'
 import { createClient, getUser } from '@/lib/supabase/server'
 import { readStore, type LocalProfile, type Tables } from '@/lib/local/db'
 import { isLocalMode } from '@/lib/mode'
+import { canReadContent, canReadProfile, localActor } from '@/lib/local/access'
+import { localGraphCounts } from '@/features/connections/graph-local'
+import { getGraphCounts } from '@/features/connections/graph-reads'
+import { approvedDepartmentOptions, type DepartmentOption, type DepartmentReference } from './departments'
 
 /**
  * Profile reads.
@@ -19,30 +24,11 @@ import { isLocalMode } from '@/lib/mode'
  *
  * LOCAL MODE
  * ----------
- * There is no RLS here, so the rule the policies implement is written out in
- * TypeScript below and applied literally — `canViewLocalProfile` is
- * `app.can_view_profile` from 0005, translated:
- *
- *     p.id = auth.uid()                                  -- yourself, always
- *     or ( p.visibility = 'public' )
- *     or ( p.visibility = 'university' and app.share_university(p.id, auth.uid()) )
- *     or ( p.visibility = 'connections' and app.are_connected(p.id, auth.uid()) )
- *
- * `are_connected` cannot be true in the local store because it has no
- * `connections` table, so a `connections`-scoped profile is visible to its author
- * and to nobody else. That is a narrower answer than Postgres would give once the
- * graph exists, and it is the honest one for this store.
- *
- * Two shapes need explaining, because the local store has fewer columns than
- * `profiles` does:
- *
- *   - `headline`, `location`, `graduation_year`, `linkedin_url`,
- *     `twitter_username` and `onboarding_completed` have no column in
- *     `LocalProfile`. They are returned as null / true rather than invented.
- *     `onboarding_completed` is true because the local sign-up assigns a handle
- *     immediately, so there is no half-created profile state to warn about.
- *   - `follower_count`, `following_count` and `connection_count` are counts of
- *     tables the store does not have, so they are zero — and therefore true.
+ * There is no RLS here. All local reads use the shared access predicates, which
+ * include visibility, accepted connections, blocks and account suspension.
+ * Graph counts are derived from readable counterpart profiles, not stored
+ * counters. Legacy rows retain their programme/GitHub mappings and completed
+ * onboarding fallback; newer rows return the canonical values actually saved.
  */
 
 export type ProfileSummary = {
@@ -65,14 +51,22 @@ export type FullProfile = ProfileSummary & {
   twitter_username: string | null
   visibility: string
   onboarding_completed: boolean
-  follower_count: number
-  following_count: number
-  connection_count: number
+  /** Null means this graph is unavailable or its read failed, never zero. */
+  follower_count: number | null
+  following_count: number | null
+  /** Always null for a foreign profile, including a public profile. */
+  connection_count: number | null
+  graph_counts_error?: string | null
   post_count: number
   project_count: number
   created_at: string
   university_id: string | null
   university: { id: string; name: string; short_name: string | null; slug: string } | null
+  // Optional for existing callers/fixtures; real reads now populate the ID/embed.
+  department_id?: string | null
+  department?: DepartmentOption | null
+  /** Only old local rows have a text-only affiliation, never an inferred ID. */
+  legacy_department?: string | null
 }
 
 const FULL_SELECT = `
@@ -80,9 +74,10 @@ const FULL_SELECT = `
   degree, semester, graduation_year, location, website,
   github_username, linkedin_url, twitter_username,
   visibility, onboarding_completed,
-  follower_count, following_count, connection_count, post_count, project_count,
-  created_at, university_id,
-  university:universities!profiles_university_id_fkey ( id, name, short_name, slug )
+  post_count, project_count,
+  created_at, university_id, department_id,
+  university:universities!profiles_university_id_fkey ( id, name, short_name, slug ),
+  department:departments!profiles_department_id_fkey ( id, university_id, name )
 `
 
 // -----------------------------------------------------------------------------
@@ -102,53 +97,31 @@ const FULL_SELECT = `
 export type LocalViewer = {
   profileId: string | null
   universityId: string | null
+  db: Tables
 }
 
 /** The reader's profile in the local store, or null when there is no session. */
 export function localViewer(db: Tables, userId: string | null): LocalViewer {
-  if (!userId) return { profileId: null, universityId: null }
-  const profile = db.profiles.find((candidate) => candidate.user_id === userId)
-  return { profileId: profile?.id ?? null, universityId: profile?.university_id ?? null }
+  const profile = localActor(db, userId)
+  return { profileId: profile?.id ?? null, universityId: profile?.university_id ?? null, db }
 }
 
-/**
- * `app.can_view_profile`, in TypeScript.
- *
- * The block check is absent rather than forgotten: there is no `blocks` table, so
- * nobody can be blocked, so there is nothing to exclude.
- */
+/** Every caller must supply the store so blocks and suspension cannot be skipped. */
 export function canViewLocalProfile(target: LocalProfile, viewer: LocalViewer): boolean {
-  if (viewer.profileId !== null && target.id === viewer.profileId) return true
-
-  switch (target.visibility) {
-    case 'public':
-      return true
-    case 'university':
-      // `app.share_university`: both sides named, and the same institution.
-      return Boolean(
-        viewer.universityId &&
-          target.university_id &&
-          viewer.universityId === target.university_id,
-      )
-    case 'connections':
-      // `app.are_connected` needs a `connections` table. There is none, so only
-      // the author (handled above) may see it.
-      return false
-    case 'private':
-    default:
-      return false
-  }
+  const profile = viewer.db.profiles.find((row) => row.id === viewer.profileId)
+  return canReadProfile(viewer.db, target, localActor(viewer.db, profile?.user_id ?? null))
 }
 
 /** The row shape every list embeds, from a `LocalProfile`. */
-export function toProfileSummary(profile: LocalProfile): ProfileSummary {
+export function toProfileSummary(
+  profile: Pick<LocalProfile, 'id' | 'username' | 'display_name' | 'avatar_url' | 'headline'>,
+): ProfileSummary {
   return {
     id: profile.id,
     username: profile.username,
     display_name: profile.display_name,
     avatar_url: profile.avatar_url,
-    // No `headline` column in the local store.
-    headline: null,
+    headline: profile.headline ?? null,
   }
 }
 
@@ -194,26 +167,21 @@ function localGithub(value: string | null): string | null {
   return cleaned === '' ? null : cleaned
 }
 
-/**
- * A local profile, in the shape the interface expects.
- *
- * The two counts that *can* be derived are derived from the arrays, because in
- * local mode there is no trigger maintaining the stored number and the stored
- * number in the seed is illustrative:
- *
- *   post_count     `app.sync_profile_post_count` — live posts by the author.
- *   project_count  `app.sync_profile_project_count` — live projects they own.
- */
-function localFullProfile(db: Tables, profile: LocalProfile): FullProfile {
+/** A committed local profile, in the shape the interface expects. */
+function localFullProfile(db: Tables, profile: LocalProfile, viewer: LocalProfile | null): FullProfile {
+  const graph = localGraphCounts(db, profile, viewer)
+  const department = db.departments.find((row) =>
+    row.id === profile.department_id && row.university_id === profile.university_id)
   const postCount = db.posts.filter(
     (post) =>
       post.author_id === profile.id &&
-      post.deleted_at === null &&
-      post.moderation_status === 'active',
+      post.moderation_status === 'active' &&
+      canReadContent(db, post, profile.id, viewer, 'post'),
   ).length
 
   const projectCount = db.projects.filter(
-    (project) => project.owner_id === profile.id && project.deleted_at === null,
+    (project) => project.owner_id === profile.id &&
+      canReadContent(db, project, profile.id, viewer, 'project'),
   ).length
 
   return {
@@ -221,28 +189,33 @@ function localFullProfile(db: Tables, profile: LocalProfile): FullProfile {
     username: profile.username,
     display_name: profile.display_name,
     avatar_url: profile.avatar_url,
-    headline: null,
+    headline: profile.headline ?? null,
     bio: profile.bio,
-    // `degree` is the programme the profile names ("BS Software Engineering"),
-    // falling back to the department when no programme is set.
-    degree: profile.programme ?? profile.department,
+    // An explicit clear must not resurrect an older programme/department.
+    degree: profile.degree === undefined ? profile.programme ?? profile.department : profile.degree,
     semester: localSemester(profile.semester),
-    graduation_year: null,
-    location: null,
+    graduation_year: profile.graduation_year ?? null,
+    location: profile.location ?? null,
     website: profile.website,
-    github_username: localGithub(profile.github),
-    linkedin_url: null,
-    twitter_username: null,
+    github_username: profile.github_username === undefined ? localGithub(profile.github) : profile.github_username,
+    linkedin_url: profile.linkedin_url ?? null,
+    twitter_username: profile.twitter_username ?? null,
     visibility: profile.visibility,
-    onboarding_completed: true,
-    follower_count: 0,
-    following_count: 0,
-    connection_count: 0,
+    onboarding_completed: profile.onboarding_completed ?? true,
+    follower_count: graph?.follower_count ?? null,
+    following_count: graph?.following_count ?? null,
+    connection_count: graph?.connection_count ?? null,
+    graph_counts_error: null,
     post_count: postCount,
     project_count: projectCount,
     created_at: profile.created_at,
     university_id: profile.university_id,
     university: localUniversityEmbed(db, profile.university_id),
+    department_id: profile.department_id ?? null,
+    department: department
+      ? { id: department.id, university_id: department.university_id, name: department.name }
+      : null,
+    legacy_department: profile.department_id === undefined ? profile.department : null,
   }
 }
 
@@ -250,41 +223,128 @@ function localFullProfile(db: Tables, profile: LocalProfile): FullProfile {
 // Reads
 // -----------------------------------------------------------------------------
 
+const PROFILE_READ_ERROR = 'The profile could not be loaded. Please try again.'
+const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i
+type ProfileRow = Omit<FullProfile,
+  'follower_count' | 'following_count' | 'connection_count' | 'graph_counts_error'>
+export type MyProfileRead =
+  | { state: 'signed-out' }
+  | { state: 'missing'; userId: string }
+  | { state: 'error'; message: string }
+  | { state: 'ok'; profile: FullProfile }
+export type ProfileRead =
+  | { state: 'missing' }
+  | { state: 'error'; message: string }
+  | { state: 'ok'; profile: FullProfile }
+
+function providerProfile(value: unknown): ProfileRow | null {
+  if (!value || typeof value !== 'object' || Array.isArray(value)) return null
+  const row = value as Record<string, unknown>
+  if (typeof row.id !== 'string' || !UUID.test(row.id) ||
+      typeof row.username !== 'string' || !row.username.trim() ||
+      typeof row.display_name !== 'string' || !row.display_name.trim() ||
+      typeof row.visibility !== 'string' ||
+      !['public', 'university', 'connections', 'private'].includes(row.visibility) ||
+      typeof row.onboarding_completed !== 'boolean' ||
+      typeof row.created_at !== 'string' || !Number.isFinite(Date.parse(row.created_at)) ||
+      !Number.isSafeInteger(row.post_count) || Number(row.post_count) < 0 ||
+      !Number.isSafeInteger(row.project_count) || Number(row.project_count) < 0) return null
+  for (const key of [
+    'avatar_url', 'headline', 'bio', 'degree', 'location', 'website',
+    'github_username', 'linkedin_url', 'twitter_username', 'university_id',
+  ]) {
+    if (!(row[key] === null || typeof row[key] === 'string')) return null
+  }
+  for (const key of ['semester', 'graduation_year']) {
+    if (!(row[key] === null || Number.isSafeInteger(row[key]))) return null
+  }
+  if (row.department_id !== undefined &&
+      !(row.department_id === null || typeof row.department_id === 'string')) return null
+  if (row.university !== null) {
+    if (!row.university || typeof row.university !== 'object' || Array.isArray(row.university)) return null
+    const university = row.university as Record<string, unknown>
+    if (typeof university.id !== 'string' || typeof university.name !== 'string' ||
+        typeof university.slug !== 'string' ||
+        !(university.short_name === null || typeof university.short_name === 'string')) return null
+  }
+  if (row.department !== undefined && row.department !== null) {
+    if (typeof row.department !== 'object' || Array.isArray(row.department)) return null
+    const department = row.department as Record<string, unknown>
+    if (typeof department.id !== 'string' || typeof department.university_id !== 'string' ||
+        typeof department.name !== 'string') return null
+  }
+
+  // Copy only the projection. Provider extras, notably maintained graph
+  // counters and account/security fields, never enter the presentation DTO.
+  const profile = row as unknown as ProfileRow
+  return {
+    id: profile.id, username: profile.username, display_name: profile.display_name,
+    avatar_url: profile.avatar_url, headline: profile.headline, bio: profile.bio,
+    degree: profile.degree, semester: profile.semester, graduation_year: profile.graduation_year,
+    location: profile.location, website: profile.website,
+    github_username: profile.github_username, linkedin_url: profile.linkedin_url,
+    twitter_username: profile.twitter_username, visibility: profile.visibility,
+    onboarding_completed: profile.onboarding_completed, post_count: profile.post_count,
+    project_count: profile.project_count, created_at: profile.created_at,
+    university_id: profile.university_id,
+    university: profile.university ? {
+      id: profile.university.id, name: profile.university.name,
+      short_name: profile.university.short_name, slug: profile.university.slug,
+    } : null,
+    department_id: profile.department_id ?? null,
+    department: profile.department ? {
+      id: profile.department.id, university_id: profile.department.university_id,
+      name: profile.department.name,
+    } : null,
+  }
+}
+
+async function withGraphCounts(profile: ProfileRow): Promise<FullProfile> {
+  const graph = await getGraphCounts(profile.id)
+  return {
+    ...profile,
+    follower_count: graph.counts?.follower_count ?? null,
+    following_count: graph.counts?.following_count ?? null,
+    connection_count: graph.counts?.connection_count ?? null,
+    graph_counts_error: graph.error,
+  }
+}
+
 /**
  * The signed-in user's own profile.
  *
- * Returns `null` for "no session" and `'missing'` for "session, but no profile
- * row". Those are different problems with different fixes and collapsing them into
- * one null loses the distinction: a missing row means the 0016 backfill has not
- * been applied to this project, which is worth saying out loud rather than
- * rendering as a blank page.
+ * Returns `'signed-out'` for no session and `'missing'` for a session without a
+ * readable profile. The existing result contract uses `'missing'` for an inactive
+ * local account too; no suspended row is exposed as a fallback. A genuinely
+ * absent cloud row may require the 0016 backfill rather than a blank form.
  */
-export async function getMyProfile(): Promise<
-  { state: 'signed-out' } | { state: 'missing'; userId: string } | { state: 'ok'; profile: FullProfile }
-> {
-  const user = await getUser()
-  if (!user) return { state: 'signed-out' }
+export async function getMyProfile(): Promise<MyProfileRead> {
+  try {
+    const user = await getUser()
+    if (!user) return { state: 'signed-out' }
 
-  if (isLocalMode()) {
-    const db = await readStore()
-    const profile = db.profiles.find((candidate) => candidate.user_id === user.id)
-    if (!profile) return { state: 'missing', userId: user.id }
-    return { state: 'ok', profile: localFullProfile(db, profile) }
+    if (isLocalMode()) {
+      const db = await readStore()
+      const profile = localActor(db, user.id)
+      if (!profile) return { state: 'missing', userId: user.id }
+      return { state: 'ok', profile: localFullProfile(db, profile, profile) }
+    }
+
+    const supabase = await createClient()
+    const { data, error } = await supabase
+      .from('profiles')
+      .select(FULL_SELECT)
+      .eq('id', user.id)
+      .maybeSingle<ProfileRow>()
+    if (error) return { state: 'error', message: PROFILE_READ_ERROR }
+    if (data === null) return { state: 'missing', userId: user.id }
+    const profile = providerProfile(data)
+    if (!profile || profile.id !== user.id) return { state: 'error', message: PROFILE_READ_ERROR }
+    return { state: 'ok', profile: await withGraphCounts(profile) }
+  } catch (error) {
+    unstable_rethrow(error)
+    return { state: 'error', message: PROFILE_READ_ERROR }
   }
-
-  const supabase = await createClient()
-  const { data, error } = await supabase
-    .from('profiles')
-    .select(FULL_SELECT)
-    .eq('id', user.id)
-    .maybeSingle<FullProfile>()
-
-  if (error) {
-    console.error('[profiles:getMyProfile]', error.code, error.message)
-    return { state: 'missing', userId: user.id }
-  }
-
-  return data ? { state: 'ok', profile: data } : { state: 'missing', userId: user.id }
 }
 
 /**
@@ -293,38 +353,50 @@ export async function getMyProfile(): Promise<
  * A profile the reader may not see returns null, not a partial row: the page
  * renders 404 for it, which is the same answer a handle that does not exist gets.
  */
+export async function getProfileByUsernameResult(username: string): Promise<ProfileRead> {
+  try {
+    if (typeof username !== 'string' || !username.trim() || username.trim().length > 64) {
+      return { state: 'missing' }
+    }
+    const wanted = username.trim()
+    if (isLocalMode()) {
+      const db = await readStore()
+      const matches = db.profiles.filter(
+        candidate => candidate.username.trim().toLowerCase() === wanted.toLowerCase(),
+      )
+      if (matches.length !== 1) return { state: 'missing' }
+      const user = await getUser()
+      const viewer = localActor(db, user?.id ?? null)
+      const profile = matches[0]!
+      if (!canReadProfile(db, profile, viewer)) return { state: 'missing' }
+      return { state: 'ok', profile: localFullProfile(db, profile, viewer) }
+    }
+
+    const supabase = await createClient()
+    const { data, error } = await supabase
+      .from('profiles')
+      .select(FULL_SELECT)
+      .ilike('username', wanted.replace(/[%_\\]/g, '\\$&'))
+      .is('deleted_at', null)
+      .maybeSingle<ProfileRow>()
+    if (error) return { state: 'error', message: PROFILE_READ_ERROR }
+    if (data === null) return { state: 'missing' }
+    const profile = providerProfile(data)
+    if (!profile || profile.username.trim().toLowerCase() !== wanted.toLowerCase()) {
+      return { state: 'error', message: PROFILE_READ_ERROR }
+    }
+    return { state: 'ok', profile: await withGraphCounts(profile) }
+  } catch (error) {
+    unstable_rethrow(error)
+    return { state: 'error', message: PROFILE_READ_ERROR }
+  }
+}
+
+/** Compatibility callers get null only for an absent/unreadable profile. */
 export async function getProfileByUsername(username: string): Promise<FullProfile | null> {
-  if (isLocalMode()) {
-    const db = await readStore()
-    const wanted = username.trim().toLowerCase()
-    const profile = db.profiles.find((candidate) => candidate.username.toLowerCase() === wanted)
-    if (!profile) return null
-
-    const user = await getUser()
-    if (!canViewLocalProfile(profile, localViewer(db, user?.id ?? null))) return null
-    return localFullProfile(db, profile)
-  }
-
-  const supabase = await createClient()
-
-  // `ilike` with no wildcards is an exact case-insensitive match, which is what
-  // the unique index on lower(username) enforces. Escaped so a handle containing
-  // % or _ cannot turn into a pattern -- it cannot today, because the check
-  // constraint forbids both, but the escape costs nothing and outlives the
-  // constraint.
-  const { data, error } = await supabase
-    .from('profiles')
-    .select(FULL_SELECT)
-    .ilike('username', username.replace(/[%_\\]/g, '\\$&'))
-    .is('deleted_at', null)
-    .maybeSingle<FullProfile>()
-
-  if (error) {
-    console.error('[profiles:getProfileByUsername]', error.code, error.message)
-    return null
-  }
-
-  return data
+  const result = await getProfileByUsernameResult(username)
+  if (result.state === 'error') throw new Error(result.message)
+  return result.state === 'ok' ? result.profile : null
 }
 
 export type UniversityOption = {
@@ -332,15 +404,17 @@ export type UniversityOption = {
   name: string
   short_name: string | null
   country: string | null
+  /** Optional for older consumers; listUniversities always supplies this list. */
+  departments?: DepartmentOption[]
 }
 
 /**
  * The universities a person may choose from.
  *
- * Only approved ones are readable by a normal user -- that is the RLS policy, not
- * a filter here -- so this list is whatever moderators have accepted. 0017 ships a
- * starting set; anything missing goes through the submission path, which is why the
- * form says the list is incomplete instead of pretending it is exhaustive.
+ * Offer approved universities and curated department references only. RLS also
+ * allows a submitter to read their own pending campus; that does not make it an
+ * approved option. is_verified describes a directory reference, not a student's
+ * claim. Existing unlisted affiliations can be preserved by the edit form.
  *
  * The local store has no `status` column, so every institution in it is offered:
  * there is no moderation queue in local mode to hold one back.
@@ -354,6 +428,7 @@ export async function listUniversities(): Promise<UniversityOption[]> {
         name: university.name,
         short_name: university.short_name,
         country: university.country,
+        departments: approvedDepartmentOptions(db.departments, university.id),
       }))
       .sort((a, b) => a.name.localeCompare(b.name))
   }
@@ -361,25 +436,30 @@ export async function listUniversities(): Promise<UniversityOption[]> {
   const supabase = await createClient()
   const { data, error } = await supabase
     .from('universities')
-    .select('id, name, short_name, country')
+    .select(`
+      id, name, short_name, country,
+      departments:departments!departments_university_id_fkey ( id, university_id, name, is_verified )
+    `)
+    .eq('status', 'approved')
+    .eq('departments.is_verified', true)
     .order('name')
-    .returns<UniversityOption[]>()
+    .returns<(Omit<UniversityOption, 'departments'> & { departments: DepartmentReference[] | null })[]>()
 
   if (error) {
     console.error('[profiles:listUniversities]', error.code, error.message)
     return []
   }
-  return data ?? []
+  return (data ?? []).map((university) => ({
+    ...university,
+    departments: approvedDepartmentOptions(university.departments ?? [], university.id),
+  }))
 }
 
 /**
  * Recently active people, for the "find someone" list. Not a recommendation engine.
  *
- * The local store records no `last_active_at` and no `status`, so the order is
- * account age — the only activity-shaped timestamp it keeps — and the two filters
- * that still mean something are applied instead: `searchable`, which the settings
- * page promises, and the visibility rule above, which is what would stop a
- * private profile appearing in a list.
+ * The local order is account age, not a fabricated activity score. Searchability
+ * and the shared visibility/block/suspension predicate still apply.
  */
 export async function listRecentProfiles(limit = 12): Promise<ProfileSummary[]> {
   if (isLocalMode()) {

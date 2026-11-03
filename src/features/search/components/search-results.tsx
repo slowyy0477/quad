@@ -4,13 +4,11 @@ import { CalendarDays, MessageSquare, Star } from 'lucide-react'
 import { Badge } from '@/components/ui/badge'
 import { Avatar } from '@/components/ui/avatar'
 import { Surface } from '@/components/ui/surface'
-import { PersonRow } from '@/features/connections/components/person-row'
+import { DiscoveryPersonRow } from '@/features/search/components/people-results'
 import { ProjectCard } from '@/features/projects/components/project-card'
 import { categoryLabel, ideaStatusLabel } from '@/features/projects/constants'
 import type {
-  SearchEvent,
   SearchIdea,
-  SearchOpportunity,
   SearchPost,
   SearchResult,
 } from '@/features/search/queries'
@@ -19,10 +17,8 @@ import type {
  * Search results, one row per kind.
  *
  * Two rows are drawn by the component that already draws them everywhere else —
- * `PersonRow` for people (the same row the connections list uses) and `ProjectCard`
- * for projects — because a search result should look like the thing it is a result
- * for. The rest are drawn here, and there are three honest reasons for that rather
- * than a preference:
+ * `DiscoveryPersonRow` adds readable affiliation/self-declared skills to the
+ * connections row; `ProjectCard` renders projects. Other kinds stay compact:
  *
  *   * `PostCard` takes a `FeedPost`, which carries the *reader's* like and save
  *     state. Search does not fetch it, and passing `false` for both would render a
@@ -32,14 +28,11 @@ import type {
  *     `converted_project_id`, `converted_at`, `moderation_status` and `updated_at`.
  *     Search returns none of them, and inventing values for five fields to satisfy a
  *     type is how a card ends up saying something the database never did.
- *   * Opportunities and events have no card component at all: 0013 created their
- *     tables, their routes are still `PlannedFeature` placeholders, and there is
- *     nothing to reuse.
+ *   * Opportunity/event summaries link directly to their implemented detail
+ *     routes, with only the columns available from the search query.
  *
- * Every number rendered below is a column the function returned — which is to say a
- * stored column. `member_count`, `star_count`, `like_count`, `comment_count`,
- * `upvote_count` and `interest_count` are trigger-maintained and are never
- * incremented, computed or estimated anywhere in the browser.
+ * Content counts come from the query layer (stored hosted values, some local
+ * adapter counts). People have no such counters or inferred activity/mastery.
  */
 
 /** `posts.type` CHECK in 0008. The value is shown only when it is not plain text. */
@@ -232,11 +225,13 @@ function IdeaRow({ idea }: { idea: SearchIdea }) {
  */
 function ListingRow({
   title,
+  href,
   badges,
   meta,
   footer,
 }: {
   title: string
+  href: string
   badges: React.ReactNode
   meta: React.ReactNode
   footer: React.ReactNode
@@ -245,10 +240,11 @@ function ListingRow({
     <Surface as="article" className="p-4">
       <div className="flex flex-wrap items-center gap-2">
         {badges}
-        <Badge tone="outline">Page planned</Badge>
       </div>
 
-      <h3 className="mt-2 text-base leading-snug text-ink">{title}</h3>
+      <h3 className="mt-2 text-base leading-snug text-ink">
+        <Link href={href} className="underline-offset-4 hover:underline">{title}</Link>
+      </h3>
 
       {meta ? <p className="mt-1.5 text-sm text-ink-muted">{meta}</p> : null}
 
@@ -270,7 +266,7 @@ function ListingRow({
 function ResultItem({ result }: { result: SearchResult }) {
   switch (result.kind) {
     case 'person':
-      return <PersonRow person={result.person} />
+      return <DiscoveryPersonRow person={result.person} />
 
     case 'project':
       return (
@@ -298,6 +294,7 @@ function ResultItem({ result }: { result: SearchResult }) {
         <li>
           <ListingRow
             title={result.opportunity.title}
+            href={`/opportunities/${encodeURIComponent(result.opportunity.slug)}`}
             badges={
               <>
                 <Badge tone="neutral">
@@ -333,6 +330,7 @@ function ResultItem({ result }: { result: SearchResult }) {
         <li>
           <ListingRow
             title={result.event.title}
+            href={`/events/${encodeURIComponent(result.event.slug)}`}
             badges={
               <Badge tone="neutral">{labelFor(EVENT_TYPE_LABELS, result.event.type)}</Badge>
             }

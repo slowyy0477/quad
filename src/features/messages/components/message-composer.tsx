@@ -15,6 +15,10 @@ import {
 } from '@/features/messages/draft'
 import { emptyFormState } from '@/lib/form-state'
 
+const subscribeHydration = () => () => {}
+const clientReady = () => true
+const serverReady = () => false
+
 /**
  * The message composer.
  *
@@ -38,7 +42,7 @@ import { emptyFormState } from '@/lib/form-state'
  * boundary.
  */
 export function MessageComposer({ conversationId }: { conversationId: string }) {
-  const [state, send] = useActionState(sendMessageAction, emptyFormState)
+  const [state, send, pending] = useActionState(sendMessageAction, emptyFormState)
   const formRef = useRef<HTMLFormElement>(null)
 
   const draft = useSyncExternalStore(
@@ -46,6 +50,9 @@ export function MessageComposer({ conversationId }: { conversationId: string }) 
     snapshotReader(conversationId),
     serverSnapshot,
   )
+  // Server HTML has no access to this tab's kept draft. Do not let an edit race
+  // the first client snapshot and append to, or overwrite, restored text.
+  const ready = useSyncExternalStore(subscribeHydration, clientReady, serverReady)
 
   // `state` is a fresh object per action result, so this runs once per submit and
   // only acts on a real success. Both things it touches are external systems --
@@ -58,12 +65,12 @@ export function MessageComposer({ conversationId }: { conversationId: string }) 
   }, [state, conversationId])
 
   const body = draft.body
-  const canSend = body.trim().length > 0
+  const canSend = ready && body.trim().length > 0
 
   function onKeyDown(event: React.KeyboardEvent<HTMLTextAreaElement>) {
     if ((event.metaKey || event.ctrlKey) && event.key === 'Enter') {
       event.preventDefault()
-      if (!canSend) return
+      if (!canSend || pending) return
       formRef.current?.requestSubmit()
     }
   }
@@ -71,6 +78,9 @@ export function MessageComposer({ conversationId }: { conversationId: string }) 
   return (
     <form ref={formRef} action={send} className="space-y-2">
       <input type="hidden" name="conversationId" value={conversationId} />
+      {draft.clientNonce ? (
+        <input type="hidden" name="clientNonce" value={draft.clientNonce} />
+      ) : null}
 
       {state.status === 'error' && state.message ? (
         <Alert tone="danger">{state.message}</Alert>
@@ -91,10 +101,13 @@ export function MessageComposer({ conversationId }: { conversationId: string }) 
             onKeyDown={onKeyDown}
             minRows={2}
             maxLength={4000}
+            disabled={!ready || pending}
             placeholder="Write a message"
           />
         )}
       </Field>
+
+      {!ready ? <p role="status" className="text-xs text-ink-muted">Loading your draft…</p> : null}
 
       {draft.restored ? (
         <p role="status" className="flex flex-wrap items-center gap-2 text-xs text-ink-muted">
@@ -116,7 +129,7 @@ export function MessageComposer({ conversationId }: { conversationId: string }) 
         <p className="text-xs text-ink-faint">
           {canSend ? '' : 'Write a message first.'}
         </p>
-        <SubmitButton variant="primary" size="sm" disabled={!canSend} pendingLabel="Sending…">
+        <SubmitButton variant="primary" size="sm" disabled={!canSend || pending} pendingLabel="Sending…">
           Send
         </SubmitButton>
       </div>

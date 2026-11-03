@@ -8,7 +8,7 @@ import { BlockControl } from '@/features/connections/components/connection-contr
 import { PersonRow } from '@/features/connections/components/person-row'
 import { listBlocked } from '@/features/connections/queries'
 import { encodeCursor, nextCursor, parseCursor } from '@/lib/cursor'
-import { isSupabaseConfigured } from '@/lib/env'
+import { isDataConfigured } from '@/lib/env'
 import { getUser } from '@/lib/supabase/server'
 
 export const metadata: Metadata = { title: 'Blocked accounts' }
@@ -35,7 +35,7 @@ export default async function BlockedPage({
 }: {
   searchParams: Promise<SearchParams>
 }) {
-  if (!isSupabaseConfigured()) {
+  if (!isDataConfigured()) {
     return (
       <Alert tone="warning" title="No database connected">
         <p>

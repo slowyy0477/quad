@@ -7,7 +7,7 @@ import { SectionHeading, Surface } from '@/components/ui/surface'
 import { ThemeToggle } from '@/components/ui/theme-toggle'
 import { PrivacyForm } from '@/features/settings/components/privacy-form'
 import { getOwnSettings } from '@/features/settings/queries'
-import { isSupabaseConfigured } from '@/lib/env'
+import { isDataConfigured } from '@/lib/env'
 import { getUser } from '@/lib/supabase/server'
 
 export const metadata: Metadata = {
@@ -15,19 +15,9 @@ export const metadata: Metadata = {
   robots: { index: false, follow: false },
 }
 
-/**
- * Settings.
- *
- * Appearance is a three-way choice applied before first paint (see theme-toggle.tsx and
- * theme-script.tsx) — `globals.css` has documented a dark theme and a settings page that
- * offers one since the design system was written, and until now neither existed.
- *
- * Every control on this page writes to a real column. What is not built is said so in
- * place rather than shown disabled or faked: email change and account deletion need
- * flows that do not exist yet, and a greyed-out button would imply a feature.
- */
+/** Account navigation stays concise; sensitive changes have dedicated reauthentication. */
 export default async function SettingsPage() {
-  if (!isSupabaseConfigured()) {
+  if (!isDataConfigured()) {
     return (
       <div className="mx-auto w-full max-w-2xl px-4 py-12 sm:px-6">
         <h1 className="text-3xl">Settings</h1>
@@ -45,10 +35,10 @@ export default async function SettingsPage() {
   const settings = await getOwnSettings()
 
   return (
-    <div className="mx-auto w-full max-w-2xl px-4 py-10 sm:px-6">
+    <div className="page-enter mx-auto w-full max-w-2xl px-4 py-8 sm:px-6">
       <h1 className="text-3xl">Settings</h1>
       <p className="mt-2 text-sm text-ink-muted">
-        These apply to your account on Quad. Nothing here is shared with your university.
+        These apply to your account on Bulla. Nothing here is shared with your university.
       </p>
 
       {settings.error ? (
@@ -83,7 +73,7 @@ export default async function SettingsPage() {
       </section>
 
       <section className="mt-10">
-        <SectionHeading title="Account" description="Things that change who you are on Quad." />
+        <SectionHeading title="Account" description="Things that change who you are on Bulla." />
         <Surface className="mt-4 divide-y divide-hairline">
           <div className="flex flex-wrap items-center justify-between gap-3 p-5">
             <div>
@@ -97,23 +87,38 @@ export default async function SettingsPage() {
             <div>
               <p className="text-sm font-medium text-ink">Password</p>
               <p className="text-sm text-ink-muted">
-                A reset link is sent to your email address; Quad never shows your password.
+                Change it after verifying your account. Other sessions will be signed out.
               </p>
             </div>
             <Button asChild variant="secondary" size="sm">
-              <Link href="/reset-password">Send a reset link</Link>
+              <Link href="/settings/password">Change password</Link>
             </Button>
           </div>
 
           <div className="flex flex-wrap items-center justify-between gap-3 p-5">
             <div>
-              <p className="text-sm font-medium text-ink">Delete account</p>
+              <p className="text-sm font-medium text-ink">Account security</p>
               <p className="max-w-md text-sm text-ink-muted">
-                Not built yet. Deletion has to remove your posts, messages and uploads as well as
-                your profile, and it is not something to guess at. Until it exists, ask and it will
-                be done by hand.
+                Staff can set up an authenticator and verify access. Local preview
+                accounts do not have cloud multi-factor authentication.
               </p>
             </div>
+            <Button asChild variant="secondary" size="sm">
+              <Link href="/settings/security">Review security</Link>
+            </Button>
+          </div>
+
+          <div className="flex flex-wrap items-center justify-between gap-3 p-5">
+            <div>
+              <p className="text-sm font-medium text-ink">Your data and account</p>
+              <p className="max-w-md text-sm text-ink-muted">
+                Download your own data or request deletion. Verification, shared-project
+                ownership and cleanup rules are explained before you confirm.
+              </p>
+            </div>
+            <Button asChild variant="secondary" size="sm">
+              <Link href="/settings/account">Manage account data</Link>
+            </Button>
           </div>
         </Surface>
       </section>

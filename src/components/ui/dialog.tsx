@@ -17,9 +17,8 @@ import { cn } from '@/lib/utils'
  * buttons competing for the same thumb-reach space, and the conventional fix — shrink
  * everything — produces a dialog whose close button is 24px from an edge.
  *
- * There is no animation here on purpose: the design language is print, motion utilities
- * are not installed, and the reduced-motion block in globals.css would disable them
- * anyway. A hard cut is honest and costs nothing.
+ * A short opacity transition supports the modern Bulla shell without moving the
+ * focused content. Reduced-motion users get an immediate state change.
  */
 export const Dialog = DialogPrimitive.Root
 export const DialogTrigger = DialogPrimitive.Trigger
@@ -38,10 +37,10 @@ export function DialogContent({
 }) {
   return (
     <DialogPortal>
-      <DialogPrimitive.Overlay className="fixed inset-0 z-50 bg-ink/45" />
+      <DialogPrimitive.Overlay className="dialog-overlay fixed inset-0 z-50 bg-ink/45" />
       <DialogPrimitive.Content
         className={cn(
-          'fixed z-50 flex flex-col bg-paper shadow-float',
+          'dialog-panel fixed z-50 flex flex-col bg-paper shadow-float',
           // Phone: the whole viewport. Larger: a panel with room to breathe.
           'inset-0 sm:inset-auto sm:top-1/2 sm:left-1/2 sm:max-h-[85dvh] sm:w-full sm:max-w-lg sm:-translate-x-1/2 sm:-translate-y-1/2 sm:rounded-md',
           'border border-rule',
@@ -62,7 +61,7 @@ export function DialogContent({
           </div>
 
           <DialogPrimitive.Close
-            className="-m-1 rounded p-1 text-ink-muted hover:bg-paper-sunken hover:text-ink"
+            className="-m-1 flex size-11 shrink-0 items-center justify-center rounded text-ink-muted hover:bg-paper-sunken hover:text-ink"
             aria-label="Close"
           >
             <X className="size-4" aria-hidden="true" />

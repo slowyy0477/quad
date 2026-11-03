@@ -8,7 +8,8 @@ import { EndOfList, LoadMore, cursorHref } from '@/components/ui/pagination'
 import { ProgressMeter } from '@/components/ui/progress-meter'
 import { StatRow } from '@/components/ui/stat-row'
 import { EmptyState, SectionHeading, Surface } from '@/components/ui/surface'
-import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs'
+import { ManagedImageControl } from '@/components/managed-image-control'
+import { TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs'
 import { categoryLabel, projectStatusLabel, visibilityLabel } from '@/features/projects/constants'
 import { ApplicationReview } from '@/features/projects/components/application-review'
 import { JoinForm } from '@/features/projects/components/join-form'
@@ -27,8 +28,14 @@ import {
   listProjectUpdates,
   listSkillOptions,
 } from '@/features/projects/queries'
-import { isSupabaseConfigured } from '@/lib/env'
+import { isDataConfigured } from '@/lib/env'
 import { encodeCursor } from '@/lib/cursor'
+import { getReadableProjectCover } from '@/features/uploads/queries'
+import { ProjectReportControl } from '@/features/projects/components/project-report-control'
+import { InviteResponse } from '@/features/projects/components/invite-response'
+import { getMyProjectInvitation } from '@/features/projects/invitations'
+import { ProjectDetailTabs } from '@/features/projects/components/project-detail-tabs'
+import { projectDetailHref, projectDetailTab } from '@/features/projects/detail-navigation'
 
 type Params = { slug: string }
 type SearchParams = Record<string, string | string[] | undefined>
@@ -46,7 +53,7 @@ function formatDate(value: string | null) {
  * describe a project as something it is not.
  */
 export async function generateMetadata({ params }: { params: Promise<Params> }): Promise<Metadata> {
-  if (!isSupabaseConfigured()) return { title: 'Project' }
+  if (!isDataConfigured()) return { title: 'Project' }
 
   const { slug } = await params
   const project = await getProjectBySlug(slug)
@@ -72,7 +79,7 @@ export async function generateMetadata({ params }: { params: Promise<Params> }):
  *
  * Three things are deliberately not conditional on being signed in: the purpose, the
  * members and the update stream are the public record of a public project, which is
- * what lets a link to it work for someone who has never heard of Quad.
+ * what lets a link to it work for someone who has never heard of Bulla.
  *
  * What the signed-out variant does hide:
  *
@@ -92,21 +99,42 @@ export default async function ProjectPage({
   params: Promise<Params>
   searchParams: Promise<SearchParams>
 }) {
-  if (!isSupabaseConfigured()) notFound()
+  if (!isDataConfigured()) notFound()
 
   const { slug } = await params
-  const project = await getProjectBySlug(slug)
-  if (!project) notFound()
+  const [project, inviteResult] = await Promise.all([
+    getProjectBySlug(slug),
+    getMyProjectInvitation(slug),
+  ])
+  if (!project) {
+    // An invitation grants its own minimal recipient DTO, not access to the
+    // private project, team, updates, cover or metadata before acceptance.
+    if (!inviteResult.invitation) notFound()
+    return (
+      <div className="page-enter mx-auto w-full max-w-2xl px-4 py-8 sm:px-6">
+        <h1 className="text-3xl text-ink">Project invitation</h1>
+        <p className="mt-2 text-sm text-ink-muted">
+          You have not joined this team yet. The project’s private content stays hidden until you accept.
+        </p>
+        <div className="mt-6">
+          <InviteResponse invitation={inviteResult.invitation} />
+        </div>
+      </div>
+    )
+  }
 
   const query = await searchParams
   const cursor = query.cursor
 
-  const [viewer, members, skills, updates, starred] = await Promise.all([
+  const [viewer, members, skills, updates, starred, coverResult] = await Promise.all([
     getProjectViewerState(project.id),
     listProjectMembers(project.id),
     listProjectSkillsWithFilled(project.id),
     listProjectUpdates({ projectId: project.id, cursor }),
     hasStarred(project.id),
+    getReadableProjectCover(project.id)
+      .then((image) => ({ image, failed: false }))
+      .catch(() => ({ image: null, failed: true })),
   ])
 
   // Only a manager may read the pending requests. A plain member or a visitor asking
@@ -117,6 +145,7 @@ export default async function ProjectPage({
     : [[], []]
 
   const canAdvertise = project.visibility !== 'private'
+  const activeTab = projectDetailTab(query.tab, viewer.canManage)
   const slots =
     project.team_size_target != null ? Math.max(0, project.team_size_target - project.member_count) : null
 
@@ -127,13 +156,22 @@ export default async function ProjectPage({
   ].filter((entry) => entry.value)
 
   return (
-    <div className="mx-auto w-full max-w-4xl px-4 py-8 sm:px-6">
+    <div className="page-enter mx-auto w-full max-w-4xl px-4 py-8 sm:px-6">
+      {inviteResult.error ? (
+        <Alert tone="warning" className="mb-5" title="Your invitation could not be checked">
+          {inviteResult.error}
+        </Alert>
+      ) : inviteResult.invitation ? (
+        <div className="mb-6">
+          <InviteResponse invitation={inviteResult.invitation} />
+        </div>
+      ) : null}
       {query.converted ? (
         <Alert tone="success" className="mb-5" title="The idea is a project now">
           {Number(query.invited ?? 0) > 0
-            ? `${Number(query.invited)} ${Number(query.invited) === 1 ? 'person who' : 'people who'} said they would help ${Number(query.invited) === 1 ? 'has' : 'have'} been invited.`
-            : 'It was created, and you are its owner.'}{' '}
-          The interested people can accept from their notifications.
+            ? `${Number(query.invited)} eligible ${Number(query.invited) === 1 ? 'person was' : 'people were'} invited.`
+            : 'No eligible invitations were recorded.'}{' '}
+          You own the project. Recipients can accept or decline from their project invitation inbox.
         </Alert>
       ) : null}
 
@@ -162,6 +200,7 @@ export default async function ProjectPage({
               {slots == null ? 'Seeking members' : slots === 0 ? 'Team full' : `Seeking ${slots} more`}
             </Badge>
           ) : null}
+          {viewer.userId ? <ProjectReportControl projectId={project.id} /> : null}
         </div>
 
         <h1 className="text-3xl text-ink">{project.title}</h1>
@@ -205,6 +244,16 @@ export default async function ProjectPage({
           ) : null}
         </div>
       </header>
+
+      {coverResult.failed ? (
+        <Alert tone="warning" className="mt-5">The project image could not be loaded. Try again later.</Alert>
+      ) : coverResult.image ? (
+        // Cookie-authorized private media must bypass public image optimization.
+        // eslint-disable-next-line @next/next/no-img-element
+        <img src={coverResult.image.url} alt={`${project.title} cover`}
+          width={coverResult.image.width} height={coverResult.image.height}
+          className="mt-6 max-h-80 w-full rounded-xl border border-hairline object-contain" />
+      ) : null}
 
       <Surface className="mt-6 p-5">
         <StatRow
@@ -304,11 +353,21 @@ export default async function ProjectPage({
       </section>
 
       <section className="mt-8">
-        <Tabs defaultValue="updates">
+        <ProjectDetailTabs slug={project.slug} activeTab={activeTab} canManage={viewer.canManage}>
           <TabsList aria-label="Project detail">
-            <TabsTrigger value="updates">Updates</TabsTrigger>
-            {viewer.canManage ? <TabsTrigger value="requests">Requests</TabsTrigger> : null}
-            {viewer.canManage ? <TabsTrigger value="settings">Seeking members</TabsTrigger> : null}
+            <TabsTrigger value="updates" asChild>
+              <Link href={projectDetailHref(project.slug, 'updates')} prefetch={false} scroll={false}>Updates</Link>
+            </TabsTrigger>
+            {viewer.canManage ? (
+              <TabsTrigger value="requests" asChild>
+                <Link href={projectDetailHref(project.slug, 'requests')} prefetch={false} scroll={false}>Requests</Link>
+              </TabsTrigger>
+            ) : null}
+            {viewer.canManage ? (
+              <TabsTrigger value="settings" asChild>
+                <Link href={projectDetailHref(project.slug, 'settings')} prefetch={false} scroll={false}>Seeking members</Link>
+              </TabsTrigger>
+            ) : null}
           </TabsList>
 
           <TabsContent value="updates">
@@ -350,6 +409,10 @@ export default async function ProjectPage({
 
           {viewer.canManage ? (
             <TabsContent value="settings">
+              <Surface className="mb-6 p-5">
+                <ManagedImageControl target={{ kind: 'project-cover', projectId: project.id }}
+                  currentImageUrl={coverResult.image?.url} />
+              </Surface>
               <SeekingForm
                 slug={project.slug}
                 isSeekingMembers={project.is_seeking_members}
@@ -361,10 +424,10 @@ export default async function ProjectPage({
               />
             </TabsContent>
           ) : null}
-        </Tabs>
+        </ProjectDetailTabs>
       </section>
 
-      {!viewer.isMember ? (
+      {!viewer.isMember && !inviteResult.invitation ? (
         <section className="mt-8">
           <SectionHeading title="Ask to join" />
           <div className="mt-3 max-w-prose">
@@ -385,10 +448,12 @@ export default async function ProjectPage({
         </section>
       ) : null}
 
-      <p className="mt-10 flex items-center gap-2 text-xs text-ink-faint">
-        <Users className="size-3.5" aria-hidden="true" />
-        Applications: <span className="tabular">{project.application_count}</span> awaiting an answer.
-      </p>
+      {viewer.canManage ? (
+        <p className="mt-10 flex items-center gap-2 text-xs text-ink-faint">
+          <Users className="size-3.5" aria-hidden="true" />
+          Applications: <span className="tabular">{project.application_count}</span> awaiting an answer.
+        </p>
+      ) : null}
     </div>
   )
 }

@@ -31,7 +31,7 @@ export const LAUNCH_STATE = {
 
   /** Why, said plainly, so the next reader does not have to guess. */
   reason:
-    'Quad is not launched. The blocking items in docs/DEPLOYMENT.md are not all ' +
+    'Bulla is not launched. The blocking items in docs/DEPLOYMENT.md are not all ' +
     'done, and a half-built site in search results is harder to undo than to prevent.',
 } as const
 

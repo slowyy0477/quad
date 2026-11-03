@@ -1,5 +1,9 @@
 # Architecture
 
+Current Bulla direction: [modular-monolith/capacity plan](bulla/PLAN.md) and
+[status](bulla/STATUS.md). The foundation rationale below predates many domain
+implementations; it is not the current feature ledger or hosted acceptance.
+
 > Status: **target design.** This document was written before implementation and
 > describes where the codebase is going. Change it before changing the structure it
 > describes.
@@ -10,22 +14,24 @@
 > | This document says | The code does | Why |
 > | --- | --- | --- |
 > | `src/modules/<domain>/` | `src/features/<domain>/` | renamed for consistency with the route groups; the boundaries are the same |
-> | `schema.ts` / `service.ts` per domain | `schemas.ts`, `queries.ts`, `actions.ts` | no `service.ts` yet — the two implemented domains are thin enough that a service layer would be a file with one function in it |
+> | `schema.ts` / `service.ts` per domain | `schemas.ts`, `queries.ts`, `actions.ts`, provider-local adapters | keep domain boundaries; add service abstractions when behavior warrants them |
 > | route groups `(marketing)`, `(auth)`, `(app)` | flat routes under `src/app/` | route groups get added when a group needs its own layout; two of them do not yet |
-> | `lib/supabase/middleware.ts` | `proxy.ts` at the repo root | **Next 16 renamed `middleware.ts` to `proxy.ts`**; the logic lives there rather than in a helper |
+> | `lib/supabase/middleware.ts` | `src/proxy.ts`, beside `src/app` | installed Next.js requires the matching app/source location; root placement did not load the proxy |
 > | ESLint `no-restricted-imports` enforces §3 | not configured | the four rules in §3 are followed by hand and are not yet mechanically enforced |
 > | `revalidateTag('feed:${user.id}')` | `revalidatePath('/feed')` | see §4 |
-> | `lib/rate-limit/` | does not exist | migration `0021_rate_limits` is reserved and unwritten |
-> | Realtime (§4), Storage | not wired | no subscriptions, no buckets |
+> | `lib/rate-limit/` | limiter wrapper and migration 0021 exist | mandatory direct-write budgets are still a release gate |
+> | Realtime (§4), Storage | conversation subscriptions exist; safe upload pipeline is unfinished | hosted authorization/delivery/reconnect remain acceptance work |
 >
-> Section 12 lists what exists per domain.
+> Section 12 is a historical foundation snapshot; use `/status` and the Bulla
+> records for the implemented-but-incomplete domain inventory.
 
 ## 1. What this is
 
 A **modular monolith**: one Next.js application, one Postgres database, hard internal
-boundaries between domains. No microservices, no message bus, no Kubernetes. The
-modularity is enforced by directory structure, import rules, and per-domain ownership of
-tables — not by network hops.
+boundaries between domains as the design goal. The current application groups domains
+under `src/features/` and has a separate private local JSON adapter. Import discipline
+is a review convention, not a configured ESLint restriction. No microservice rewrite
+or measured production capacity is implied by this structure.
 
 ## 2. Stack
 
@@ -34,15 +40,19 @@ tables — not by network hops.
 | Framework | Next.js 16 (App Router) | RSC lets reads happen server-side with no client bundle cost |
 | Language | TypeScript, `strict` | non-negotiable for a schema this size |
 | Styling | Tailwind CSS v4 | CSS-first config; tokens live in `globals.css` |
-| Primitives | Radix UI via shadcn-style local components | accessible by default, we own the source |
+| Primitives | Radix UI via shadcn-style local components | accessible building blocks; application accessibility still needs verification |
 | Database | Supabase Postgres | RLS is the security floor |
 | Auth | Supabase Auth (email/password + Google OAuth) | cookie-based SSR sessions |
-| Realtime | Supabase Realtime | chat + notifications, no polling — **not wired yet** |
+| Realtime | Supabase Realtime | conversation subscription code exists; local mode is not realtime; hosted proof pending |
 | Storage | Supabase Storage | avatars, post media, attachments — **not wired yet** |
 | Validation | Zod | one schema shared by client form, server action, and tests |
 | Forms | React Hook Form + `zodResolver`, or `useActionState` | uncontrolled inputs, minimal re-render; the auth forms use `useActionState` because they post to Server Actions and must work without JS |
 | Unit/integration | Vitest | fast, ESM-native |
-| E2E | Playwright | real browser, real DB — **no specs written** |
+| E2E | Playwright | isolated local browser smoke exists; comprehensive two-account/hosted coverage remains |
+
+The Supabase entries describe the hosted path. In local mode, accounts/content use
+`src/lib/local/` and TypeScript access checks, not Postgres RLS, Supabase Auth or
+Realtime. That development adapter is not the database for the 50,000-account target.
 
 ### Next 16 notes that cost real debugging time
 
@@ -50,8 +60,8 @@ tables — not by network hops.
   not optional.
 - `middleware.ts` is now **`proxy.ts`**, exporting `proxy` rather than `middleware`.
 - `next typegen` generates `PageProps<'/route'>` and `LayoutProps<'/'>` into
-  `.next/types`. `tsc --noEmit` fails without it, which is why `npm run typecheck` runs
-  typegen first.
+  the configured build directory's types. `npm run typecheck` runs typegen before
+  TypeScript; see `package.json`.
 - The proxy matcher **must** exclude `_next/static`, or an auth check runs in front of
   the stylesheet — and a redirect there does not fail loudly, it renders the site
   unstyled.
@@ -59,7 +69,18 @@ tables — not by network hops.
   (a shared `emptyState` constant, say) throws at module evaluation. That is why
   `form-state.ts` files exist beside the `actions.ts` files.
 
+For this installed Node.js proxy build, registration is in
+`server/functions-config-manifest.json` under `/_middleware`, with `runtime: "nodejs"`.
+An empty Edge-oriented `server/middleware-manifest.json` is not absence proof.
+Manifest inspection and actual HTTP guard checks are separate evidence; see R16 in
+[ISSUES.md](bulla/ISSUES.md).
+
 ## 3. Directory layout
+
+**Historical target layout, illustrative rather than a checkout inventory.**
+The actual routes are flat under `src/app/`, domains are in `src/features/`, and
+the request proxy is `src/proxy.ts`. The tree's route groups, `service.ts`, `index.ts`
+conventions and helper directories are proposals, not proof that those files exist.
 
 ```
 src/
@@ -111,7 +132,11 @@ tests/{integration,e2e,security}/
 docs/
 ```
 
-### Import rules (enforced by ESLint `no-restricted-imports`)
+### Proposed import rules (not configured in ESLint)
+
+These rules belong to the target `modules/` layout above.
+[`eslint.config.mjs`](../eslint.config.mjs) does not configure
+`no-restricted-imports`; it cannot currently enforce these boundaries.
 
 1. `components/ui/**` may not import from `modules/**` or `lib/supabase/**`.
 2. `modules/a/**` may not import from `modules/b/**` *except* from `modules/b/schema.ts`,
@@ -120,131 +145,151 @@ docs/
 3. `app/**` may not import `service.ts` directly — only `queries.ts` / `actions.ts`.
 4. Nothing outside `lib/supabase/admin.ts` may import the service-role key.
 
-Rule 2 keeps the boundaries real. When `feed` needs a profile, it calls
-`profiles.getProfileCard(id)` — it does not `select * from profiles`.
+Under rule 2's proposal, feed would obtain profile data through the owning domain.
+`profiles.getProfileCard(id)` is an illustrative API, not an existing export or
+evidence that every current cross-domain query already follows that convention.
 
 ## 4. Data flow
 
 ### Reads — React Server Components
 
-```
-page.tsx (RSC)  →  modules/x/queries.ts  →  createServerClient()  →  Postgres (RLS applies)
+```text
+page.tsx (RSC) → src/features/x/queries.ts
+  hosted → createClient() → Supabase HTTP Data API / RPC → Postgres (RLS + grants)
+  local  → readStore() → private JSON snapshot (TypeScript access checks)
 ```
 
-Queries run as the **logged-in user**, so RLS is doing real work on every read. Queries
-return view models (`PostCard`, `ProfileHeader`) — never raw table rows — so the wire
-format is decoupled from the schema.
+Hosted reads use the caller's session, or anonymous access for public reads.
+Domain queries assemble page-facing data; the directory layout alone does not
+guarantee a uniform view-model contract or complete authorization. Local reads do not
+exercise database policies. See [`server.ts`](../src/lib/supabase/server.ts) and
+[`local/db.ts`](../src/lib/local/db.ts).
 
 ### Writes — Server Actions
 
-Every mutation goes through one wrapper. There is no other write path.
+[`src/lib/action.ts`](../src/lib/action.ts) **exists**. Selected hosted messaging,
+moderation and bug-report actions use it; other actions, including feed/auth, have
+hand-written paths, and local adapters use their own validation/access checks.
+Direct Data API writes also exist independently of Server Actions, so the wrapper is
+not a universal authorization or abuse-control boundary.
+
+Illustrative excerpt of the hosted report pipeline in
+[`moderation/actions.ts`](../src/features/moderation/actions.ts); imports, domain
+error handling and the success payload are omitted:
 
 ```ts
-export const createPost = action(CreatePostInput)
-  .use(requireAuth)                       // 401 if no session
-  .use(requireActiveAccount)              // 403 if suspended/banned
-  .use(rateLimit('post:create', 10, 3600))
-  .run(async ({ input, user, db }) => {
-    const post = await postService.create(db, user.id, input)
-    revalidateTag(`feed:${user.id}`)
-    return post
+const fileReport = action(reportSchema)
+  .use(requireActiveAccount)
+  .use(rateLimit('report:file'))
+  .use(guard('You can only report something you can see.', targetIsVisible))
+  .run(async ({ input, supabase }) => {
+    const { error } = await supabase.from('reports').insert({
+      kind: input.kind,
+      reason: input.reason,
+      detail: input.detail ?? null,
+      [REPORT_TARGET_COLUMN[input.kind]]: input.targetId,
+    })
+    if (error) throw error
+    revalidatePath('/report-a-bug')
   })
 ```
 
-The wrapper does: Zod parse → auth → account status → rate limit → ownership guard →
-service → revalidate → typed `Result<T>`. Errors become safe user-facing messages;
-raw Postgres errors never reach the browser.
+The builder parses input and verifies a hosted user, then runs only the steps attached
+by its caller, maps failures to a typed result and invokes the domain write. Account
+restriction predicates/content-insert triggers are in migration `0020`; the
+fixed-window limiter and RPC are in `0021`. General posting/message budgets,
+caller-selected limiter parameters and direct-write bypass remain S06 acceptance work
+in [ISSUES.md](bulla/ISSUES.md).
 
-**Implemented today** without the wrapper (which does not exist yet), because the
-wrapper's middleware — account status, rate limiting — has no database support yet:
-
-```ts
-export async function createPostAction(_prev: PostFormState, formData: FormData) {
-  const parsed = postSchema.safeParse(...)          // Zod
-  if (!parsed.success) return fieldErrors(parsed)
-  const supabase = await createClient()             // runs AS THE USER, so RLS applies
-  const { error } = await supabase.from('posts').insert({ ...parsed.data })
-  if (error?.code === '42501') return { error: 'You are not allowed to post right now.' }
-  if (error) return { error: GENERIC }              // never the Postgres message
-  revalidatePath('/feed')
-}
-```
-
-Note the insert carries **no `author_id`**: the column defaults to `auth.uid()` and a
-trigger overwrites anything sent, so authorship cannot be forged even by a caller who
-constructs the request by hand.
+The hosted feed insert in [`feed/actions.ts`](../src/features/feed/actions.ts) omits
+`author_id`; `0008_posts.sql` supplies/guards authorship at the database. This is a
+specific write contract, not evidence that all mutations share the same wrapper.
 
 ### Caching decision: `revalidatePath`, not tags — for now
 
-`revalidateTag('feed:${user.id}')` is the design above, and it is wrong for
-user-scoped data as things stand. A per-user tag needs a per-user cache entry, and the
-feed is rendered dynamically per request because RLS makes every user's result
-different. Tagging a response that is never reused buys nothing and creates a cache key
-that must be invalidated correctly forever. `revalidatePath('/feed')` on the writer's
-own request is honest about what is happening. Revisit when there is a genuinely shared,
-cacheable read (a university directory, a public project page).
+Current feed writes call `revalidatePath('/feed')`, not `revalidateTag`. Authenticated
+results must not be shared across users merely to gain caching. Any future tagged
+cache needs an explicit ownership/privacy and invalidation design.
 
-Also note: `revalidateTag` takes a single argument in Next 16.
+The installed Next.js reference at
+`node_modules/next/dist/docs/01-app/03-api-reference/04-functions/revalidateTag.md`
+documents `revalidateTag(tag, profile)` and deprecates the single-argument form.
+The old one-argument statement is not valid guidance for this installed version.
 
 ### Realtime
 
-`messages` and `notifications` only. Client subscribes to a filtered channel; RLS applies
-to Realtime too, so a subscription cannot leak rows the user can't already read.
+Messaging has an inbox/thread UI at [`/messages`](../src/app/messages/page.tsx).
+[`ThreadRealtime`](../src/features/messages/components/thread-realtime.tsx) mounts a
+conversation-filtered Postgres Changes subscription through
+[`channel.ts`](../src/features/messages/components/channel.ts). Payloads signal a
+server refresh rather than supplying message content for direct rendering.
 
-**Not wired.** There are no subscriptions in the codebase. Messaging has no UI.
+The shared helper supports `messages` and `notifications`; that support alone does
+not prove a notification subscription is mounted. Local mode opens no socket or
+polling interval and offers manual refresh. Hosted publication, row filtering,
+two-session isolation and reconnect behavior still need acceptance; PGlite SQL tests
+do not verify the Realtime service.
 
 ## 5. Security model — three independent layers
 
-Any one layer failing must not produce a breach.
+Defense in depth is the design goal, not a recorded proof that any layer can fail
+independently without a breach.
 
-1. **RLS** on every table. The floor. Assume the client is hostile and has the anon key,
-   because it does.
-2. **Server-side guards** in the action wrapper. Ownership, role, membership. Never
-   "the button was hidden".
+1. **RLS and explicit grants** on hosted exposed tables. Internal operational tables
+   are a different audience. Assume the client is hostile and has the anon key.
+2. **Server-side guards** in pages, selected wrapped actions and provider adapters.
+   Ownership, role and membership must not depend on a hidden button.
 3. **Column-level `GRANT`s**. `authenticated` has no `UPDATE` privilege on
    `profiles.status`, `profiles.username_changed_at`, or anything in `user_roles`. Role
-   escalation is impossible even with a correct-looking RLS policy.
+   changes to those columns are refused independently of an own-row UPDATE policy.
 
 Roles live in `user_roles`, **not** on `profiles`, precisely so a user's own-row UPDATE
 policy can never grant them admin.
 
-RLS helpers are `security definer` + `set search_path = ''` and live in the `app` schema.
-This is what prevents infinite policy recursion (a policy on `profiles` that itself
-selects from `profiles`).
+Security-definer helpers pin `search_path`; some helpers deliberately use
+`security invoker`, including the report-target trigger in forward migration `0023`.
+The schema tests check grants and helper hardening, not every hosted service.
+Conversation roles, departed history and direct-write budgets have separate gates
+in [ISSUES.md](bulla/ISSUES.md).
 
 See [SECURITY.md](SECURITY.md).
 
 ## 6. Pagination
 
-Cursor-based everywhere that grows without bound: feed, comments, messages, search,
-notifications. Cursor is `(created_at, id)` keyset, base64-encoded, never an offset —
-offsets skip and duplicate rows when data shifts under the user.
+Feed, thread/inbox and notification queries have keyset cursor paths. Admin queues use
+page/range pagination. That is not proof that every growing reply/member/search read
+is bounded or that local and ranked hosted ordering are identical.
 
-Offset pagination is allowed only for admin tables where a page count is genuinely useful.
+The target is stable cursor-based paging for growing user-facing lists, with offsets
+reserved for deliberate admin page controls. Reply/member paging, ranking/count
+budgets and realistic query plans remain [F08 work](bulla/ISSUES.md).
 
 ## 7. Counters and derived data
 
-Denormalized counters (`posts.like_count`, `projects.member_count`,
-`universities.student_count`) are maintained by database triggers. Nothing reads
-`count(*)` in a list view.
+Hosted migrations maintain denormalized counters where defined. Other reads, including
+admin queues and notification counts, explicitly request exact counts; local views
+derive values from store rows. There is no universal “no counts in list views” rule
+already enforced by the code.
 
-Everything a user sees as a number is derived from stored rows — learning streaks from
-`daily_logs`, goal completion from `goals`, admin metrics from real aggregates. No number
-in this application is invented. See [PRODUCT.md](PRODUCT.md#honesty-rules).
+Displayed values must have a readable stored source or be clearly labeled development
+fixtures. Query-cost and privacy checks remain per-view acceptance work. See
+[product honesty requirements](PRODUCT.md#product-honesty-requirements).
 
 ## 8. Notifications
 
-Generated **in the database**, by triggers, through one function
-`app.create_notification(...)`. Reasons:
+Hosted notifications are generated **in the database**, by triggers/functions using
+`app.create_notification(...)`. Local adapters generate their own store rows; that
+does not exercise the hosted trigger, preference or delivery contracts. Hosted reasons:
 
 - the client cannot forge a notification,
 - the sender cannot be trusted to write one,
 - deduplication is a constraint rather than application logic that races.
 
-**As built** (migration 0014), the entity reference is a set of **typed, nullable
-foreign-key columns** — `post_id`, `project_id`, `idea_id`, `message_id`, … — with a
-check constraint asserting that exactly one is non-null and that it matches the
-`type`. The design above implied a polymorphic `(entity_type, entity_id)` pair. Typed
+**As built** (migration 0014), entity references use **typed, nullable foreign-key
+columns** — `post_id`, `project_id`, `idea_id`, `conversation_id`, … — rather than a
+polymorphic `(entity_type, entity_id)` pair. Not every notification has exactly one
+target: moderation notices can have none. The migration's notification-type and
+creation-function rules define the allowed shape. Typed
 columns won for one reason: a polymorphic id has no referential integrity, so deleting
 a post leaves a notification pointing at nothing, and every read has to defend against
 it. With real foreign keys, `on delete cascade` removes the notification with the row
@@ -254,15 +299,15 @@ The cost is a wider table and a migration whenever a new notifiable entity appea
 That is a good trade: adding a column is a decision someone reviews, which is what you
 want when the question is "should this generate a notification".
 
-Deduplication is `unique (recipient_id, actor_id, type, post_id, project_id, …) nulls
-not distinct` — `nulls not distinct` is load-bearing, because without it every row with
-a null column is unique and the constraint never fires.
+`notifications_dedupe` uses `unique nulls not distinct` over recipient, type, actor
+and the typed target columns. Its null handling makes otherwise-identical nullable
+references participate in deduplication.
 
 ## 9. Error and state contract
 
-Every route that loads data ships four states: `loading.tsx` (or `<Suspense>` + skeleton),
-error boundary, empty state, and content. This is checked in review — a route with no
-empty state is not done.
+The completion contract is four states: loading (`loading.tsx` or Suspense), error,
+empty and content. This is a review/acceptance requirement, not an inventory claim that
+every current route has passed those checks.
 
 `src/app/error.tsx` renders `error.digest` **only**, never `error.message`: in a Server
 Component that message can contain a query, a path, or row data.
@@ -272,33 +317,42 @@ Component that message can contain a query, a path, or row data.
 - No custom recommendation ML. Feed ranking is a documented SQL function, swappable.
 - No AI dependency in any core path.
 - No GitHub sync in MVP (schema has the columns; sync is a later module).
-- No custom job queue. Scheduled work uses `pg_cron`.
-- No Redis. Rate limiting is Postgres-backed, which is adequate at MVP scale and removes
-  an entire piece of infrastructure.
+- No complete durable job/worker pipeline. A reminder-dispatch SQL function exists;
+  scheduled dispatch is setup work, not evidence of an active `pg_cron` job.
+- No Redis dependency. A Postgres limiter exists for selected calls; mandatory abuse
+  controls and measured multi-instance capacity are unfinished.
+
+Durable jobs and infrastructure changes in [PLAN.md](bulla/PLAN.md) remain proposals
+until implemented and verified.
 
 ## 11. Decisions
 
-The reasoning for each non-obvious choice is written **at the top of the file it
-governs** — the migration headers and the module doc comments — rather than in a
-separate ADR directory. `docs/decisions/` does not exist. That is a deliberate choice
-for a codebase this young: a decision recorded next to the code it constrains is read
-by the person about to change it; one filed in a directory is read by nobody. The
-load-bearing ones are collected in [SECURITY.md](SECURITY.md) and in §2 above.
+Migration headers and domain comments contain foundation rationale, but can themselves
+lag implementation. Use the current [plan](bulla/PLAN.md) and
+[issue register](bulla/ISSUES.md) for unresolved decisions and acceptance gates.
+Historical comments are context, not authorization to change an external system.
 
 ## 12. What exists today
 
-The single source of truth is [`src/lib/build-status.ts`](../src/lib/build-status.ts),
-which the running application renders at `/status`. It is code, not prose, so the
-placeholder pages and the status page cannot disagree: `PlannedFeature` looks its own
-state up in the same list.
+[`src/lib/build-status.ts`](../src/lib/build-status.ts) is the hand-maintained
+feature ledger rendered at `/status`. Its per-feature notes define the verified or
+incomplete scope; configuration presence does not make a feature usable end to end.
+Source inspection and recorded results must keep that ledger honest.
 
-| State | Meaning | Count |
-| --- | --- | --- |
-| `working` | usable end to end, once Supabase is configured | 5 |
-| `partial` | real, incomplete — the gap is named on the page | 2 |
-| `schema-only` | tables, policies and tests exist; **no interface** | 11 |
-| `planned` | designed, not built; the route says so | 7 |
+| State | Scope-qualified reading |
+| --- | --- |
+| `working` | the explicitly recorded scope is verified, not a public-launch approval |
+| `partial` | implementation exists with named gaps or acceptance still pending |
+| `schema-only` | database work exists without a corresponding interface |
+| `planned` | not implemented |
 
-Per-domain: `auth` and `feed` have `schemas.ts` + `queries.ts` + `actions.ts` +
-`components/`. Every other domain exists only as SQL. That asymmetry is the honest
-picture of the project, and `/status` shows it to users rather than hiding it.
+The old foundation counts and “all domains except auth/feed are SQL-only” description
+are obsolete. Profiles/social graph/skills, projects/ideas, learning, messages,
+boards/search, notifications and moderation/bugs have application code as well as
+database work. Examples include [`profiles/actions.ts`](../src/features/profiles/actions.ts),
+[`messages/page.tsx`](../src/app/messages/page.tsx) and
+[`admin/page.tsx`](../src/app/admin/page.tsx).
+
+Keep volatile test totals and verification results in [STATUS.md](bulla/STATUS.md)
+and timestamped evidence, not this guide. Hosted Auth/PostgREST/Realtime/storage,
+recovery and load acceptance remain distinct from local source or test evidence.

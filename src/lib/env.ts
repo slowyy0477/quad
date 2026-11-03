@@ -21,6 +21,7 @@
  * browser.
  */
 import { z } from 'zod'
+import { isLocalMode } from '@/lib/mode'
 
 const urlSchema = z
   .string()
@@ -54,6 +55,11 @@ const parsedPublic = publicSchema.safeParse(rawPublic)
 /** True when the browser and server have everything they need to reach Supabase. */
 export function isSupabaseConfigured(): boolean {
   return parsedPublic.success
+}
+
+/** Data-backed screens can run locally without unrelated cloud credentials. */
+export function isDataConfigured(): boolean {
+  return isLocalMode() || isSupabaseConfigured()
 }
 
 /**
@@ -102,17 +108,27 @@ export function describeEnvProblems(): string[] {
  * The canonical origin of this deployment.
  *
  * Used to build the OAuth redirect URL. Getting this wrong in production sends a
- * user -- and their authorization code -- to the wrong origin, so it is required
- * there and falls back only in development.
+ * user -- and their authorization code -- to the wrong origin, so configured
+ * production cloud serving requires an explicit HTTPS origin. Unconfigured
+ * setup and intentionally private local previews do not authorize cloud flows.
  */
 export function siteUrl(): string {
   const configured = process.env.NEXT_PUBLIC_SITE_URL
-  if (configured) return configured.replace(/\/$/, '')
+  if (configured) {
+    try {
+      const url = new URL(configured)
+      if (!['http:', 'https:'].includes(url.protocol) || url.username || url.password ||
+        url.pathname !== '/' || url.search || url.hash ||
+        (process.env.NODE_ENV === 'production' && !isLocalMode() &&
+          isSupabaseConfigured() && url.protocol !== 'https:')) throw new Error()
+      return url.origin
+    } catch {
+      throw new Error('NEXT_PUBLIC_SITE_URL must be a canonical origin; configured production cloud serving requires HTTPS.')
+    }
+  }
 
-  if (process.env.NODE_ENV === 'production') {
-    // Vercel sets this automatically for preview and production deployments.
-    const vercel = process.env.VERCEL_PROJECT_PRODUCTION_URL ?? process.env.VERCEL_URL
-    if (vercel) return `https://${vercel}`
+  if (process.env.NODE_ENV === 'production' && !isLocalMode() && isSupabaseConfigured()) {
+    throw new Error('NEXT_PUBLIC_SITE_URL is required for configured production cloud serving.')
   }
 
   return 'http://localhost:3000'

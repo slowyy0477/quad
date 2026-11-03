@@ -3,17 +3,17 @@ import type { Metadata } from 'next'
 
 export const metadata: Metadata = {
   title: 'About',
-  description: 'What Quad is for, who it is for, and what it deliberately is not.',
+  description: 'What Bulla is for, who it is for, and what it deliberately is not.',
 }
 
 export default function AboutPage() {
   return (
     <div className="mx-auto w-full max-w-2xl px-4 py-12 sm:px-6">
-      <h1 className="text-3xl">About Quad</h1>
+      <h1 className="text-3xl">About Bulla</h1>
 
       <div className="mt-6 space-y-5 text-ink-muted">
         <p>
-          Quad is a network for university students. The premise is that the interesting facts about
+          Bulla is a network for university students. The premise is that the interesting facts about
           a student are specific — what they are studying, what they are building, who they are
           building it with, what they are trying to get better at this semester — and that none of
           the existing places to put those facts were designed for them.
@@ -31,7 +31,7 @@ export default function AboutPage() {
         <ul className="list-disc space-y-2 pl-5">
           <li>
             <span className="font-medium text-ink">Not a skill-verification service.</span> When you
-            say you are intermediate at Python, Quad records that you said so. It has no way to test
+            say you are intermediate at Python, Bulla records that you said so. It has no way to test
             the claim and does not pretend otherwise — skill levels are shown as self-declared,
             everywhere they appear.
           </li>
@@ -49,7 +49,7 @@ export default function AboutPage() {
 
         <h2 className="pt-4 text-xl text-ink">Built in the open, and unfinished</h2>
         <p>
-          Quad is in active development. Large parts of it exist as a database with enforced
+          Bulla is in active development. Large parts of it exist as a database with enforced
           permissions and no interface yet. Rather than hide that, the{' '}
           <Link href="/status" className="text-accent-700 underline underline-offset-2">
             build status page
@@ -60,7 +60,7 @@ export default function AboutPage() {
 
         <h2 className="pt-4 text-xl text-ink">Affiliation</h2>
         <p>
-          Quad is not affiliated with, endorsed by, or operated on behalf of any university. Where a
+          Bulla is not affiliated with, endorsed by, or operated on behalf of any university. Where a
           university appears on the platform it is because students added it, and a “verified”
           marker means an administrator checked the institution exists — not that the institution
           approved of anything here.

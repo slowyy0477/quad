@@ -5,6 +5,7 @@ import { redirect } from 'next/navigation'
 import type { Database } from '@/lib/db/database.types'
 import { isSupabaseConfigured } from '@/lib/env'
 import { isLocalMode } from '@/lib/mode'
+import { localFormWrite } from '@/lib/local/write-result'
 import { id, mutate, now, type LocalOpportunity } from '@/lib/local/db'
 import { describeWriteError, echoValues, fieldErrorsOf, type FormState } from '@/lib/form-state'
 import { createClient, getUser } from '@/lib/supabase/server'
@@ -122,7 +123,7 @@ export async function createOpportunityAction(
     }
   }
 
-  if (isLocalMode()) return createOpportunityLocal(user.id, parsed.data, parsedSkills.data.length, formData)
+  if (isLocalMode()) return localFormWrite(() => createOpportunityLocal(user.id, parsed.data, parsedSkills.data.length, formData), formData)
 
   const supabase = await createClient()
   const { data, error } = await supabase
@@ -202,7 +203,7 @@ export async function toggleOpportunitySaveAction(
   const user = await getUser()
   if (!user) redirect(`/login?next=/opportunities/${slug}`)
 
-  if (isLocalMode()) return toggleSaveLocal(user.id, opportunityId, slug, saved)
+  if (isLocalMode()) return localFormWrite(() => toggleSaveLocal(user.id, opportunityId, slug, saved), formData)
 
   const supabase = await createClient()
 

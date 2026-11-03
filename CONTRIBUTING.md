@@ -1,17 +1,19 @@
 # Contributing
 
-Quad is a one-person project with a process borrowed from teams, because the failure mode
+Bulla is a one-person project with a process borrowed from teams, because the failure mode
 of a project this size is a beautiful shell — an interface over a hole. These are the rules
 that keep that from happening.
 
 ## Before you push
 
 ```bash
-npm run verify      # typecheck → lint → 296+ database tests
+npm run verify      # typecheck → lint → Vitest
+npm run verify:bulla -- --build --e2e  # repeatable local Markdown evidence
 ```
 
-It takes about nine minutes on the machine this was built on. It is not optional; the CI
-workflow runs exactly the same command, so skipping it locally only moves the failure.
+Use current run reports for timing and results; do not infer hosted acceptance
+from local checks. Preserve unrelated dirty work, and do not push/deploy as part
+of a review or because an older document suggests it.
 
 ## The rules that are not style preferences
 
@@ -49,13 +51,20 @@ workflow runs exactly the same command, so skipping it locally only moves the fa
 
 | Path | What |
 | --- | --- |
-| `docs/plan/PLAN.md` | the plan to finish it — audit, findings, finish lines, milestones |
-| `docs/plan/UX.md` | the interface contract: UI kit, screens, accessibility and performance budgets |
+| `docs/bulla/PLAN.md`, `STATUS.md`, `ISSUES.md` | current milestones, completed/remaining work and exact acceptance gates |
+| `docs/bulla/DESIGN.md`, `RESEARCH.md` | current Bulla interface contract and source-backed decisions |
+| `docs/plan/PLAN.md`, `UX.md`, `DESIGN.md` | historical plans/design iterations; not current completion status |
 | `docs/plan/ENGINEERING.md` | code standards, Definition of Done, CI, test strategy |
 | `docs/plan/GITHUB.md` | how the work is run: labels, milestones, board, cadence |
-| `docs/plan/SCHEMA.md` | generated schema reference — 52 tables, every column |
+| `docs/plan/SCHEMA.md` | generated schema reference; regenerate/check migration drift before relying on it |
 | `docs/ARCHITECTURE.md` | how the system is put together, and where the code differs from the design |
 | `docs/SECURITY.md` | threat model, the four authorisation layers, and what is *not* protected yet |
+
+After every meaningful completion, update `docs/bulla/STATUS.md`,
+`CHANGELOG.md` and the D-drive `Bulla-Recovery/CHECKPOINT.md`: changed paths,
+exact test/build/browser evidence, remaining work, blockers and next action.
+The verifier writes step-level Markdown reports; it does not replace those
+product/security continuity records.
 
 ## Reporting a bug
 

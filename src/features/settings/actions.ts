@@ -6,6 +6,7 @@ import { createClient, getUser } from '@/lib/supabase/server'
 import { isSupabaseConfigured } from '@/lib/env'
 import { isLocalMode } from '@/lib/mode'
 import { mutate } from '@/lib/local/db'
+import { localActor } from '@/lib/local/access'
 import type { SettingsFormState } from '@/features/settings/form-state'
 
 /**
@@ -16,9 +17,9 @@ import type { SettingsFormState } from '@/features/settings/form-state'
  * write. Nothing new is invented: a setting with no column behind it would be a control
  * that appears to work and does not, which is exactly what PRODUCT.md rule 2 forbids.
  *
- * `update` is called with no `.eq()` on purpose. The policy restricts the row to the
- * caller, and adding a client-supplied id would create the illusion that the client
- * chose which row was written.
+ * Scope by the verified session's id, never a client-supplied id. Moderator RLS
+ * deliberately has a wider audience, so relying on RLS alone here could turn an
+ * ordinary personal-settings save into a bulk update.
  */
 
 const privacySchema = z.object({
@@ -53,7 +54,7 @@ export async function updatePrivacyAction(
     }
 
     const found = await mutate((db) => {
-      const me = db.profiles.find((profile) => profile.user_id === user.id)
+      const me = localActor(db, user.id)
       if (!me) return false
 
       me.visibility = parsed.data.visibility
@@ -76,14 +77,26 @@ export async function updatePrivacyAction(
     return { status: 'error', message: 'Settings are unavailable: this deployment has no database.' }
   }
 
+  const user = await getUser()
+  if (!user) return { status: 'error', message: 'You are not signed in.' }
+
   const supabase = await createClient()
-  const { error } = await supabase.from('profiles').update(parsed.data)
+  const { data, error } = await supabase
+    .from('profiles')
+    .update(parsed.data)
+    .eq('id', user.id)
+    .select('id')
+    .single<{ id: string }>()
 
   if (error) {
     console.error('[settings:updatePrivacy]', error.code, error.message)
     if (error.code === '42501') {
       return { status: 'error', message: 'You are not allowed to change these settings.' }
     }
+    return { status: 'error', message: 'Your settings could not be saved. Please try again.' }
+  }
+
+  if (data?.id !== user.id) {
     return { status: 'error', message: 'Your settings could not be saved. Please try again.' }
   }
 

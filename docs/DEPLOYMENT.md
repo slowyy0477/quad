@@ -1,25 +1,27 @@
 # Deployment
 
-**Read this first: Quad is not ready for a public launch.** It can be deployed — the
-build is clean and the database layer is solid — but the launch checklist at the bottom
-has unticked items that are not cosmetic. Deploy it to a preview URL, share it with
-people who know what they are looking at, and treat the checklist as the gate for
-anything more.
+**Bulla is not cleared for a public launch.** Use the current
+[recovery/production plan](bulla/PLAN.md), [issue register](bulla/ISSUES.md) and
+[recorded verification](bulla/STATUS.md). Compilation is not evidence that
+hosted identity, authorization, resilience or 50,000-user capacity passed.
+The steps below are an operator reference, not authorization to provision,
+bill, migrate, push or deploy. Confirm the intended isolated staging target
+and recovery plan before any external change.
 
 ---
 
 ## What you need
 
-| Account | For | Cost |
+| Prerequisite | For | Acceptance |
 | --- | --- | --- |
-| [Supabase](https://supabase.com) | Postgres, Auth, Storage | free tier is enough to start |
-| [Vercel](https://vercel.com) (or any Node host) | the Next.js app | free tier is enough to start |
-| [Google Cloud Console](https://console.cloud.google.com) | Google sign-in — **optional**; email/password works without it | free |
-| A domain | production only | varies |
+| Managed Supabase project | Postgres, Auth, authorized Realtime, future private storage | Check actual compute, limits, backups, region and measured workload; no tier is proven here |
+| Chosen Node/Next host | Stateless app replicas and TLS | Agree resource/connection budgets, monitoring and rollback |
+| Google OAuth provider, if desired | Optional sign-in | Verify approved callback/origins and real login; do not create keys from this guide alone |
+| Controlled domain and email delivery | Production origin and transactional mail | Verify TLS, SMTP/confirmation/recovery and operational ownership |
 
-No other third-party service is used. No analytics, no error reporting, no email
-provider beyond Supabase's own — see [PRIVACY](../src/app/privacy/page.tsx), which says
-the same thing to users.
+The shipped integrations are not a complete operating service. Monitoring,
+email delivery, safe uploads, jobs and recovery still need acceptance. Keep
+draft privacy/terms accurate as providers and actual data practices change.
 
 ## 1. Database
 
@@ -28,14 +30,14 @@ npx supabase link --project-ref <your-project-ref>
 npm run db:push
 ```
 
-Verify in the dashboard: **Table editor** shows 52 tables, and every one has the RLS
+Verify the actual migration catalog and schema: every client-facing table has the RLS
 shield lit. If any table shows RLS disabled, stop — that table is world-readable with
 the public anon key. (`npm test` asserts this, so it should not happen; check anyway,
 because this is the failure that matters most.)
 
 Then, in **Project settings → Database**:
 
-- Note whether your plan includes backups. The free tier does not.
+- Confirm actual backup/PITR entitlement, retention and the agreed recovery objectives.
 - Before real users exist, restore one backup into a scratch project. An untested
   backup is not a backup.
 
@@ -68,28 +70,27 @@ Set these in your host's dashboard. Full reference: [ENVIRONMENT.md](ENVIRONMENT
 
 ```
 NEXT_PUBLIC_SUPABASE_URL=https://<project-ref>.supabase.co
+NEXT_PUBLIC_DATA_MODE=supabase
 NEXT_PUBLIC_SUPABASE_ANON_KEY=<anon key>
-SUPABASE_SERVICE_ROLE_KEY=<service_role key>
 NEXT_PUBLIC_SITE_URL=https://your-domain.example
 ```
 
 `NEXT_PUBLIC_SITE_URL` is **required** in production: the OAuth callback URL is built
 from it, and a wrong value sends a user and their authorization code to another origin.
 
+The service-role key is optional for ordinary browsing and server-only wherever
+an explicitly reviewed privileged feature needs it. Never expose it in a public
+variable. Enable `BULLA_REQUIRE_HTTPS=1` only for the actual TLS deployment.
 Do **not** set `ADMIN_EMAIL` / `ADMIN_PASSWORD` in the hosting environment. They are
 read by a local script; see [ADMIN.md](ADMIN.md).
 
 ## 4. Deploy
 
-Vercel detects Next.js with no configuration:
+Choose the deployment host only after staging and budget decisions. Follow its
+current official deployment procedure; do not install global tooling or promote
+a production deployment as an automatic consequence of this guide.
 
-```bash
-npm i -g vercel
-vercel
-vercel --prod
-```
-
-Any Node host works:
+Local compilation/serving commands:
 
 ```bash
 npm ci
@@ -102,7 +103,8 @@ it requires a **rebuild**, not a restart.
 
 ## 5. First admin
 
-Once, from your machine, with `.env.local` pointing at the production project:
+Only for an explicitly approved target, from your machine with `.env.local`
+pointing at that verified project:
 
 ```bash
 npm run create-admin
@@ -112,10 +114,11 @@ Then delete the credentials from `.env.local`. See [ADMIN.md](ADMIN.md).
 
 ## 6. Verify the deployment
 
-Check each of these by hand; there is no automated smoke test yet.
+Local automated smoke exists, but hosted acceptance below is still required.
+Record real outcomes rather than checking boxes merely because a page exists.
 
 - [ ] `/` renders, and shows **no** "Setup required" badge
-- [ ] `/setup` reports all four variables present
+- [ ] `/setup` reports the expected provider/configuration; presence does not prove connectivity
 - [ ] `/status` loads
 - [ ] Sign up with a real address → the confirmation email arrives → the link returns to
       the site signed in
@@ -144,21 +147,24 @@ Unticked items are not ready. This is the honest state, not a wish list.
 - [ ] **Remove `robots: { index: false }`** from `src/app/layout.tsx` — but only when the
       rest of this list is done. A half-built site in search results is harder to undo
       than to prevent.
-- [ ] **Moderation.** Migration `0020_reports` is not written. There is no way to
-      report content, no moderator queue, and no audit log. Do not open a social
-      platform to strangers without these.
-- [ ] **Rate limiting.** `0021_rate_limits` is not written. Nothing limits how fast a
-      user can post.
+- [ ] **Moderation.** Reports/decisions/audit exist, but database report eligibility,
+      board coverage, staff authentication and real operational review must pass.
+- [ ] **Rate limiting.** Limiter code exists; enforce server-owned direct-write
+      budgets atomically, including independent concurrent and bypass tests.
 - [ ] **A security contact.** [SECURITY.md](SECURITY.md) §9 has no address.
 - [ ] **Backups verified by restore.**
-- [ ] **Onboarding.** New accounts get a placeholder username and no way to set a real
-      one.
+- [ ] **Onboarding.** Screens/local persistence exist; complete hosted journeys
+      and explicit initial publication choice.
+- [ ] **Account lifecycle.** Recovery completion, reauthentication, export/deletion,
+      ownership transfer and retention/media cleanup.
+- [ ] **Capacity and recovery.** Measure the agreed realistic staging workload,
+      connection/fan-out/query budgets, soak/spike/failure and actual restore.
 
 ### Important
 
-- [ ] Content Security Policy and security headers (`next.config.ts` — nothing configured)
-- [ ] Playwright end-to-end specs (`tests/e2e/` is empty)
-- [ ] Permission tests for profiles, social graph, posts, comments, ideas
+- [ ] Runtime CSP/nonces, `src/proxy.ts`, secure cookies/origin checks and actual TLS headers
+- [ ] Two-account and hosted Playwright/integration journeys beyond local smoke
+- [ ] Permission/retry/concurrency coverage for all exposed domains and direct APIs
 - [ ] Error reporting (Sentry or equivalent — none)
 - [ ] Uptime monitoring
 - [ ] Accessibility audit with a screen reader
@@ -170,8 +176,8 @@ Unticked items are not ready. This is the honest state, not a wish list.
 - [ ] Every feature marked `planned` or `schema-only` on `/status` is either built or
       still honestly labelled. **Do not remove the status page to look finished** — it is
       the thing that keeps the product honest with its users.
-- [ ] No seed or test accounts in the production database. There is no seed script yet,
-      so today this means: check for accounts you created while testing.
+- [ ] No synthetic test/demo accounts or content in production. Local preview
+      seeding and staging fixtures must not become real-user evidence.
 - [ ] Confirm the "under construction" copy still matches reality.
 
 ## Rollback

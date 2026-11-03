@@ -5,11 +5,13 @@ import { Alert } from '@/components/ui/alert'
 import { Button } from '@/components/ui/button'
 import { EmptyState } from '@/components/ui/surface'
 import { ProfileView } from '@/features/profiles/components/profile-view'
+import { PortfolioSections } from '@/features/profiles/components/portfolio-sections'
+import { getProfilePortfolio, parsePortfolioCursors } from '@/features/profiles/portfolio'
 import { getMyProfile } from '@/features/profiles/queries'
 import { InterestTags } from '@/features/skills/components/interest-tags'
 import { SkillList } from '@/features/skills/components/skill-list'
 import { listProfileInterests, listProfileSkills } from '@/features/skills/queries'
-import { isSupabaseConfigured } from '@/lib/env'
+import { isDataConfigured } from '@/lib/env'
 
 export const metadata: Metadata = { title: 'Your profile' }
 
@@ -22,8 +24,12 @@ export const metadata: Metadata = { title: 'Your profile' }
  * a private profile that looks complete when you view it invites the assumption that
  * everyone else sees the same thing.
  */
-export default async function MyProfilePage() {
-  if (!isSupabaseConfigured()) {
+export default async function MyProfilePage({
+  searchParams,
+}: {
+  searchParams: Promise<Record<string, string | string[] | undefined>>
+}) {
+  if (!isDataConfigured()) {
     return (
       <div className="mx-auto w-full max-w-2xl px-4 py-12">
         <h1 className="text-3xl">Your profile</h1>
@@ -40,6 +46,17 @@ export default async function MyProfilePage() {
   const result = await getMyProfile()
 
   if (result.state === 'signed-out') redirect('/login?next=/me')
+
+  if (result.state === 'error') {
+    return (
+      <div className="mx-auto w-full max-w-2xl px-4 py-12">
+        <h1 className="text-3xl">Your profile</h1>
+        <Alert tone="danger" title="Your profile could not be loaded" className="mt-6">
+          {result.message}
+        </Alert>
+      </div>
+    )
+  }
 
   if (result.state === 'missing') {
     return (
@@ -62,19 +79,21 @@ export default async function MyProfilePage() {
 
   const { profile } = result
 
-  const [skills, interests] = await Promise.all([
+  const query = await searchParams
+  const [skills, interests, portfolioResult] = await Promise.all([
     listProfileSkills(profile.id),
     listProfileInterests(profile.id),
+    getProfilePortfolio(profile.id, { cursors: parsePortfolioCursors(query) }),
   ])
 
   return (
-    <div className="mx-auto w-full max-w-2xl px-4 py-10 sm:px-6">
+    <div className="page-enter mx-auto w-full max-w-3xl px-4 py-8 sm:px-6">
       <div className="mb-6 flex flex-wrap items-center justify-between gap-3">
         <p className="font-sans text-2xs font-semibold tracking-[0.12em] text-ink-faint uppercase">
           Your profile
         </p>
         <div className="flex flex-wrap gap-2">
-          <Button asChild variant="secondary" size="sm">
+          <Button asChild variant="primary" size="sm">
             <Link href="/me/edit">Edit profile</Link>
           </Button>
           <Button asChild variant="secondary" size="sm">
@@ -84,7 +103,7 @@ export default async function MyProfilePage() {
             <Link href="/connections">Connections</Link>
           </Button>
           <Button asChild variant="ghost" size="sm">
-            <Link href={`/u/${profile.username}`}>View as public</Link>
+            <Link href={`/u/${profile.username}`}>Profile link</Link>
           </Button>
         </div>
       </div>
@@ -127,6 +146,9 @@ export default async function MyProfilePage() {
           interests.length > 0 ? <InterestTags interests={interests} isSelf /> : undefined
         }
       />
+      <div className="mt-10">
+        <PortfolioSections {...portfolioResult} basePath="/me" />
+      </div>
     </div>
   )
 }

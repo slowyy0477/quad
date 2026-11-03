@@ -39,6 +39,8 @@ const SUBJECT: Record<ReportKind, string> = {
   idea: 'this idea',
   message: 'this message',
   profile: 'this account',
+  event: 'this event',
+  opportunity: 'this opportunity',
 }
 
 const KIND_LABEL: Record<ReportKind, string> = {
@@ -48,6 +50,8 @@ const KIND_LABEL: Record<ReportKind, string> = {
   idea: 'Idea',
   message: 'Private message',
   profile: 'Profile',
+  event: 'Event',
+  opportunity: 'Opportunity',
 }
 
 const DATE = new Intl.DateTimeFormat('en-GB', {
@@ -93,7 +97,7 @@ export default async function AdminQueuePage({
 
       {rows && rows.length === 0 ? (
         <EmptyState title="Nothing needs a decision">
-          When somebody reports a post, a comment, a project, an idea, a message or a person, it
+          When somebody reports content, an event, an opportunity, a message or a person, it
           appears here with the reported content shown inline. Every action you take from here is
           recorded with your name and your reason.
         </EmptyState>

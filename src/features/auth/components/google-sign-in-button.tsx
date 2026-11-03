@@ -1,5 +1,6 @@
 import { signInWithGoogleAction } from '@/features/auth/actions'
 import { SubmitButton } from '@/components/ui/submit-button'
+import { getAuthCapabilities } from '@/features/auth/providers'
 
 /**
  * Google sign-in.
@@ -12,7 +13,17 @@ import { SubmitButton } from '@/components/ui/submit-button'
  * The mark is inline SVG in Google's four brand colours because their sign-in
  * branding guidelines require the unmodified logo.
  */
-export function GoogleSignInButton({ next, disabled }: { next: string; disabled?: boolean }) {
+export async function GoogleSignInButton({ next, disabled }: { next: string; disabled?: boolean }) {
+  const capabilities = await getAuthCapabilities()
+  if (disabled || !capabilities.google) {
+    return (
+      <p className="text-center text-xs text-ink-muted">
+        {capabilities.status === 'unreachable'
+          ? 'Google sign-in could not be checked and is unavailable right now.'
+          : 'Google sign-in is not enabled for this deployment.'}
+      </p>
+    )
+  }
   return (
     <form action={signInWithGoogleAction}>
       <input type="hidden" name="next" value={next} />

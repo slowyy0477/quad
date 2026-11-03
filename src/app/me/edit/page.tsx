@@ -4,14 +4,15 @@ import type { Metadata } from 'next'
 import { Alert } from '@/components/ui/alert'
 import { Button } from '@/components/ui/button'
 import { Surface } from '@/components/ui/surface'
+import { ManagedImageControl } from '@/components/managed-image-control'
 import { ProfileEditForm } from '@/features/profiles/components/profile-edit-form'
 import { getMyProfile, listUniversities } from '@/features/profiles/queries'
-import { isSupabaseConfigured } from '@/lib/env'
+import { isDataConfigured } from '@/lib/env'
 
 export const metadata: Metadata = { title: 'Edit your profile' }
 
 export default async function EditProfilePage() {
-  if (!isSupabaseConfigured()) {
+  if (!isDataConfigured()) {
     return (
       <div className="mx-auto w-full max-w-2xl px-4 py-12">
         <h1 className="text-3xl">Edit your profile</h1>
@@ -29,6 +30,16 @@ export default async function EditProfilePage() {
 
   if (result.state === 'signed-out') redirect('/login?next=/me/edit')
   if (result.state === 'missing') redirect('/me')
+  if (result.state === 'error') {
+    return (
+      <div className="mx-auto w-full max-w-2xl px-4 py-12">
+        <h1 className="text-3xl">Edit your profile</h1>
+        <Alert tone="danger" title="Your profile could not be loaded" className="mt-6">
+          {result.message} Nothing will be overwritten.
+        </Alert>
+      </div>
+    )
+  }
 
   // An account that has not been through onboarding has no chosen username, and this
   // form cannot set one. Sending them to the place that can is more useful than
@@ -38,7 +49,7 @@ export default async function EditProfilePage() {
   const universities = await listUniversities()
 
   return (
-    <div className="mx-auto w-full max-w-2xl px-4 py-10 sm:px-6">
+    <div className="page-enter mx-auto w-full max-w-2xl px-4 py-10 sm:px-6">
       <div className="mb-6 flex flex-wrap items-center justify-between gap-3">
         <h1 className="text-2xl">Edit your profile</h1>
         <Button asChild variant="ghost" size="sm">
@@ -50,10 +61,9 @@ export default async function EditProfilePage() {
         <ProfileEditForm profile={result.profile} universities={universities} />
       </Surface>
 
-      <p className="mt-5 text-xs text-ink-faint">
-        Avatar uploads are not built — storage buckets and file validation are not written yet, so no
-        upload control is shown. A Google-signed-in account keeps whatever picture Google supplied.
-      </p>
+      <Surface className="mt-6 p-5 sm:p-6">
+        <ManagedImageControl target={{ kind: 'avatar' }} currentImageUrl={result.profile.avatar_url} />
+      </Surface>
     </div>
   )
 }

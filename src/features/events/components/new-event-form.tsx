@@ -1,7 +1,7 @@
 'use client'
 
 import { useActionState } from 'react'
-import { Alert } from '@/components/ui/alert'
+import { FormErrorSummary } from '@/components/ui/form-error-summary'
 import { Checkbox } from '@/components/ui/checkbox'
 import { Field } from '@/components/ui/field'
 import { Input, Select, Textarea } from '@/components/ui/input'
@@ -32,11 +32,20 @@ export function NewEventForm() {
 
   return (
     <form action={action} className="space-y-5">
-      {state.status === 'error' && state.message ? (
-        <Alert tone="danger" title="The event was not saved">
-          {state.message}
-        </Alert>
-      ) : null}
+      <FormErrorSummary state={state} title="The event was not saved" fields={{
+        title: { id: 'event-title', label: 'Title' },
+        description: { id: 'event-description', label: 'Description' },
+        type: { id: 'event-type', label: 'Kind of event' },
+        attendanceMode: { id: 'event-mode', label: 'How to attend' },
+        timeZone: { id: 'event-zone', label: 'Time zone' },
+        capacity: { id: 'event-capacity', label: 'Capacity' },
+        startsAt: { id: 'event-starts', label: 'Starts' },
+        endsAt: { id: 'event-ends', label: 'Ends' },
+        location: { id: 'event-location', label: 'Where' },
+        locationUrl: { id: 'event-location-url', label: 'Location link' },
+        joinUrl: { id: 'event-join-url', label: 'Joining link' },
+        visibility: { id: 'event-visibility', label: 'Who can see it' },
+      }} />
 
       <Field
         id="event-title"

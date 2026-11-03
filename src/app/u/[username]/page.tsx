@@ -2,15 +2,20 @@ import Link from 'next/link'
 import { notFound } from 'next/navigation'
 import type { Metadata } from 'next'
 import { ConnectionControls } from '@/features/connections/components/connection-controls'
-import { getViewerConnection } from '@/features/connections/queries'
+import { getPageRelationships } from '@/features/connections/graph-reads'
 import { ProfileView } from '@/features/profiles/components/profile-view'
-import { getMyProfile, getProfileByUsername } from '@/features/profiles/queries'
+import { PortfolioSections } from '@/features/profiles/components/portfolio-sections'
+import { getProfilePortfolio, parsePortfolioCursors } from '@/features/profiles/portfolio'
+import { getMyProfile, getProfileByUsernameResult, toProfileSummary } from '@/features/profiles/queries'
 import { InterestTags } from '@/features/skills/components/interest-tags'
 import { SkillList } from '@/features/skills/components/skill-list'
 import { listProfileInterests, listProfileSkills } from '@/features/skills/queries'
-import { isSupabaseConfigured } from '@/lib/env'
+import { isDataConfigured } from '@/lib/env'
 import { isLocalMode } from '@/lib/mode'
 import { getUser } from '@/lib/supabase/server'
+import { Button } from '@/components/ui/button'
+import { Alert } from '@/components/ui/alert'
+import { ReportDialog } from '@/features/moderation/components/report-dialog'
 
 /**
  * A public profile.
@@ -36,11 +41,12 @@ export async function generateMetadata({
 }: {
   params: Promise<Params>
 }): Promise<Metadata> {
-  if (!isSupabaseConfigured()) return { title: 'Profile' }
+  if (!isDataConfigured()) return { title: 'Profile' }
 
   const { username } = await params
-  const profile = await getProfileByUsername(username)
-  if (!profile) return { title: 'Profile not found' }
+  const result = await getProfileByUsernameResult(username)
+  if (result.state !== 'ok') return { title: result.state === 'missing' ? 'Profile not found' : 'Profile' }
+  const { profile } = result
 
   return {
     title: `${profile.display_name} (@${profile.username})`,
@@ -48,12 +54,29 @@ export async function generateMetadata({
   }
 }
 
-export default async function PublicProfilePage({ params }: { params: Promise<Params> }) {
-  if (!isLocalMode() && !isSupabaseConfigured()) notFound()
+export default async function PublicProfilePage({
+  params,
+  searchParams,
+}: {
+  params: Promise<Params>
+  searchParams: Promise<Record<string, string | string[] | undefined>>
+}) {
+  if (!isLocalMode() && !isDataConfigured()) notFound()
 
   const { username } = await params
-  const profile = await getProfileByUsername(username)
-  if (!profile) notFound()
+  const result = await getProfileByUsernameResult(username)
+  if (result.state === 'missing') notFound()
+  if (result.state === 'error') {
+    return (
+      <div className="mx-auto w-full max-w-3xl px-4 py-8 sm:px-6">
+        <h1 className="text-3xl">Profile</h1>
+        <Alert tone="danger" title="The profile could not be loaded" className="mt-6">
+          {result.message}
+        </Alert>
+      </div>
+    )
+  }
+  const { profile } = result
 
   const user = await getUser()
 
@@ -65,14 +88,23 @@ export default async function PublicProfilePage({ params }: { params: Promise<Pa
   const me = user ? await getMyProfile() : null
   const isSelf = me?.state === 'ok' && me.profile.id === profile.id
 
-  const [skills, interests, viewer] = await Promise.all([
+  const query = await searchParams
+  const [skills, interests, viewer, portfolioResult] = await Promise.all([
     listProfileSkills(profile.id),
     listProfileInterests(profile.id),
-    user && !isSelf ? getViewerConnection(profile.id) : Promise.resolve(null),
+    user && !isSelf ? getPageRelationships([{
+      id: profile.id, person: toProfileSummary(profile), created_at: profile.created_at, connectionId: null,
+    }]) : Promise.resolve(null),
+    getProfilePortfolio(profile.id, { cursors: parsePortfolioCursors(query) }),
   ])
+  const relationship = viewer?.relationships[profile.id]
+  const relationshipError = user && !isSelf
+    ? me?.state === 'error' ? me.message
+      : viewer?.error ?? (!relationship ? 'Relationship controls could not be loaded. Please try again.' : null)
+    : null
 
   return (
-    <div className="mx-auto w-full max-w-2xl px-4 py-10 sm:px-6">
+    <div className="page-enter mx-auto w-full max-w-3xl px-4 py-8 sm:px-6">
       <ProfileView
         profile={profile}
         isSelf={isSelf}
@@ -108,20 +140,29 @@ export default async function PublicProfilePage({ params }: { params: Promise<Pa
         }
         actions={
           isSelf ? undefined : (
-            <ConnectionControls
-              profileId={profile.id}
-              username={profile.username}
-              displayName={profile.display_name}
-              state={viewer?.state ?? 'none'}
-              connectionId={viewer?.connectionId ?? null}
-              isFollowing={viewer?.isFollowing ?? false}
-              isBlockingThem={viewer?.isBlockingThem ?? false}
-              signedIn={Boolean(user)}
-              showBlock={Boolean(user)}
-            />
+            <div className="space-y-2">
+              {relationshipError ? <Alert tone="warning">{relationshipError}</Alert> : <ConnectionControls
+                profileId={profile.id}
+                username={profile.username}
+                displayName={profile.display_name}
+                state={relationship?.state ?? 'none'}
+                connectionId={relationship?.connectionId ?? null}
+                isFollowing={relationship?.isFollowing ?? false}
+                isBlockingThem={relationship?.isBlockingThem ?? false}
+                signedIn={Boolean(user)}
+                showBlock={Boolean(user)}
+              />}
+              {user ? (
+                <ReportDialog kind="profile" targetId={profile.id} subject="this person"
+                  trigger={<Button variant="ghost" size="sm" aria-label="Report this person">Report profile</Button>} />
+              ) : null}
+            </div>
           )
         }
       />
+      <div className="mt-10">
+        <PortfolioSections {...portfolioResult} basePath={`/u/${encodeURIComponent(profile.username)}`} />
+      </div>
     </div>
   )
 }

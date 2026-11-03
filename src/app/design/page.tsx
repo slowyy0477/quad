@@ -318,7 +318,7 @@ export default function DesignPage() {
           </div>
         </div>
         <p className="mt-3 text-2xs text-ink-faint">
-          Levels are self-declared. Quad does not test skills, and nothing here is a verification.
+          Levels are self-declared. Bulla does not test skills, and nothing here is a verification.
         </p>
       </Specimen>
 

@@ -62,7 +62,7 @@ export function eventStatusLabel(value: string) {
  * a calendar, and the page explains the clamp when it happens.
  */
 export const EVENT_VISIBILITIES = [
-  { value: 'public', label: 'Anyone on Quad' },
+  { value: 'public', label: 'Anyone on Bulla' },
   { value: 'university', label: 'People at my university' },
 ] as const
 

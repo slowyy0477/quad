@@ -3,12 +3,13 @@ import 'server-only'
 /**
  * Messaging reads.
  *
- * Nothing here filters by participation, and that is the point. Every select runs
- * as the signed-in user, and four policies decide what comes back:
+ * Every hosted select runs as the signed-in user. Message RLS checks the union
+ * of actual membership intervals; knowing a conversation or message id grants
+ * nothing. The 0024 safe-summary view additionally protects previews/activity:
  *
- *   `conversations_select_participant`    app.was_conversation_participant(id)
- *   `conversation_participants_select`    app.was_conversation_participant(conversation_id)
- *   `messages_select_participant`         participation, and not hidden by moderation
+ *   `message_conversation_summaries`      caller-scoped membership-window summary
+ *   `conversation_participants_select`    active participants, or the reader's own row
+ *   `messages_select_participant`         membership windows and moderation
  *   `blocks_select_own`                   only the reader's own blocks
  *
  * `tests/db/messaging.test.ts` proves all four by handing the attacker the real
@@ -22,19 +23,17 @@ import 'server-only'
  * invisible to everyone, and the policy leaves it readable so moderators can
  * review it.
  *
- * ## Why the conversation list is ordered by `updated_at` and not `last_message_at`
+ * ## Why the conversation list is ordered by the safe summary's `updated_at`
  *
  * A chat list is read most-recent-first, and `last_message_at` is the field that
  * means that — but it is nullable (`conversations_before_write` sets it to null
  * for a conversation nobody has written into), so ordering by it would need
  * `NULLS LAST` and the cursor would have to encode "the boundary row had no
  * messages", which the `created_at|id` cursor shape cannot carry. `updated_at` is
- * NOT NULL, is set to the same instant as `last_message_at` by
- * `app.messages_after_insert` (which updates the conversation, firing
- * `conversations_set_updated_at`), and is *not* touched when the reader marks the
- * thread read — so reading a conversation does not reorder the list, which
- * ordering by `last_read_at` would have done. The activity time the interface
- * shows is still `last_message_at`, falling back to `created_at`.
+ * NOT NULL in the view shape and equals the newest READABLE message's creation
+ * time, or the conversation's creation time. Raw denormalized activity is not
+ * used: it would move a departed person's inbox when an inaccessible message
+ * arrived. Marking read never changes this ordering.
  *
  * ## The one parameter that is passed in rather than read from the session
  *
@@ -54,14 +53,16 @@ import 'server-only'
  * is stated as such in docs/plan/LOCAL-MODE.md — the point here is to reproduce the
  * *rule*, not to claim the *enforcement*:
  *
- *   conversations                → the reader has a `conversation_participants` row
+ *   conversations                → the reader has recorded membership
  *   conversation_participants    → rows of a conversation the reader participates in
- *   messages                     → rows of a conversation the reader participates in
- *   blocks                       → no `blocks` table exists locally, so nobody has
- *                                  blocked anybody and `i_blocked` is false rather
- *                                  than guessed at
+ *   messages                     → creation/edit within recorded membership windows
+ *   blocks                       → either-way blocks suppress local history and sends
  *
- * Two things the store does not have, and what is done instead of inventing them:
+ * Legacy local rows have no join timestamps. `local-access.ts` uses the recorded
+ * conversation creation as their lower bound and a messaging-only sidecar for
+ * every new join/leave/rejoin. Pre-existing data is not rewritten while reading.
+ *
+ * Two local representation differences:
  *
  *   * `updated_at` and `unread_count`. There is no `updated_at` column, so the list
  *     is ordered by `last_message_at ?? created_at` — the same instant
@@ -71,9 +72,9 @@ import 'server-only'
  *     counting the messages in the conversation that are newer than it and were not
  *     written by the reader — which is precisely what the trigger increments and
  *     `mark_conversation_read` resets.
- *   * `is_muted` and `left_at`. Neither column exists locally, so both are reported
- *     as the state of a conversation nobody has muted or left, and `setMuted` in
- *     `actions.ts` refuses rather than writing a flag with nowhere to live.
+ *   * `is_muted` and `left_at` are stored in participant preferences. Closed
+ *     membership intervals are retained separately so clearing a preference can
+ *     never reopen an absence. Departed readers have zero unread.
  *
  * Local ids are `cnv_…`/`msg_…` rather than uuids, so every id guard in this file
  * accepts the shape the mode it is in actually produces, and the cursor decoder
@@ -84,12 +85,23 @@ import 'server-only'
 
 import { decodeCursor, type Cursor } from '@/lib/cursor'
 import { isLocalMode } from '@/lib/mode'
+import { canReadProfile, localActor } from '@/lib/local/access'
 import { readStore, type LocalConversation, type LocalProfile, type Tables } from '@/lib/local/db'
 import { createClient, getUser } from '@/lib/supabase/server'
+import { groupManagementPaneLocal } from './local-groups'
+import { callGroupRPC } from './group-rpc'
+import {
+  activeMessageMembershipLocal,
+  canReadConversationHistoryLocal,
+  canReadMessageLocal,
+  canStartDirectMessageLocal,
+  messageMembershipsLocal,
+} from './local-access'
 import type {
   ConversationPage,
   ConversationPane,
   ConversationSummary,
+  GroupManagementPane,
   MessageAuthor,
   MessagingPermission,
   ThreadMessage,
@@ -112,12 +124,7 @@ const LOCAL_ID = /^[a-z]+_[a-z0-9]{1,64}$/
 
 const CONVERSATION_SELECT = `
   id, type, title, created_at, updated_at, last_message_at, last_message_preview,
-  participants:conversation_participants!conversation_participants_conversation_id_fkey (
-    profile_id, role, unread_count, is_muted, last_read_at, left_at,
-    profile:profiles!conversation_participants_profile_id_fkey (
-      id, username, display_name, avatar_url
-    )
-  )
+  participants
 `
 
 const MESSAGE_SELECT = `
@@ -248,13 +255,13 @@ async function blockedAmong(
 
 /** The reader's profile row. Messaging is addressed by `profile_id`, not by user id. */
 function readerProfile(db: Tables, userId: string): LocalProfile | null {
-  return db.profiles.find((profile) => profile.user_id === userId) ?? null
+  return localActor(db, userId)
 }
 
 /** The embedded `profiles` row, or null when it is not readable (`profiles` has its own policy). */
-function authorOf(db: Tables, profileId: string): MessageAuthor | null {
+function authorOf(db: Tables, profileId: string, viewer: LocalProfile | null): MessageAuthor | null {
   const profile = db.profiles.find((candidate) => candidate.id === profileId)
-  if (!profile) return null
+  if (!canReadProfile(db, profile, viewer) || !profile) return null
   return {
     id: profile.id,
     username: profile.username,
@@ -268,12 +275,9 @@ function activityOf(conversation: { last_message_at: string | null; created_at: 
   return conversation.last_message_at ?? conversation.created_at
 }
 
-/** `app.was_conversation_participant` without the `left_at` half, which has no column here. */
+/** Historical membership is distinct from an active permission to send. */
 function participates(db: Tables, conversationId: string, profileId: string): boolean {
-  return db.conversation_participants.some(
-    (participant) =>
-      participant.conversation_id === conversationId && participant.profile_id === profileId,
-  )
+  return canReadConversationHistoryLocal(db, conversationId, db.profiles.find(row => row.id === profileId) ?? null)
 }
 
 /**
@@ -289,34 +293,41 @@ function unreadOf(
   db: Tables,
   participant: { conversation_id: string; profile_id: string; last_read_at: string | null },
 ): number {
+  if (!activeMessageMembershipLocal(db, participant.conversation_id, participant.profile_id)) return 0
+  const viewer = db.profiles.find(row => row.id === participant.profile_id) ?? null
   return db.messages.filter(
     (message) =>
       message.conversation_id === participant.conversation_id &&
+      canReadMessageLocal(db, message, viewer) &&
       message.author_id !== participant.profile_id &&
-      (participant.last_read_at === null || message.created_at > participant.last_read_at),
+      (participant.last_read_at === null ||
+        Date.parse(message.created_at) > Date.parse(participant.last_read_at)),
   ).length
 }
 
 /** The reader's participant rows, as the embed returns them. */
-function participantJoins(db: Tables, conversationId: string): ParticipantJoin[] {
+function participantJoins(db: Tables, conversationId: string, viewer: LocalProfile | null): ParticipantJoin[] {
   return db.conversation_participants
     .filter((participant) => participant.conversation_id === conversationId)
     .map((participant) => ({
       profile_id: participant.profile_id,
-      // No `role` column: every local participant is what the seed writes, 'member'.
-      role: 'member',
-      unread_count: unreadOf(db, participant),
-      // No `is_muted` column. False is what an unmuted row reads as; it is not a claim
-      // that muting works locally — `setConversationMutedAction` refuses for that reason.
-      is_muted: false,
+      // Missing legacy roles remain members; reading never invents an admin.
+      role: participant.role === 'admin' ? 'admin' : 'member',
+      unread_count: participant.profile_id === viewer?.id ? unreadOf(db, participant) : 0,
+      // Muting is stored in the backwards-compatible preference sidecar.
+      is_muted: db.participant_preferences.some(row => row.conversation_id === conversationId && row.profile_id === participant.profile_id && row.is_muted),
       last_read_at: participant.last_read_at,
-      // No `left_at` column: nobody has left a conversation in the store.
-      left_at: null,
-      profile: authorOf(db, participant.profile_id),
+      left_at: activeMessageMembershipLocal(db, conversationId, participant.profile_id)
+        ? null
+        : db.participant_preferences.find(row => row.conversation_id === conversationId && row.profile_id === participant.profile_id)?.left_at ?? messageMembershipsLocal(db, conversationId, participant.profile_id).at(-1)?.left_at ?? null,
+      profile: authorOf(db, participant.profile_id, viewer),
     }))
 }
 
-function conversationRow(db: Tables, conversation: LocalConversation): ConversationJoinRow {
+function conversationRow(db: Tables, conversation: LocalConversation, viewer: LocalProfile | null): ConversationJoinRow {
+  const latest = db.messages
+    .filter(row => row.conversation_id === conversation.id && canReadMessageLocal(db, row, viewer))
+    .sort(compareMessage)[0]
   return {
     id: conversation.id,
     type: conversation.type,
@@ -324,10 +335,10 @@ function conversationRow(db: Tables, conversation: LocalConversation): Conversat
     created_at: conversation.created_at,
     // The shape has `updated_at` and the store does not; `last_message_at ?? created_at`
     // is what the Supabase path would have in it (the trigger sets both together).
-    updated_at: activityOf(conversation),
-    last_message_at: conversation.last_message_at,
-    last_message_preview: conversation.last_message_preview,
-    participants: participantJoins(db, conversation.id),
+    updated_at: latest?.created_at ?? conversation.created_at,
+    last_message_at: latest?.created_at ?? null,
+    last_message_preview: latest ? Array.from(latest.body).slice(0, 140).join('') : null,
+    participants: participantJoins(db, conversation.id, viewer),
   }
 }
 
@@ -394,14 +405,6 @@ function decodeStoreCursor(raw: string | string[] | undefined): Cursor | null {
  * nobody but their owner here, because the store has no connections table — which
  * is the honest state, not a copy of somebody else's rule.
  */
-function readableProfile(reader: LocalProfile | null, target: LocalProfile): boolean {
-  if (reader && reader.id === target.id) return true
-  if (target.visibility === 'public') return true
-  if (target.visibility === 'university') {
-    return Boolean(reader?.university_id) && reader?.university_id === target.university_id
-  }
-  return false
-}
 
 /** One page of the reader's conversations, most recently active first. */
 export async function listConversations({
@@ -415,7 +418,8 @@ export async function listConversations({
 }): Promise<ConversationPage> {
   if (isLocalMode()) {
     const db = await readStore()
-    const reader = readerProfile(db, meId)
+    const session = await getUser()
+    const reader = session?.id === meId ? readerProfile(db, session.id) : null
     if (!reader) return { conversations: [], nextCursor: null, error: null }
 
     const decoded = decodeStoreCursor(cursor)
@@ -424,7 +428,7 @@ export async function listConversations({
     // are narrowed to the reader's own before anything else happens to them.
     const rows = db.conversations
       .filter((conversation) => participates(db, conversation.id, reader.id))
-      .map((conversation) => conversationRow(db, conversation))
+      .map((conversation) => conversationRow(db, conversation, reader))
       .filter((row) => {
         if (!decoded) return true
         const activity = activityOf(row)
@@ -454,7 +458,7 @@ export async function listConversations({
   const decoded = decodeCursor(Array.isArray(cursor) ? cursor[0] : cursor)
 
   let query = supabase
-    .from('conversations')
+    .from('message_conversation_summaries')
     .select(CONVERSATION_SELECT)
     .order('updated_at', { ascending: false })
     .order('id', { ascending: false })
@@ -516,7 +520,8 @@ export async function getConversationPane(
     if (!LOCAL_ID.test(conversationId)) return null
 
     const db = await readStore()
-    const reader = readerProfile(db, meId)
+    const session = await getUser()
+    const reader = session?.id === meId ? readerProfile(db, session.id) : null
     if (!reader) return null
 
     // `conversations_select_participant` again: a conversation that is not the
@@ -525,7 +530,7 @@ export async function getConversationPane(
     const conversation = db.conversations.find((candidate) => candidate.id === conversationId)
     if (!conversation || !participates(db, conversation.id, reader.id)) return null
 
-    const participants = participantJoins(db, conversation.id)
+    const participants = participantJoins(db, conversation.id, reader)
     const mine = participants.find((participant) => participant.profile_id === reader.id)
     const others = participants.filter((participant) => participant.profile_id !== reader.id)
     const readable = others
@@ -539,10 +544,14 @@ export async function getConversationPane(
       other: conversation.type === 'direct' ? (readable[0] ?? null) : null,
       unread_count: mine?.unread_count ?? 0,
       is_muted: mine?.is_muted ?? false,
-      // No `blocks` table: nothing to have blocked.
+      // Blocked local conversations have already been omitted.
       i_blocked: false,
       left: mine?.left_at != null,
       last_read_at: mine?.last_read_at ?? null,
+      reader_profile_id: reader.id,
+      ...(conversation.type === 'group' ? {
+        group: groupManagementPaneLocal(db, conversation.id, reader),
+      } : {}),
     }
   }
 
@@ -550,7 +559,7 @@ export async function getConversationPane(
 
   const supabase = await createClient()
   const { data, error } = await supabase
-    .from('conversations')
+    .from('message_conversation_summaries')
     .select(CONVERSATION_SELECT)
     .eq('id', conversationId)
     .maybeSingle<ConversationJoinRow>()
@@ -572,6 +581,15 @@ export async function getConversationPane(
     others.map((participant) => participant.profile_id),
   )
 
+  let group: GroupManagementPane | null = null
+  if (data.type === 'group' && mine?.left_at == null) {
+    const result = await callGroupRPC(supabase, 'message_group_members', {
+      p_conversation_id: conversationId,
+    })
+    if (result.error) console.error('[messages:groupMembers]', result.error.code)
+    else group = result.data
+  }
+
   return {
     id: data.id,
     type: data.type,
@@ -582,6 +600,8 @@ export async function getConversationPane(
     i_blocked: others.some((participant) => blocked.has(participant.profile_id)),
     left: mine?.left_at != null,
     last_read_at: mine?.last_read_at ?? null,
+    reader_profile_id: meId,
+    ...(data.type === 'group' ? { group } : {}),
   }
 }
 
@@ -630,7 +650,7 @@ export async function listThreadMessages({
     const decoded = decodeStoreCursor(cursor)
 
     const rows = db.messages
-      .filter((message) => message.conversation_id === conversationId)
+      .filter((message) => message.conversation_id === conversationId && canReadMessageLocal(db, message, reader))
       .filter(
         (message) =>
           !decoded ||
@@ -653,7 +673,7 @@ export async function listThreadMessages({
       is_edited: false,
       deleted_at: null,
       attachment_name: null,
-      author: authorOf(db, row.author_id),
+      author: authorOf(db, row.author_id, reader),
     }))
 
     return {
@@ -751,45 +771,11 @@ export async function getMessagingPermission(
     if (!LOCAL_ID.test(targetId)) return { state: 'refused', reason: 'That person could not be identified.' }
 
     const db = await readStore()
-    const me = readerProfile(db, meId)
-    const target = db.profiles.find((candidate) => candidate.id === targetId)
-
-    if (targetId === meId || (me && target && me.id === target.id)) {
-      return { state: 'refused', reason: 'You cannot start a conversation with yourself.' }
-    }
-
-    // The mirror of `app.can_message` is only as good as the rows it can see. A block
-    // is stored in `blocks`, which the store does not have, so no block is checked
-    // and none can be claimed — the same shape of gap the Supabase version documents
-    // for a block in the other direction.
-    if (!target) return { state: 'allowed' }
-
-    // `profiles` has no `status` column locally: every account in the store is active,
-    // which is what the seed writes.
-    switch (target.allow_messages_from ?? 'everyone') {
-      case 'everyone':
-        return { state: 'allowed' }
-      case 'nobody':
-        return { state: 'refused', reason: 'They have turned messages off.' }
-      case 'university':
-        if (
-          me?.university_id &&
-          target.university_id &&
-          me.university_id === target.university_id
-        ) {
-          return { state: 'allowed' }
-        }
-        return { state: 'refused', reason: 'They only accept messages from their own university.' }
-      case 'connections':
-        // No `connections` table exists locally, so nobody is connected to anybody and
-        // this answer is true rather than convenient.
-        return {
-          state: 'refused',
-          reason: 'They only accept messages from people they are connected to.',
-        }
-      default:
-        return { state: 'refused', reason: 'They are not accepting messages.' }
-    }
+    const session = await getUser()
+    const me = session?.id === meId ? readerProfile(db, session.id) : null
+    return canStartDirectMessageLocal(db, me, targetId)
+      ? { state: 'allowed' }
+      : { state: 'refused', reason: 'Messaging is not available with this person.' }
   }
 
   if (!UUID.test(targetId)) return { state: 'refused', reason: 'That person could not be identified.' }
@@ -900,7 +886,7 @@ export async function findMessagingTarget(
     // `profiles_select_visible` decides what this lookup can return in Supabase mode,
     // so a profile the reader may not read is "no such handle" here too — not a
     // different sentence that would confirm the account exists.
-    if (!found || !readableProfile(reader, found)) return null
+    if (!found || !canReadProfile(db, found, reader)) return null
 
     return {
       id: found.id,
@@ -931,8 +917,7 @@ export async function findMessagingTarget(
  *
  * `public.total_unread_messages()` in one statement in Postgres, and the same
  * question here: the sum of the reader's own unread counts, excluding conversations
- * they have muted (which the function does) and conversations they have left (which
- * the store cannot represent). Locally the sum is derived from `last_read_at` the
+ * they have muted and conversations they have left. Locally the sum is derived from `last_read_at` the
  * same way each row's count is, so a badge and the list cannot disagree.
  *
  * The header renders `unreadNotifications` today and has no message badge; this is
@@ -952,7 +937,7 @@ export async function getTotalUnreadMessages(): Promise<number> {
     if (!reader) return 0
 
     return db.conversation_participants
-      .filter((participant) => participant.profile_id === reader.id)
+      .filter((participant) => participant.profile_id === reader.id && activeMessageMembershipLocal(db, participant.conversation_id, reader.id) && canReadConversationHistoryLocal(db, participant.conversation_id, reader) && !db.participant_preferences.some(row => row.conversation_id === participant.conversation_id && row.profile_id === reader.id && row.is_muted))
       .reduce((total, participant) => total + unreadOf(db, participant), 0)
   }
 

@@ -1,5 +1,5 @@
 # ---------------------------------------------------------------------------
-# Quad — University Student Network
+# Bulla — University Student Network
 # See https://git-scm.com/docs/gitignore
 # ---------------------------------------------------------------------------
 
@@ -15,6 +15,7 @@
 
 # next.js
 /.next/
+/.next-*/
 /out/
 /build
 /dist
@@ -79,4 +80,4 @@ supabase/apply-all.sql
 supabase/apply-from-*.sql
 
 # Local data store: accounts, posts, everything, in plain JSON. Never deployed.
-data/
+/data/

@@ -2,13 +2,15 @@ import { NextResponse, type NextRequest } from 'next/server'
 import { isSupabaseConfigured } from '@/lib/env'
 import { createClient } from '@/lib/supabase/server'
 import { safeRedirect } from '@/features/auth/redirect'
+import { isLocalMode } from '@/lib/mode'
 
 /**
  * OAuth and email-link callback.
  *
- * Everything that authenticates out-of-band lands here: Google sign-in, the email
- * confirmation link, the password-reset link. Supabase sends back a one-time
- * `code`, and this handler trades it for a session.
+ * Google sign-in and PKCE email-confirmation links land here. Supabase sends
+ * back a one-time `code`, and this handler trades it for a session. Password
+ * recovery uses /auth/recovery and provider TokenHash verification on form POST;
+ * a code exchange here never grants password-reset authority.
  *
  * This must be a Route Handler rather than a page. The exchange writes session
  * cookies, and a Server Component cannot set cookies -- its response headers are
@@ -28,7 +30,7 @@ export async function GET(request: NextRequest) {
   // into the page; the code is enough for the login page to explain itself.
   const providerError = url.searchParams.get('error')
   if (providerError) {
-    console.error('[auth:callback]', providerError, url.searchParams.get('error_description'))
+    console.error('[auth:callback]', 'Provider rejected callback')
     return NextResponse.redirect(new URL(`/login?error=${encodeURIComponent(providerError)}`, url.origin))
   }
 
@@ -38,18 +40,25 @@ export async function GET(request: NextRequest) {
     return NextResponse.redirect(new URL('/login', url.origin))
   }
 
-  if (!isSupabaseConfigured()) {
+  if (isLocalMode() || !isSupabaseConfigured()) {
     return NextResponse.redirect(new URL('/setup', url.origin))
   }
 
   const supabase = await createClient()
-  const { error } = await supabase.auth.exchangeCodeForSession(code)
+  const { data, error } = await supabase.auth.exchangeCodeForSession(code)
 
   if (error) {
     // Usually an expired or already-redeemed link. Both are one-time codes, so
     // "request a new one" is the only useful advice.
-    console.error('[auth:callback:exchange]', error.code ?? error.status, error.message)
+    console.error('[auth:callback:exchange]', error.code ?? error.status)
     return NextResponse.redirect(new URL('/login?error=link_expired', url.origin))
+  }
+
+  // This SDK suffix is not signed recovery authority. Old PKCE recovery links
+  // must request the new one-time-token email flow, not reuse an ordinary session.
+  if ('redirectType' in data && data.redirectType === 'recovery') {
+    await supabase.auth.signOut({ scope: 'local' })
+    return NextResponse.redirect(new URL('/reset-password?error=legacy_link', url.origin))
   }
 
   return NextResponse.redirect(new URL(next, url.origin))

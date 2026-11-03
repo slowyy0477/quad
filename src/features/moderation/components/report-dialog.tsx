@@ -1,6 +1,6 @@
 'use client'
 
-import { useActionState, useEffect, useRef } from 'react'
+import { useActionState, useEffect, useId, useRef } from 'react'
 import { Alert } from '@/components/ui/alert'
 import { Button } from '@/components/ui/button'
 import {
@@ -14,6 +14,7 @@ import { Field } from '@/components/ui/field'
 import { Textarea } from '@/components/ui/input'
 import { RadioGroup, RadioOption } from '@/components/ui/radio-group'
 import { SubmitButton } from '@/components/ui/submit-button'
+import { FormErrorSummary } from '@/components/ui/form-error-summary'
 import { submitReportAction } from '@/features/moderation/actions'
 import { emptyReportState } from '@/features/moderation/form-state'
 import { REPORT_REASONS, type ReportKind } from '@/features/moderation/schemas'
@@ -72,6 +73,9 @@ export function ReportDialog({
 }) {
   const [state, send] = useActionState(submitReportAction, emptyReportState)
   const formRef = useRef<HTMLFormElement>(null)
+  const fieldPrefix = useId()
+  const reasonId = `${fieldPrefix}-reason`
+  const detailId = `${fieldPrefix}-detail`
 
   // A success clears the reason and detail so a second report from the same
   // dialog (on a list of posts) does not silently resend the first one's text.
@@ -100,21 +104,22 @@ export function ReportDialog({
           </div>
         ) : (
           <form ref={formRef} action={send} className="space-y-5">
-            {state.message && state.status === 'error' && !state.fieldErrors ? (
-              <Alert tone="danger">{state.message}</Alert>
-            ) : null}
+            <FormErrorSummary state={state} title="The report was not sent" fields={{
+              reason: { id: `${reasonId}-0`, label: 'Reason for reporting' },
+              detail: { id: detailId, label: 'Additional details' },
+            }} />
 
             <input type="hidden" name="kind" value={kind} />
             <input type="hidden" name="targetId" value={targetId} />
 
-            <Field id="report-reason" label="Why are you reporting this?" error={state.fieldErrors?.reason} required>
+            <Field id={reasonId} label="Why are you reporting this?" error={state.fieldErrors?.reason} required>
               {(fieldProps) => (
-                <RadioGroup name="reason" required aria-describedby={fieldProps['aria-describedby']}>
+                <RadioGroup name="reason" required aria-label="Why are you reporting this?" aria-describedby={fieldProps['aria-describedby']}>
                   {REPORT_REASONS.map((reason, index) => (
                     <RadioOption
                       key={reason}
                       value={reason}
-                      id={`report-reason-${index}`}
+                      id={`${reasonId}-${index}`}
                       label={reason}
                     />
                   ))}
@@ -123,7 +128,7 @@ export function ReportDialog({
             </Field>
 
             <Field
-              id="report-detail"
+              id={detailId}
               label="Anything else a moderator should know?"
               hint="Optional. Do not repeat what is in the content — say what it does not show."
               error={state.fieldErrors?.detail}

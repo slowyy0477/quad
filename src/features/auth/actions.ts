@@ -6,10 +6,11 @@ import type { AuthError } from '@supabase/supabase-js'
 import { isSupabaseConfigured, siteUrl } from '@/lib/env'
 import { createClient } from '@/lib/supabase/server'
 import { safeRedirect } from '@/features/auth/redirect'
-import { resetRequestSchema, signInSchema, signUpSchema } from '@/features/auth/schemas'
+import { cloudSignUpSchema, resetRequestSchema, signInSchema } from '@/features/auth/schemas'
 import type { AuthFormState } from '@/features/auth/form-state'
 import { isLocalMode } from '@/lib/mode'
 import { localSignInAction, localSignOutAction, localSignUpAction } from '@/features/auth/local-actions'
+import { getAuthCapabilities } from '@/features/auth/providers'
 
 /**
  * Auth Server Actions.
@@ -41,8 +42,8 @@ const UNAVAILABLE: AuthFormState = {
 
 /** Maps a Supabase auth error to something worth showing a person. */
 function describe(error: AuthError, context: 'sign-in' | 'sign-up' | 'reset'): string {
-  // Logged, not shown. This is the only place the raw message should appear.
-  console.error(`[auth:${context}]`, error.code ?? error.status, error.message)
+  // Never log provider messages, submitted identities or credentials.
+  console.error(`[auth:${context}]`, error.code ?? error.status)
 
   switch (error.code) {
     case 'invalid_credentials':
@@ -139,7 +140,7 @@ export async function signUpAction(
     displayName: String(formData.get('displayName') ?? ''),
     acceptTerms: String(formData.get('acceptTerms') ?? ''),
   }
-  const parsed = signUpSchema.safeParse(raw)
+  const parsed = cloudSignUpSchema.safeParse(raw)
 
   if (!parsed.success) {
     return {
@@ -200,7 +201,10 @@ export async function requestPasswordResetAction(
   _previous: AuthFormState,
   formData: FormData,
 ): Promise<AuthFormState> {
-  if (!isSupabaseConfigured()) return UNAVAILABLE
+  const capabilities = await getAuthCapabilities()
+  if (!capabilities.emailRecovery) {
+    return { status: 'error', message: capabilities.recoveryUnavailableReason ?? 'Email recovery is unavailable.' }
+  }
 
   const raw = { email: String(formData.get('email') ?? '') }
   const parsed = resetRequestSchema.safeParse(raw)
@@ -209,18 +213,24 @@ export async function requestPasswordResetAction(
     return { status: 'error', fieldErrors: fieldErrorsOf(parsed.error), values: raw }
   }
 
-  const supabase = await createClient()
-  const { error } = await supabase.auth.resetPasswordForEmail(parsed.data.email, {
-    redirectTo: `${siteUrl()}/auth/callback?next=/settings/password`,
-  })
+  try {
+    const supabase = await createClient()
+    const { error } = await supabase.auth.resetPasswordForEmail(parsed.data.email, {
+      redirectTo: `${siteUrl()}/auth/recovery`,
+    })
 
-  // Rate limiting is worth surfacing; "no such user" is not, and Supabase does
-  // not distinguish it here either. The page that follows says "if an account
-  // exists" rather than "we sent it".
-  if (error && (error.code === 'over_email_send_rate_limit' || error.code === 'over_request_rate_limit')) {
-    return { status: 'error', message: describe(error, 'reset'), values: raw }
+    // Enumeration-neutral for a missing account, truthful for delivery/provider
+    // failures. A failed mail service must not redirect to a success receipt.
+    if (error && error.code !== 'user_not_found') {
+      if (error.code === 'over_email_send_rate_limit' || error.code === 'over_request_rate_limit') {
+        return { status: 'error', message: describe(error, 'reset'), values: raw }
+      }
+      console.error('[auth:reset]', error.code ?? error.status)
+      return { status: 'error', message: 'The account service could not accept a recovery email request. No email delivery is confirmed; try again later.', values: raw }
+    }
+  } catch {
+    return { status: 'error', message: 'The account service is unavailable. No recovery email delivery is confirmed.', values: raw }
   }
-  if (error) console.error('[auth:reset]', error.code ?? error.status, error.message)
 
   redirect('/reset-password/sent')
 }
@@ -230,27 +240,27 @@ export async function requestPasswordResetAction(
 // -----------------------------------------------------------------------------
 
 export async function signInWithGoogleAction(formData: FormData) {
-  if (!isSupabaseConfigured()) redirect('/setup')
+  const capabilities = await getAuthCapabilities()
+  if (!capabilities.google) redirect('/auth/provider-unavailable')
 
   const next = safeRedirect(String(formData.get('next') ?? ''))
-  const supabase = await createClient()
-
-  const { data, error } = await supabase.auth.signInWithOAuth({
-    provider: 'google',
-    options: {
-      redirectTo: `${siteUrl()}/auth/callback?next=${encodeURIComponent(next)}`,
-      // No extra scopes. Quad needs an identity, not a mailbox or a calendar, and
-      // asking for more than that is both a consent-screen deterrent and a
-      // liability if the token is ever leaked.
-    },
-  })
-
-  if (error || !data.url) {
-    console.error('[auth:google]', error?.code ?? error?.status, error?.message)
-    redirect('/login?error=oauth')
+  let destination: string | null = null
+  try {
+    const supabase = await createClient()
+    const { data, error } = await supabase.auth.signInWithOAuth({
+      provider: 'google',
+      options: {
+        redirectTo: `${siteUrl()}/auth/callback?next=${encodeURIComponent(next)}`,
+        // No extra scopes: an identity, not access to a mailbox or calendar.
+      },
+    })
+    if (!error && data.url) destination = data.url
+    else console.error('[auth:google]', error?.code ?? error?.status)
+  } catch {
+    console.error('[auth:google]', 'Provider sign-in unavailable')
   }
-
-  redirect(data.url)
+  if (!destination) redirect('/login?error=oauth')
+  redirect(destination)
 }
 
 // -----------------------------------------------------------------------------

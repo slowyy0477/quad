@@ -25,18 +25,19 @@ export const emailSchema = z
 /**
  * Password rules.
  *
- * A length floor and nothing else. Composition rules ("one uppercase, one digit,
- * one symbol") measurably push people towards `Password1!` and towards writing it
- * down; length is the property that actually costs an attacker something. Twelve
- * characters is above Supabase's default of six, which is too low to leave alone.
- *
- * The upper bound exists because bcrypt silently truncates past 72 bytes, and a
- * silently truncated password is worse than a rejected one.
+ * A 15-character phrase, without uppercase/digit/symbol composition rules.
+ * Reject trivial repetition, whitespace-only strings and a small common-password
+ * denylist. This is not a comprehensive breached-password screening service.
+ * Local scrypt does not truncate passwords; the 128-character ceiling bounds
+ * new input. Sign-in has a separate compatibility policy for existing accounts.
  */
 export const passwordSchema = z
   .string()
-  .min(12, 'Use at least 12 characters — a short phrase works well')
-  .max(72, 'Use at most 72 characters')
+  .min(15, 'Use at least 15 characters — a short phrase works well')
+  .refine((value) => Array.from(value).length >= 15, 'Use at least 15 characters — a short phrase works well')
+  .max(128, 'Use at most 128 characters')
+  .refine((value) => value.trim().length > 0 && !/^(.)\1+$/u.test(value), 'Use a phrase that is not a repeated character')
+  .refine((value) => !['passwordpassword', 'password123456789', '123456789012345', 'qwertyuiopasdfgh', 'letmeinletmein12'].includes(value.toLowerCase()), 'Choose a less common password')
 
 export const displayNameSchema = z
   .string()
@@ -70,7 +71,7 @@ export const signInSchema = z.object({
   // Not `passwordSchema`: an existing password predates the current rules, and
   // rejecting it at the sign-in form would lock people out of their own accounts
   // with a validation error instead of letting them in to change it.
-  password: z.string().min(1, 'Enter your password'),
+  password: z.string().min(1, 'Enter your password').max(1024, 'That password is too long'),
 })
 
 export const signUpSchema = z.object({
@@ -92,6 +93,21 @@ export const newPasswordSchema = z
     message: 'Those passwords do not match',
     path: ['confirm'],
   })
+
+export const changePasswordSchema = newPasswordSchema
+  .safeExtend({ currentPassword: signInSchema.shape.password })
+  .refine((value) => value.currentPassword !== value.password, {
+    message: 'Choose a password different from your current password',
+    path: ['password'],
+  })
+
+/** Supabase's bcrypt adapter must not silently truncate a long UTF-8 password. */
+export const cloudPasswordSchema = passwordSchema.refine(
+  (value) => new TextEncoder().encode(value).length <= 72,
+  'For this account service, use at most 72 UTF-8 bytes (fewer characters for emoji)',
+)
+
+export const cloudSignUpSchema = signUpSchema.safeExtend({ password: cloudPasswordSchema })
 
 export type SignInInput = z.infer<typeof signInSchema>
 export type SignUpInput = z.infer<typeof signUpSchema>

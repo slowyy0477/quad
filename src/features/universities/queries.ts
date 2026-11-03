@@ -3,6 +3,7 @@ import 'server-only'
 import { createClient, getUser } from '@/lib/supabase/server'
 import { readStore, type LocalUniversity, type Tables } from '@/lib/local/db'
 import { isLocalMode } from '@/lib/mode'
+import { localActor } from '@/lib/local/access'
 import type { Database } from '@/lib/db/database.types'
 
 /**
@@ -323,7 +324,10 @@ export async function listMyPendingSubmissions(): Promise<PendingSubmission[]> {
   const user = await getUser()
   if (!user) return []
 
-  if (isLocalMode()) return []
+  if (isLocalMode()) {
+    const db = await readStore(); const me = localActor(db, user.id)
+    return db.university_requests.filter(row => row.submitted_by === me?.id && row.status === 'pending').sort((a,b) => b.created_at.localeCompare(a.created_at) || b.id.localeCompare(a.id)).map(row => ({ id: row.id, name: row.name, short_name: row.short_name, city: row.city, country: row.country, created_at: row.created_at }))
+  }
 
   const supabase = await createClient()
   const { data, error } = await supabase

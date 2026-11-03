@@ -81,6 +81,7 @@ export default async function GoalsPage({
     selected ? listGoals(selected.id) : Promise.resolve({ goals: [], error: null }),
     listGoals(null),
   ])
+  const primaryGoals = selected ? termGoals : looseGoals
 
   const termOptions = semesters.map((semester) => ({
     id: semester.id,
@@ -88,21 +89,20 @@ export default async function GoalsPage({
   }))
 
   return (
-    <div className="mx-auto w-full max-w-3xl px-4 py-8 sm:py-12">
-      <header className="border-b border-rule pb-4">
+    <div className="page-enter mx-auto w-full max-w-3xl px-4 py-8 sm:py-12">
+      <header className="border-b border-hairline pb-5">
         <div className="flex flex-wrap items-baseline justify-between gap-3">
           <h1 className="text-3xl">Goals</h1>
           <Link
             href="/log"
             className="text-sm text-accent-700 underline-offset-4 hover:underline"
           >
-            The daily study log →
+            Study log →
           </Link>
         </div>
         <p className="mt-2 max-w-prose text-sm text-ink-muted">
-          A term holds your courses and the goals you filed under it. Every number here is
-          counted from rows you can point at — there is no completeness score and nothing is
-          inferred.
+          A little structure for what you want to learn. Set a goal, break it into
+          steps, and keep your progress here.
         </p>
       </header>
 
@@ -113,7 +113,7 @@ export default async function GoalsPage({
       ) : null}
 
       {semesters.length > 0 ? (
-        <nav aria-label="Terms" className="mt-5 flex flex-wrap items-center gap-x-4 gap-y-2">
+        <nav aria-label="Terms" className="mt-5 flex flex-wrap items-center gap-2">
           {semesters.map((semester) => {
             const active = selected?.id === semester.id
             return (
@@ -123,8 +123,8 @@ export default async function GoalsPage({
                 aria-current={active ? 'page' : undefined}
                 className={
                   active
-                    ? 'border-b-2 border-accent-600 pb-0.5 text-sm font-medium text-ink'
-                    : 'border-b-2 border-transparent pb-0.5 text-sm text-ink-muted hover:text-ink'
+                    ? 'inline-flex min-h-11 items-center rounded-md bg-accent-50 px-3 text-sm font-medium text-accent-700'
+                    : 'inline-flex min-h-11 items-center rounded-md px-3 text-sm text-ink-muted transition-colors hover:bg-paper-sunken hover:text-ink'
                 }
               >
                 {semester.name}
@@ -200,51 +200,56 @@ export default async function GoalsPage({
           title="No term yet"
           action={null}
         >
-          Add your first term below. Goals can exist without one, but a term is what makes
-          them a plan rather than a list.
+          Add a term to organise your courses. You can still create goals without one.
         </EmptyState>
       )}
 
       <section className="mt-10" aria-labelledby="goals-heading">
         <SectionHeading
           title={selected ? `Goals for ${selected.name}` : 'Goals'}
-          description="Steps are ticked; the number is typed. Neither is inferred from the other."
+          description="Your own goals, updated by you."
         />
 
-        {termGoals.error ? (
+        {primaryGoals.error ? (
           <Alert className="mt-4" tone="danger" title="Your goals could not be loaded">
-            {termGoals.error}
+            {primaryGoals.error}
           </Alert>
         ) : null}
 
-        {(termGoals.goals ?? []).length === 0 ? (
-          <EmptyState className="mt-4" title="No goals for this term yet">
-            A goal needs a number to count towards — problems done, chapters read, weeks
-            logged. Add one below and it can gain steps as you learn what they are.
+        {!primaryGoals.error && (primaryGoals.goals ?? []).length === 0 ? (
+          <EmptyState className="mt-4" title={selected ? 'No goals for this term yet' : 'No goals yet'}>
+            Pick one thing you want to make progress on. Add a goal below, then
+            break it into smaller steps.
           </EmptyState>
         ) : (
           <div className="mt-2">
-            {(termGoals.goals ?? []).map((goal) => (
+            {(primaryGoals.goals ?? []).map((goal) => (
               <GoalCard key={goal.id} goal={goal} />
             ))}
           </div>
         )}
 
-        <details className="mt-5">
-          <summary className="cursor-pointer text-sm text-accent-700 underline-offset-4 hover:underline">
+        <details className="quiet-disclosure mt-5">
+          <summary>
             Add a goal
           </summary>
-          <div className="mt-4">
+          <div className="p-5">
             <GoalForm semesters={termOptions} defaultSemesterId={selected?.id ?? null} />
           </div>
         </details>
       </section>
 
-      {(looseGoals.goals ?? []).length > 0 ? (
+      {selected && looseGoals.error ? (
+        <Alert className="mt-8" tone="danger" title="Your other goals could not be loaded">
+          {looseGoals.error}
+        </Alert>
+      ) : null}
+
+      {selected && (looseGoals.goals ?? []).length > 0 ? (
         <section className="mt-10" aria-labelledby="loose-heading">
           <SectionHeading
-            title="Outside any term"
-            description="Goals you did not file under one. They count the same; they just have no term to belong to."
+            title="Outside this term"
+            description="Goals without a term."
           />
           <div className="mt-2">
             {(looseGoals.goals ?? []).map((goal) => (
@@ -263,8 +268,8 @@ export default async function GoalsPage({
       {(achievementsResult.achievements ?? []).length > 0 ? (
         <section className="mt-10" aria-labelledby="achievements-heading">
           <SectionHeading
-            title="Earned"
-            description="Each one was awarded by a trigger that counted something real. There is no progress towards one, because the platform does not track any."
+            title="Achievements"
+            description="Milestones from your actual work on Bulla."
           />
           <div className="mt-2">
             <AchievementList achievements={achievementsResult.achievements ?? []} />
@@ -272,19 +277,13 @@ export default async function GoalsPage({
         </section>
       ) : null}
 
-      <section className="mt-10 border-t border-rule pt-6" aria-labelledby="terms-heading">
-        <h2 id="terms-heading" className="text-base font-medium text-ink">
-          Add a term
-        </h2>
-        <p className="mt-1 max-w-prose text-sm text-ink-muted">
-          One term at a time is marked current; the database enforces that, so this is a move
-          rather than a second flag.
-        </p>
-        <details className="mt-3">
-          <summary className="cursor-pointer text-sm text-accent-700 underline-offset-4 hover:underline">
-            New term
-          </summary>
-          <div className="mt-4">
+      <section className="mt-8" aria-label="Manage terms">
+        <details className="quiet-disclosure">
+          <summary>Add a term</summary>
+          <div className="p-5">
+            <p className="mb-4 text-sm text-ink-muted">
+              Give your courses a home. Only one term is marked current at a time.
+            </p>
             <SemesterForm />
           </div>
         </details>

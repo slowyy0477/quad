@@ -7,7 +7,7 @@ export default function NotFound() {
       <p className="font-display text-5xl text-ink-faint tabular">404</p>
       <h1 className="mt-4 text-2xl">There is nothing at this address</h1>
       <p className="mt-3 text-ink-muted">
-        The page may have moved, or it may be a part of Quad that has not been built yet — the build
+        The page may have moved, or it may be a part of Bulla that has not been built yet — the build
         status page lists which is which.
       </p>
       <div className="mt-8 flex flex-wrap justify-center gap-3">

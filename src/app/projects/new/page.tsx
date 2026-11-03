@@ -5,7 +5,7 @@ import { Alert } from '@/components/ui/alert'
 import { Button } from '@/components/ui/button'
 import { SectionHeading, Surface } from '@/components/ui/surface'
 import { NewProjectForm } from '@/features/projects/components/new-project-form'
-import { isSupabaseConfigured } from '@/lib/env'
+import { isDataConfigured } from '@/lib/env'
 import { getUser } from '@/lib/supabase/server'
 
 export const metadata: Metadata = {
@@ -27,7 +27,7 @@ export const metadata: Metadata = {
  * the composer already on that page.
  */
 export default async function NewProjectPage() {
-  if (!isSupabaseConfigured()) {
+  if (!isDataConfigured()) {
     return (
       <div className="mx-auto w-full max-w-2xl px-4 py-12 sm:px-6">
         <h1 className="text-2xl">Create a project</h1>
@@ -45,8 +45,9 @@ export default async function NewProjectPage() {
   return (
     <div className="mx-auto w-full max-w-2xl px-4 py-10 sm:px-6">
       <SectionHeading
+        level={1}
         title="Create a project"
-        description="Three things, and the rest is generated. You become the owner straight away."
+        description="Give it a purpose and choose who can see it. You become the owner straight away."
       />
 
       <Surface className="mt-5 p-5">

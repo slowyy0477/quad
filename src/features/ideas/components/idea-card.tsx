@@ -1,4 +1,5 @@
 import Link from 'next/link'
+import { ArrowUp, Users } from 'lucide-react'
 import { formatDistanceToNowStrict } from 'date-fns'
 import { Badge } from '@/components/ui/badge'
 import { Surface } from '@/components/ui/surface'
@@ -25,7 +26,7 @@ export function IdeaCard({ idea }: { idea: IdeaListItem }) {
   const name = idea.author?.display_name ?? 'A former member'
 
   return (
-    <Surface as="article" className="p-4 transition-colors hover:border-rule">
+    <Surface as="article" className="interactive-card p-5">
       <div className="flex flex-wrap items-center gap-2">
         <Badge tone="neutral">{categoryLabel(idea.category)}</Badge>
         <Badge tone={STATUS_TONE[idea.status] ?? 'neutral'}>{ideaStatusLabel(idea.status)}</Badge>
@@ -57,14 +58,14 @@ export function IdeaCard({ idea }: { idea: IdeaListItem }) {
           </time>
         </span>
 
-        <span className="flex items-center gap-3 tabular">
-          <span>
-            {idea.upvote_count} <span className="sr-only">votes</span>
-            <span aria-hidden="true"> ▲</span>
+        <span className="flex flex-wrap items-center gap-3 tabular">
+          <span className="inline-flex items-center gap-1">
+            <ArrowUp className="size-3.5" aria-hidden="true" />
+            {idea.upvote_count} votes
           </span>
-          <span>
-            {idea.interest_count} <span className="sr-only">interested</span>
-            <span aria-hidden="true"> ☺</span>
+          <span className="inline-flex items-center gap-1">
+            <Users className="size-3.5" aria-hidden="true" />
+            {idea.interest_count} interested
           </span>
         </span>
       </div>

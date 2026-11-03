@@ -17,9 +17,11 @@
  */
 
 import { z } from 'zod'
+import { GROUP_HANDLE_LIMIT, GROUP_TITLE_LIMIT } from './group-contract'
 
 export const sendMessageSchema = z.object({
   conversationId: z.string().uuid('That conversation could not be identified.'),
+  clientNonce: z.string().uuid('That send could not be identified.').optional(),
   body: z
     .string()
     .trim()
@@ -42,6 +44,38 @@ export const markReadSchema = z.object({
 export const setMutedSchema = z.object({
   conversationId: z.string().uuid('That conversation could not be identified.'),
   muted: z.boolean(),
+})
+
+/** Handles, not a directory search or client-selected participant identities. */
+export const groupHandlesSchema = z.string()
+  .max(500, 'Use at most 10 handles.')
+  .transform(value => [...new Set(value.split(/[\s,;]+/)
+    .map(handle => handle.replace(/^@/, '').toLowerCase())
+    .filter(Boolean))])
+  .pipe(z.array(z.string().min(3).max(30).regex(
+    /^[a-z0-9_.]+$/, 'Use handles separated by commas or spaces.',
+  )).min(1, 'Add at least one other person.').max(GROUP_HANDLE_LIMIT, 'Use at most 10 handles.'))
+
+export const createGroupSchema = z.object({
+  title: z.string().trim().min(1, 'Give the group a name.')
+    .max(GROUP_TITLE_LIMIT, 'Group names are at most 120 characters.'),
+  handles: groupHandlesSchema,
+})
+
+export const addGroupMembersSchema = z.object({
+  conversationId: z.string().uuid('That group could not be identified.'),
+  handles: groupHandlesSchema,
+})
+
+export const setGroupRoleSchema = z.object({
+  conversationId: z.string().uuid('That group could not be identified.'),
+  profileId: z.string().uuid('That member could not be identified.'),
+  role: z.enum(['admin', 'member']),
+})
+
+export const removeGroupMemberSchema = z.object({
+  conversationId: z.string().uuid('That group could not be identified.'),
+  profileId: z.string().uuid('That member could not be identified.'),
 })
 
 /** The handle as `ilike` needs it: no wildcards, however the constraint changes. */

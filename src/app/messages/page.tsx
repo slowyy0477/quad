@@ -5,12 +5,11 @@ import { Alert } from '@/components/ui/alert'
 import { EmptyState } from '@/components/ui/surface'
 import { cursorHref } from '@/components/ui/pagination'
 import { encodeCursor } from '@/lib/cursor'
-import { isSupabaseConfigured } from '@/lib/env'
+import { isDataConfigured } from '@/lib/env'
 import { isLocalMode } from '@/lib/mode'
 import { getUser } from '@/lib/supabase/server'
 import { cn } from '@/lib/utils'
 import { ConversationList } from '@/features/messages/components/conversation-list'
-import { NewConversationForm } from '@/features/messages/components/new-conversation'
 import { Thread } from '@/features/messages/components/thread'
 import {
   findMessagingTarget,
@@ -65,7 +64,7 @@ export default async function MessagesPage({
 }: {
   searchParams: Promise<SearchParams>
 }) {
-  if (!isLocalMode() && !isSupabaseConfigured()) {
+  if (!isLocalMode() && !isDataConfigured()) {
     return (
       <div className="mx-auto w-full max-w-2xl px-4 py-12">
         <h1 className="text-2xl">Messages</h1>
@@ -114,14 +113,15 @@ export default async function MessagesPage({
   const target = showStartPanel ? await findMessagingTarget(handle) : null
   const permission: MessagingPermission | null =
     target && showStartPanel ? await getMessagingPermission(user.id, target.id) : null
+  const startUsername = target && showStartPanel && permission?.state !== 'refused'
+    ? target.username : undefined
 
   return (
-    <div className="mx-auto w-full max-w-6xl pb-16 sm:px-6 sm:pb-8">
-      <div className="px-3 pt-6 pb-3 sm:px-0">
-        <h1 className="font-display text-2xl text-ink">Messages</h1>
+    <div className="page-enter mx-auto w-full max-w-6xl px-4 py-8 sm:px-6">
+      <div className="pb-5">
+        <h1 className="font-display text-3xl text-ink">Messages</h1>
         <p className="mt-1 max-w-prose text-sm text-ink-muted">
-          Private conversations. Row level security decides what each side can read, so a
-          conversation id on its own opens nothing.
+          Catch up with your people, share an idea, and keep your work moving.
         </p>
       </div>
 
@@ -159,33 +159,29 @@ export default async function MessagesPage({
                 </Link>
                 . Opening one twice returns the same conversation rather than a second thread.
               </p>
-              <NewConversationForm defaultUsername={target.username} />
             </div>
           )}
         </div>
       ) : null}
 
-      <div className="grid min-h-0 gap-0 md:grid-cols-[20rem_minmax(0,1fr)] md:gap-6">
+      <div className="grid min-h-0 gap-0 rounded-lg border border-hairline bg-paper-raised shadow-raised md:grid-cols-[minmax(14rem,0.8fr)_minmax(0,1.5fr)]">
         <aside
           className={cn(
-            'min-w-0 border-hairline md:border-r md:pr-4',
+            'min-w-0 border-hairline p-3 md:border-r',
             pane ? 'hidden md:block' : 'block',
           )}
         >
-          {list.error ? (
-            <div className="px-3 py-3">
-              <Alert tone="danger">{list.error}</Alert>
-            </div>
-          ) : null}
-
           <ConversationList
             conversations={list.conversations ?? []}
             selectedId={pane?.id ?? null}
             loadMoreHref={listHref}
+            startUsername={startUsername}
+            startOpen={Boolean(startUsername)}
+            error={list.error}
           />
         </aside>
 
-        <div className={cn('min-w-0 md:pl-4', pane ? 'block' : 'hidden md:block')}>
+        <div className={cn('min-w-0 p-3', pane ? 'block' : 'hidden md:block')}>
           {pane && thread ? (
             <Thread
               pane={pane}
@@ -211,8 +207,7 @@ export default async function MessagesPage({
             <div className="p-3 md:pt-6">
               <EmptyState title="No conversation open">
                 <p>
-                  Choose one from the list. On a phone the thread opens as its own view, with a way
-                  back to this list.
+                  Choose a conversation from the list, or find someone from their profile to say hello.
                 </p>
               </EmptyState>
             </div>

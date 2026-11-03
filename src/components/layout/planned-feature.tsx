@@ -31,7 +31,7 @@ export function PlannedFeature({
       <h1 className="mt-4 text-3xl">{title}</h1>
 
       <p className="mt-4 text-ink-muted">
-        This part of Quad is not built yet, and rather than show you a mock-up of it, this page says
+        This part of Bulla is not built yet, and rather than show you a mock-up of it, this page says
         so.
       </p>
 

@@ -75,7 +75,7 @@ export function deadlineWindowDays(value: string | undefined): number | null {
 
 /** `opportunities.visibility` CHECK. There are two values, not the four profiles have. */
 export const OPPORTUNITY_VISIBILITIES = [
-  { value: 'public', label: 'Anyone on Quad' },
+  { value: 'public', label: 'Anyone on Bulla' },
   { value: 'university', label: 'People at my university' },
 ] as const
 

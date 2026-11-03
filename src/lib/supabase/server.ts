@@ -1,10 +1,10 @@
 import 'server-only'
+import { cache } from 'react'
 
 import { createServerClient } from '@supabase/ssr'
 import { cookies } from 'next/headers'
 import { publicEnv } from '@/lib/env'
 import { isLocalMode } from '@/lib/mode'
-import { ensureSeeded } from '@/lib/local/seed'
 import { getLocalUser } from '@/lib/local/session'
 
 /**
@@ -70,12 +70,8 @@ export async function createClient() {
  * what someone may see, the difference between "the cookie says Ana" and "Ana"
  * is the whole question.
  *
- * In local mode the equivalent question is answered by `getLocalUser`, which
- * verifies an HMAC over the user id with a key that never leaves the server. It is
- * a weaker guarantee than a signed JWT checked against an auth server — there is no
- * revocation, no expiry beyond the cookie's thirty days, and no second factor — and
- * `src/lib/mode.ts` refuses to run a production build in that mode for exactly that
- * reason.
+ * Local mode resolves an opaque, expiring, revocable session digest. It does not
+ * provide hosted identity or a second factor and remains private development only.
  */
 export type SessionUser = {
   id: string
@@ -83,11 +79,12 @@ export type SessionUser = {
   user_metadata?: Record<string, unknown>
 }
 
-export async function getUser(): Promise<SessionUser | null> {
+// React's cache is request-scoped in Server Components, never a cross-user
+// process cache. Header, page and domain reads share one verified auth lookup.
+export const getUser = cache(async function getUser(): Promise<SessionUser | null> {
   if (isLocalMode()) {
-    // The seed is written on the first read of the session, so a fresh clone has a
-    // demo account to sign in with instead of an empty database and a dead form.
-    await ensureSeeded()
+    // Reading a session must not bootstrap demo users/content or bypass locked
+    // mutation budgets. Operators/test setup seed explicitly, outside requests.
     const local = await getLocalUser()
     if (!local) return null
     return {
@@ -102,4 +99,4 @@ export async function getUser(): Promise<SessionUser | null> {
     data: { user },
   } = await supabase.auth.getUser()
   return user
-}
+})

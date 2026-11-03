@@ -135,12 +135,30 @@ export function ReportTargetPreview({ target }: { target: ReportTarget }) {
     )
   }
 
-  return (
-    <div className="space-y-2">
-      <p className="text-xs text-ink-muted">A person · their profile was reported</p>
-      <p className="text-sm text-ink">
-        <Person person={target.person} />
-      </p>
-    </div>
-  )
+  if (target.kind === 'event' || target.kind === 'opportunity') {
+    return (
+      <div className="space-y-2">
+        <p className="flex flex-wrap items-center gap-2 text-xs text-ink-muted">
+          {target.kind === 'event' ? 'Event' : 'Opportunity'} · <Person person={target.author} />
+          <StatusBadge status={target.moderationStatus} />
+        </p>
+        <p className="text-sm font-medium text-ink">{target.title}</p>
+        <p className="max-h-48 overflow-y-auto whitespace-pre-wrap text-sm text-ink-muted">
+          {target.description}
+        </p>
+      </div>
+    )
+  }
+
+  if (target.kind === 'profile') {
+    return (
+      <div className="space-y-2">
+        <p className="text-xs text-ink-muted">A person · their profile was reported</p>
+        <p className="text-sm text-ink">
+          <Person person={target.person} />
+        </p>
+      </div>
+    )
+  }
+  return null
 }

@@ -2,6 +2,7 @@ import 'server-only'
 
 import { createClient } from '@/lib/supabase/server'
 import { isLocalMode } from '@/lib/mode'
+import { catalogueLocal, profileSkillsLocal, profileInterestsLocal } from './local'
 
 /**
  * Skill and interest reads.
@@ -75,7 +76,7 @@ type SkillEmbed = { name: string; slug: string; category: string; is_approved: b
 
 /** The skills one profile claims, in the order they chose. */
 export async function listProfileSkills(profileId: string): Promise<ProfileSkill[]> {
-  if (isLocalMode()) return []
+  if (isLocalMode()) return profileSkillsLocal(profileId)
 
   const supabase = await createClient()
 
@@ -122,7 +123,7 @@ export async function listProfileSkills(profileId: string): Promise<ProfileSkill
 
 /** The interests one profile has tagged, alphabetical. */
 export async function listProfileInterests(profileId: string): Promise<ProfileInterest[]> {
-  if (isLocalMode()) return []
+  if (isLocalMode()) return profileInterestsLocal(profileId)
 
   const supabase = await createClient()
 
@@ -171,7 +172,7 @@ export async function listProfileInterests(profileId: string): Promise<ProfileIn
  * arbitrarily. It is not a quality score and the interface does not call it one.
  */
 export async function listSkillCatalogue(limit = 200): Promise<SkillOption[]> {
-  if (isLocalMode()) return []
+  if (isLocalMode()) return catalogueLocal('skills', limit)
 
   const supabase = await createClient()
   const { data, error } = await supabase
@@ -190,7 +191,7 @@ export async function listSkillCatalogue(limit = 200): Promise<SkillOption[]> {
 }
 
 export async function listInterestCatalogue(limit = 200): Promise<InterestOption[]> {
-  if (isLocalMode()) return []
+  if (isLocalMode()) return catalogueLocal('interests', limit)
 
   const supabase = await createClient()
   const { data, error } = await supabase

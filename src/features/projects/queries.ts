@@ -3,6 +3,8 @@ import 'server-only'
 import { createClient, getUser } from '@/lib/supabase/server'
 import { decodeCursor, type Cursor } from '@/lib/cursor'
 import { isLocalMode } from '@/lib/mode'
+import { pendingApplicationsLocal, starredLocal } from './local'
+import { canReadContent, canManageLocalProject, blockedPair, contentActive, canReadProfile, localActor } from '@/lib/local/access'
 import {
   readStore,
   type LocalPost,
@@ -453,10 +455,18 @@ export type RequiredSkill = {
 export async function listProjectSkillsWithFilled(
   projectId: string,
 ): Promise<{ required: RequiredSkill[]; all: ProjectSkillRow[] }> {
-  // No `project_skills`, `profile_skills` or `skills` table in the local store:
-  // no project declares a required skill there, so both halves are empty. The
-  // detail page hides the "Skills needed" section rather than showing zeros.
-  if (isLocalMode()) return { required: [], all: [] }
+  if (isLocalMode()) {
+    const user = await getUser(); const db = await readStore(); const me = localActor(db, user?.id ?? null)
+    const project = db.projects.find(row => row.id === projectId)
+    if (!project || !canReadContent(db, project, project.owner_id, me, 'project')) return { required: [], all: [] }
+    const all: ProjectSkillRow[] = db.project_skills.filter(row => row.project_id === projectId).flatMap(row => {
+      const skill = db.skills.find(skill => skill.id === row.skill_id && (skill.is_approved || skill.created_by === me?.id))
+      return skill ? [{ skill_id: row.skill_id, is_required: row.is_required, skill: { id: skill.id, name: skill.name, slug: skill.slug } }] : []
+    })
+    const members = new Set(db.project_members.filter(row => row.project_id === projectId && canReadProfile(db, db.profiles.find(profile => profile.id === row.profile_id), me)).map(row => row.profile_id))
+    const required = all.filter(row => row.is_required && row.skill).map(row => ({ skillId: row.skill_id, name: row.skill!.name, slug: row.skill!.slug, filled: db.profile_skills.filter(claim => claim.skill_id === row.skill_id && members.has(claim.profile_id)).length }))
+    return { required, all }
+  }
 
   const supabase = await createClient()
 
@@ -619,10 +629,9 @@ export type ProjectApplicationRow = {
  * which is the intended answer rather than an empty state to explain away.
  */
 export async function listPendingApplications(projectId: string): Promise<ProjectApplicationRow[]> {
-  // The local store has no `project_applications` table, so there is nothing to
-  // read and nothing that `requestToJoinAction` could have written. The Requests
-  // tab renders its empty state.
-  if (isLocalMode()) return []
+  // The local adapter applies the same applicant/manager boundary to its
+  // persisted applications; a page reload must not discard a live request.
+  if (isLocalMode()) return pendingApplicationsLocal(projectId)
 
   const supabase = await createClient()
   const { data, error } = await supabase
@@ -727,7 +736,7 @@ export async function hasStarred(projectId: string): Promise<boolean> {
 
   // No `project_stars` table in the local store, so nothing is ever starred there
   // and `toggleStarAction` refuses rather than claiming a write it did not make.
-  if (isLocalMode()) return false
+  if (isLocalMode()) return starredLocal(projectId)
 
   const supabase = await createClient()
   const { data, error } = await supabase
@@ -786,12 +795,7 @@ export function clampVisibility(
  * from `owner_id`.
  */
 export function canManageProject(db: Tables, project: LocalProject, profileId: string | null): boolean {
-  if (!profileId) return false
-  if (project.owner_id === profileId) return true
-  return db.project_members.some(
-    (member) =>
-      member.project_id === project.id && member.profile_id === profileId && member.role === 'maintainer',
-  )
+  return canManageLocalProject(db, project.id, db.profiles.find(row => row.id === profileId) ?? null)
 }
 
 /** The reader, as a profile row. `getUser()` also writes the seed on first run. */
@@ -821,51 +825,17 @@ async function localContext(): Promise<{ db: Tables; viewer: LocalProfile | null
  * anybody: the owner/member clauses are the only way such a row is readable.
  */
 export function canSeeProject(db: Tables, project: LocalProject, viewer: LocalProfile | null): boolean {
-  if (project.deleted_at) return false
-
-  if (viewer) {
-    if (project.owner_id === viewer.id) return true
-    if (db.project_members.some((member) => member.project_id === project.id && member.profile_id === viewer.id)) {
-      return true
-    }
-  }
-
-  switch (project.visibility) {
-    case 'public':
-      return true
-    case 'university': {
-      const owner = db.profiles.find((profile) => profile.id === project.owner_id)
-      return Boolean(
-        viewer?.university_id && owner?.university_id && owner.university_id === viewer.university_id,
-      )
-    }
-    case 'connections':
-    case 'private':
-    default:
-      return false
-  }
+  return canReadContent(db, project, project.owner_id, viewer, 'project')
 }
 
 /** `posts_select`, for the project update stream. */
 function canSeePost(db: Tables, post: LocalPost, viewer: LocalProfile | null): boolean {
-  if (post.deleted_at) return false
-  if (post.moderation_status !== 'active') return false
-  if (viewer && post.author_id === viewer.id) return true
-
-  switch (post.visibility) {
-    case 'public':
-      return true
-    case 'university': {
-      const author = db.profiles.find((profile) => profile.id === post.author_id)
-      return Boolean(
-        viewer?.university_id && author?.university_id && author.university_id === viewer.university_id,
-      )
-    }
-    case 'connections':
-    case 'private':
-    default:
-      return false
+  if (post.deleted_at || post.moderation_status !== 'active' || blockedPair(db, post.author_id, viewer?.id) || !contentActive(db, 'post', post.id)) return false
+  if (post.project_id && viewer) {
+    const project = db.projects.find(row => row.id === post.project_id)
+    if (project && canSeeProject(db, project, viewer) && db.project_members.some(row => row.project_id === project.id && row.profile_id === viewer.id)) return true
   }
+  return canReadContent(db, post, post.author_id, viewer, 'post')
 }
 
 /** Newest first, `(created_at, id)` descending -- the index the migration builds. */
@@ -915,9 +885,9 @@ function memberCountOf(db: Tables, projectId: string): number {
   return db.project_members.filter((member) => member.project_id === projectId).length
 }
 
-function ownerChip(db: Tables, ownerId: string): ProjectListItem['owner'] {
+function ownerChip(db: Tables, ownerId: string, viewer: LocalProfile | null = null): ProjectListItem['owner'] {
   const profile = db.profiles.find((entry) => entry.id === ownerId)
-  if (!profile) return null
+  if (!profile || !canReadProfile(db, profile, viewer)) return null
   return {
     id: profile.id,
     username: profile.username,
@@ -927,9 +897,9 @@ function ownerChip(db: Tables, ownerId: string): ProjectListItem['owner'] {
 }
 
 /** The four profile fields the update stream and the applications render. */
-function headlineChip(db: Tables, profileId: string): ProjectUpdate['author'] {
+function headlineChip(db: Tables, profileId: string, viewer: LocalProfile | null = null): ProjectUpdate['author'] {
   const profile = db.profiles.find((entry) => entry.id === profileId)
-  if (!profile) return null
+  if (!profile || !canReadProfile(db, profile, viewer)) return null
   return {
     id: profile.id,
     username: profile.username,
@@ -940,7 +910,7 @@ function headlineChip(db: Tables, profileId: string): ProjectUpdate['author'] {
   }
 }
 
-function memberChips(db: Tables, projectId: string): ProjectMemberChip[] {
+function memberChips(db: Tables, projectId: string, viewer: LocalProfile | null): ProjectMemberChip[] {
   return db.project_members
     .filter((member) => member.project_id === projectId)
     .sort((a, b) => a.created_at.localeCompare(b.created_at))
@@ -948,7 +918,7 @@ function memberChips(db: Tables, projectId: string): ProjectMemberChip[] {
       const profile = db.profiles.find((entry) => entry.id === member.profile_id)
       return {
         profile_id: member.profile_id,
-        profile: profile
+        profile: profile && canReadProfile(db, profile, viewer)
           ? {
               id: profile.id,
               username: profile.username,
@@ -960,7 +930,7 @@ function memberChips(db: Tables, projectId: string): ProjectMemberChip[] {
     })
 }
 
-function projectItem(db: Tables, project: LocalProject): ProjectListItem {
+function projectItem(db: Tables, project: LocalProject, viewer: LocalProfile | null): ProjectListItem {
   return {
     id: project.id,
     slug: project.slug,
@@ -974,26 +944,27 @@ function projectItem(db: Tables, project: LocalProject): ProjectListItem {
     visibility: project.visibility,
     is_seeking_members: project.is_seeking_members,
     member_count: memberCountOf(db, project.id),
-    // No project_stars table in the local store: nothing can be starred.
-    star_count: 0,
+    star_count: db.project_stars.filter(row => row.project_id === project.id).length,
     created_at: project.created_at,
-    owner: ownerChip(db, project.owner_id),
+    owner: ownerChip(db, project.owner_id, viewer),
   }
 }
 
-function projectListRow(db: Tables, project: LocalProject): ProjectListRow {
+function projectListRow(db: Tables, project: LocalProject, viewer: LocalProfile | null): ProjectListRow {
   return {
-    ...projectItem(db, project),
+    ...projectItem(db, project, viewer),
     team_size_target: project.team_size_target,
-    members: memberChips(db, project.id),
-    // No project_skills table, so no project carries a skill chip here.
-    skills: [],
+    members: memberChips(db, project.id, viewer),
+    skills: db.project_skills.filter(row => row.project_id === project.id).map(row => {
+      const skill = db.skills.find(entry => entry.id === row.skill_id && entry.is_approved)
+      return { skill_id: row.skill_id, is_required: row.is_required, skill: skill ? { id: skill.id, name: skill.name, slug: skill.slug } : null }
+    }),
   }
 }
 
-function projectDetail(db: Tables, project: LocalProject): ProjectDetail {
+function projectDetail(db: Tables, project: LocalProject, viewer: LocalProfile | null): ProjectDetail {
   return {
-    ...projectListRow(db, project),
+    ...projectListRow(db, project, viewer),
     description: project.description,
     // repo_url, demo_url, looking_for, started_at and completed_at have no local
     // column. They are returned as null because the shape is consumed unchanged;
@@ -1003,9 +974,8 @@ function projectDetail(db: Tables, project: LocalProject): ProjectDetail {
     looking_for: null,
     started_at: null,
     completed_at: null,
-    // No project_applications table.
-    application_count: 0,
-    post_count: db.posts.filter((post) => post.project_id === project.id && post.deleted_at === null).length,
+    application_count: canManageLocalProject(db, project.id, viewer) ? db.project_applications.filter(row => row.project_id === project.id && row.status === 'pending').length : 0,
+    post_count: db.posts.filter((post) => post.project_id === project.id && canSeePost(db, post, viewer)).length,
     // The local project has no updated_at column; created_at is the only instant
     // the store records for it.
     updated_at: project.created_at,
@@ -1029,7 +999,7 @@ async function listProjectsLocal({
     .filter((project) => (seeking ? project.is_seeking_members : true))
     .sort(newestFirst)
     .slice(0, limit)
-    .map((project) => projectItem(db, project))
+    .map((project) => projectItem(db, project, viewer))
 
   return { projects, error: null }
 }
@@ -1041,7 +1011,7 @@ async function listProjectsByOwnerLocal(ownerId: string): Promise<ProjectListIte
     .filter((project) => project.owner_id === ownerId)
     .filter((project) => canSeeProject(db, project, viewer))
     .sort(newestFirst)
-    .map((project) => projectItem(db, project))
+    .map((project) => projectItem(db, project, viewer))
 }
 
 async function listMyProjectsLocal(userId: string): Promise<ProjectListItem[]> {
@@ -1058,7 +1028,7 @@ async function listMyProjectsLocal(userId: string): Promise<ProjectListItem[]> {
         db.project_members.some((member) => member.project_id === project.id && member.profile_id === viewer.id)),
   )
 
-  return mine.sort(newestFirst).map((project) => projectItem(db, project))
+  return mine.sort(newestFirst).map((project) => projectItem(db, project, viewer))
 }
 
 async function getProjectBySlugLocal(slug: string): Promise<ProjectDetail | null> {
@@ -1067,7 +1037,7 @@ async function getProjectBySlugLocal(slug: string): Promise<ProjectDetail | null
   // The same answer for "no such project" and "not visible to you", which is what
   // `maybeSingle` under RLS returns: nothing.
   if (!project || !canSeeProject(db, project, viewer)) return null
-  return projectDetail(db, project)
+  return projectDetail(db, project, viewer)
 }
 
 async function listProjectMembersLocal(projectId: string): Promise<ProjectMember[]> {
@@ -1087,7 +1057,7 @@ async function listProjectMembersLocal(projectId: string): Promise<ProjectMember
         title: null,
         // The local column is `created_at`; the shape calls it `joined_at`.
         joined_at: member.created_at,
-        profile: profile
+        profile: profile && canReadProfile(db, profile, viewer)
           ? {
               id: profile.id,
               username: profile.username,
@@ -1113,9 +1083,6 @@ async function listOpenProjectsLocal({
 }): Promise<OpenProjectsPage> {
   const { db, viewer } = await localContext()
 
-  // No project_skills table: nothing in the local store declares a skill, so a
-  // skill filter matches no project rather than being silently ignored.
-  if (skillId) return { projects: [], nextCursor: null, error: null }
 
   const universityOf = (project: LocalProject) =>
     db.profiles.find((profile) => profile.id === project.owner_id)?.university_id ?? null
@@ -1124,6 +1091,7 @@ async function listOpenProjectsLocal({
 
   const scanned = db.projects
     .filter((project) => project.is_seeking_members && canSeeProject(db, project, viewer))
+    .filter(project => !skillId || db.project_skills.some(row => row.project_id === project.id && row.skill_id === skillId))
     .filter((project) => (universityId ? universityOf(project) === universityId : true))
     .sort(newestFirst)
     .filter((project) => afterCursor(project, decoded))
@@ -1137,7 +1105,7 @@ async function listOpenProjectsLocal({
   const last = scanned.at(-1)
 
   return {
-    projects: open.map((project) => projectListRow(db, project)),
+    projects: open.map((project) => projectListRow(db, project, viewer)),
     nextCursor: scanned.length === limit && last ? { createdAt: last.created_at, id: last.id } : null,
     error: null,
   }
@@ -1150,7 +1118,7 @@ async function listMyProjectRowsLocal(ids: string[]): Promise<{ projects: Projec
   const projects = db.projects
     .filter((project) => wanted.has(project.id) && canSeeProject(db, project, viewer))
     .sort(newestFirst)
-    .map((project) => projectListRow(db, project))
+    .map((project) => projectListRow(db, project, viewer))
 
   return { projects, error: null }
 }
@@ -1202,8 +1170,9 @@ async function listProjectUpdatesLocal({
 
 async function getProjectViewerStateLocal(projectId: string, userId: string): Promise<ProjectViewerState> {
   const db = await readStore()
-  const viewer = db.profiles.find((profile) => profile.user_id === userId) ?? null
-  if (!viewer) {
+  const viewer = localActor(db, userId)
+  const project = db.projects.find((row) => row.id === projectId)
+  if (!viewer || !project || !canReadContent(db, project, project.owner_id, viewer, 'project')) {
     return {
       userId: null,
       canManage: false,
@@ -1224,8 +1193,11 @@ async function getProjectViewerStateLocal(projectId: string, userId: string): Pr
     isMember: Boolean(membership),
     canManage: role === 'owner' || role === 'maintainer',
     role,
-    // No project_applications or project_invites table in the local store.
-    hasPendingApplication: false,
-    hasPendingInvite: false,
+    hasPendingApplication: db.project_applications.some(
+      (row) => row.project_id === projectId && row.applicant_id === viewer.id && row.status === 'pending',
+    ),
+    hasPendingInvite: db.project_invites.some(
+      (row) => row.project_id === projectId && row.invitee_id === viewer.id && row.status === 'pending',
+    ),
   }
 }

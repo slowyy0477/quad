@@ -33,6 +33,12 @@ beforeAll(async () => {
   alice = await db.createUser({ username: 'alice', fullName: 'Alice' })
   bob = await db.createUser({ username: 'bob', fullName: 'Bob' })
   eve = await db.createUser({ username: 'eve', fullName: 'Eve' })
+  // Group additions require accepted consent; Eve intentionally remains a stranger.
+  await db.asService(
+    `insert into public.connections (requester_id, addressee_id, status, responded_at)
+     values ($1, $2, 'accepted', now())`,
+    [alice, bob],
+  )
 }, 120_000)
 
 afterAll(async () => {
@@ -198,8 +204,7 @@ describe('writing into a conversation you are not part of', () => {
   })
 
   it('refuses to add itself as a participant of a group conversation', async () => {
-    // No participant-count trigger applies here, so the RLS insert policy is the
-    // only thing standing between Eve and someone else's group chat.
+    // Both the group guard and RLS reject an unrelated actor, even with its UUID.
     const groupRows = await db.asUser<{ create_group_conversation: string }>(
       alice,
       `select public.create_group_conversation($1, $2)`,
@@ -207,7 +212,7 @@ describe('writing into a conversation you are not part of', () => {
     )
     const conversationId = groupRows[0]!.create_group_conversation
 
-    await expectRejection(
+    const error = await expectRejection(
       () =>
         db.asUser(
           eve,
@@ -215,8 +220,9 @@ describe('writing into a conversation you are not part of', () => {
            values ($1, $2)`,
           [conversationId, eve],
         ),
-      REJECTS.rlsViolation,
+      /only a current active group admin/i,
     )
+    expect(error).toMatchObject({ code: '42501', hint: 'group_admin_required' })
 
     // And she still cannot read it.
     const rows = await db.asUser(

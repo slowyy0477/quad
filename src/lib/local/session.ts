@@ -1,38 +1,17 @@
 import 'server-only'
 
 import { cookies } from 'next/headers'
-import { createHmac, randomBytes, scryptSync, timingSafeEqual } from 'node:crypto'
-import { mutate, readStore, id, now, type LocalProfile, type LocalUser } from '@/lib/local/db'
+import { signUpSchema } from '@/features/auth/schemas'
+import { createHash, randomBytes, scryptSync, timingSafeEqual } from 'node:crypto'
+import { mutate, readStore, id, now, type LocalProfile, type LocalUser, type Tables } from '@/lib/local/db'
 
-/**
- * Local accounts and sessions.
- *
- * WHAT IS REAL HERE
- * -----------------
- * Passwords are salted and hashed with scrypt (`N=16384, r=8, p=1`, 64-byte key) —
- * the same primitive a production system would use, and no plaintext is ever
- * written. The session cookie is an HMAC over the user id, `httpOnly`, `sameSite=lax`,
- * and `secure` outside development, so a cookie cannot be edited to become another
- * account without the signing key.
- *
- * WHAT IS NOT REAL, AND IS NOT PRETENDED TO BE
- * --------------------------------------------
- * There is no email verification, no password-reset delivery, no rate limiting and
- * no second factor. The signing key falls back to a constant when
- * `LOCAL_SESSION_SECRET` is unset, which is fine for one person on one laptop and
- * unacceptable anywhere else — hence the production guard in `src/lib/mode.ts`.
- * The interface says "local mode" in the header so nobody mistakes this for the
- * Postgres deployment.
- */
+/** Opaque local sessions. Only SHA-256 token digests are persisted, never bearer tokens. */
 
 const COOKIE = 'quad_local_session'
 const MAX_AGE_SECONDS = 60 * 60 * 24 * 30
 
-function signingKey(): string {
-  const configured = process.env.LOCAL_SESSION_SECRET
-  if (configured && configured.length >= 16) return configured
-  return 'quad-local-development-signing-key-do-not-deploy'
-}
+/** Kept stable so accounts and cookies from the older local application still work. */
+export const LOCAL_SESSION_COOKIE = COOKIE
 
 export function hashPassword(password: string): string {
   const salt = randomBytes(16).toString('hex')
@@ -41,8 +20,8 @@ export function hashPassword(password: string): string {
 }
 
 export function verifyPassword(password: string, stored: string): boolean {
-  const [scheme, salt, expected] = stored.split('$')
-  if (scheme !== 'scrypt' || !salt || !expected) return false
+  if (password.length > 1024 || !/^scrypt\$[a-f0-9]{32}\$[a-f0-9]{128}$/i.test(stored)) return false
+  const [, salt, expected] = stored.split('$')
 
   const derived = scryptSync(password, salt, 64)
   const known = Buffer.from(expected, 'hex')
@@ -50,46 +29,75 @@ export function verifyPassword(password: string, stored: string): boolean {
   return timingSafeEqual(known, derived)
 }
 
-function sign(userId: string): string {
-  return createHmac('sha256', signingKey()).update(userId).digest('hex')
+function tokenDigest(raw: string | undefined): string | null {
+  if (!raw || !/^[A-Za-z0-9_-]{43}$/.test(raw)) return null
+  return createHash('sha256').update(raw).digest('hex')
 }
 
-/** The cookie value: `<userId>.<hmac>`. The id is public; the signature is not. */
-function token(userId: string): string {
-  return `${userId}.${sign(userId)}`
+/** Permanent disable never expires; temporary suspension requires a valid elapsed deadline. */
+function accountAvailable(db: Tables, user: LocalUser | undefined): user is LocalUser {
+  if (!user || user.disabled_at != null) return false
+  const profile = db.profiles.find((candidate) => candidate.user_id === user.id)
+  const state = profile && db.profile_account_states.find((candidate) => candidate.profile_id === profile.id)
+  if (state?.status !== 'suspended') return true
+  const deadline = state.suspended_until ? Date.parse(state.suspended_until) : NaN
+  return Number.isFinite(deadline) && deadline <= Date.now()
 }
 
-function userIdFromToken(raw: string | undefined): string | null {
-  if (!raw) return null
-  const index = raw.lastIndexOf('.')
-  if (index <= 0) return null
-
-  const userId = raw.slice(0, index)
-  const provided = raw.slice(index + 1)
-  const expected = sign(userId)
-
-  // Constant-time comparison, and equal lengths before the call is required:
-  // timingSafeEqual throws on a length mismatch, which would be a crash reachable
-  // by sending a wrong-shaped cookie.
-  const a = Buffer.from(provided, 'utf8')
-  const b = Buffer.from(expected, 'utf8')
-  if (a.length !== b.length) return null
-  return timingSafeEqual(a, b) ? userId : null
+/** Prevent an in-flight legacy-password login from creating a session after a change. */
+export class LocalCredentialsChangedError extends Error {
+  constructor() {
+    super('Credentials changed before the session could be issued')
+    this.name = 'LocalCredentialsChangedError'
+  }
 }
 
-export async function startSession(userId: string): Promise<void> {
+export async function startSession(
+  userId: string,
+  options?: { expectedPasswordHash: string },
+): Promise<void> {
   const store = await cookies()
-  store.set(COOKIE, token(userId), {
-    httpOnly: true,
-    sameSite: 'lax',
-    secure: process.env.NODE_ENV === 'production',
-    path: '/',
-    maxAge: MAX_AGE_SECONDS,
+  const token = randomBytes(32).toString('base64url')
+  const previous = tokenDigest(store.get(COOKIE)?.value)
+  await mutate((db) => {
+    const user = db.users.find((candidate) => candidate.id === userId)
+    if (!accountAvailable(db, user)) throw new Error('Account is unavailable')
+    if (options && user.password_hash !== options.expectedPasswordHash) throw new LocalCredentialsChangedError()
+    const timestamp = Date.now()
+    db.sessions = db.sessions.filter((session) => session.token_hash !== previous && Date.parse(session.expires_at) > timestamp)
+    const current = db.sessions.filter((session) => session.user_id === userId).sort((a, b) => a.created_at.localeCompare(b.created_at))
+    const evicted = new Set(current.slice(0, Math.max(0, current.length - 4)).map((session) => session.id))
+    db.sessions = db.sessions.filter((session) => !evicted.has(session.id))
+    db.sessions.push({
+      id: id('ses'),
+      user_id: userId,
+      token_hash: tokenDigest(token)!,
+      created_at: now(),
+      expires_at: new Date(Date.now() + MAX_AGE_SECONDS * 1000).toISOString(),
+    })
   })
+  try {
+    store.set(COOKIE, token, {
+      httpOnly: true,
+      sameSite: 'lax',
+      secure: process.env.NODE_ENV === 'production',
+      path: '/',
+      maxAge: MAX_AGE_SECONDS,
+    })
+  } catch (error) {
+    await mutate((db) => {
+      db.sessions = db.sessions.filter((session) => session.token_hash !== tokenDigest(token))
+    })
+    throw error
+  }
 }
 
 export async function endSession(): Promise<void> {
   const store = await cookies()
+  const digest = tokenDigest(store.get(COOKIE)?.value)
+  if (digest) await mutate((db) => {
+    db.sessions = db.sessions.filter((session) => session.token_hash !== digest)
+  })
   store.delete(COOKIE)
 }
 
@@ -99,15 +107,33 @@ export type LocalSessionUser = {
   profile: LocalProfile | null
 }
 
-/** The signed-in account, read from the signed cookie. */
+/** Resolve a bearer token through the private server-side session table. */
 export async function getLocalUser(): Promise<LocalSessionUser | null> {
-  const store = await cookies()
-  const userId = userIdFromToken(store.get(COOKIE)?.value)
-  if (!userId) return null
+  return getLocalUserFromToken((await cookies()).get(COOKIE)?.value)
+}
 
-  const db = await readStore()
-  const user = db.users.find((candidate) => candidate.id === userId)
-  if (!user) return null
+/** Cookie-independent authorization for the Node-runtime proxy. */
+export async function getLocalUserFromToken(raw: string | undefined): Promise<LocalSessionUser | null> {
+  const digest = tokenDigest(raw)
+  if (!digest) return null
+  return getLocalUserFromSnapshot(await readStore(), raw)
+}
+
+/**
+ * The same session check against a locked write snapshot. Sensitive mutations
+ * must not authorize against an earlier read and then write after revocation.
+ */
+export function getLocalUserFromSnapshot(db: Tables, raw: string | undefined): LocalSessionUser | null {
+  const digest = tokenDigest(raw)
+  if (!digest) return null
+
+  const session = db.sessions.find((candidate) => candidate.token_hash === digest)
+  if (!session) return null
+  const created = Date.parse(session.created_at)
+  const expires = Date.parse(session.expires_at)
+  if (!Number.isFinite(created) || !Number.isFinite(expires) || created > Date.now() || expires <= Date.now() || expires <= created) return null
+  const user = db.users.find((candidate) => candidate.id === session.user_id)
+  if (!accountAvailable(db, user)) return null
 
   return {
     id: user.id,
@@ -116,26 +142,20 @@ export async function getLocalUser(): Promise<LocalSessionUser | null> {
   }
 }
 
-/** A username from a display name, made unique against the accounts that exist. */
+/** Select from the transaction snapshot, never from a pre-write availability check. */
+function usernameFromProfiles(displayName: string, email: string, profiles: LocalProfile[]): string {
+  const clean = (value: string) => value.toLowerCase().replace(/[^a-z0-9_]+/g, '_').slice(0, 20).replace(/^_+|_+$/g, '')
+  const seed = clean(displayName) || clean(email.split('@')[0] ?? '') || 'student'
+  const base = seed.length >= 3 ? seed : `${seed}_student`
+  const taken = new Set(profiles.map((profile) => profile.username.toLowerCase()))
+  let candidate = base
+  for (let suffix = 2; taken.has(candidate); suffix += 1) candidate = `${base}${suffix}`
+  return candidate
+}
+
+/** Informational only. Account creation allocates its username inside mutate. */
 export async function uniqueUsername(displayName: string, email: string): Promise<string> {
-  const db = await readStore()
-  const base =
-    displayName
-      .toLowerCase()
-      .replace(/[^a-z0-9_]+/g, '_')
-      .replace(/^_+|_+$/g, '')
-      .slice(0, 20) ||
-    email.split('@')[0]?.replace(/[^a-z0-9_]+/g, '_').slice(0, 20) ||
-    'student'
-
-  const taken = new Set(db.profiles.map((profile) => profile.username.toLowerCase()))
-  if (!taken.has(base)) return base
-
-  for (let suffix = 2; suffix < 500; suffix += 1) {
-    const candidate = `${base}${suffix}`
-    if (!taken.has(candidate)) return candidate
-  }
-  return `${base}${Date.now().toString(36).slice(-4)}`
+  return usernameFromProfiles(displayName, email, (await readStore()).profiles)
 }
 
 /** Create the account and its profile in one write. Returns null when the email is taken. */
@@ -150,11 +170,14 @@ export async function createAccount({
   displayName: string
   universityId?: string | null
 }): Promise<{ user: LocalUser; profile: LocalProfile } | null> {
-  const normalised = email.trim().toLowerCase()
-  const username = await uniqueUsername(displayName, normalised)
+  const parsed = signUpSchema.safeParse({ email, password, displayName, acceptTerms: 'on' })
+  if (!parsed.success) throw new Error('Invalid account details')
+  const normalised = parsed.data.email
+  displayName = parsed.data.displayName
 
   return mutate((db) => {
-    if (db.users.some((candidate) => candidate.email === normalised)) return null
+    if (db.users.some((candidate) => candidate.email.trim().toLowerCase() === normalised)) return null
+    const username = usernameFromProfiles(displayName, normalised, db.profiles)
 
     const user: LocalUser = {
       id: id('usr'),
@@ -176,8 +199,11 @@ export async function createAccount({
       semester: null,
       website: null,
       github: null,
-      visibility: 'public',
+      // This applies only to newly created rows. Existing accounts are not migrated.
+      visibility: 'private',
       searchable: true,
+      onboarding_completed: false,
+      onboarding_step: 0,
       created_at: now(),
     }
 
@@ -190,8 +216,8 @@ export async function createAccount({
 /** Verify an email and password. Returns the account, or null for either kind of miss. */
 export async function checkCredentials(email: string, password: string): Promise<LocalUser | null> {
   const db = await readStore()
-  const user = db.users.find((candidate) => candidate.email === email.trim().toLowerCase())
-  if (!user) return null
+  const user = db.users.find((candidate) => candidate.email.trim().toLowerCase() === email.trim().toLowerCase())
+  if (!accountAvailable(db, user)) return null
   if (!verifyPassword(password, user.password_hash)) return null
   return user
 }

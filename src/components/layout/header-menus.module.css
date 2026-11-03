@@ -1,0 +1,108 @@
+.trigger,
+.close {
+  display: inline-flex;
+  position: relative;
+  flex-shrink: 0;
+  align-items: center;
+  justify-content: center;
+  min-block-size: 44px;
+  min-inline-size: 44px;
+  border-radius: var(--radius-sm);
+  color: var(--color-ink-muted);
+}
+
+.trigger:hover,
+.close:hover,
+.trigger[data-state='open'] {
+  background: var(--color-paper-sunken);
+  color: var(--color-ink);
+}
+
+.panel {
+  z-index: 60;
+  display: flex;
+  flex-direction: column;
+  inline-size: min(24rem, calc(100vw - 24px));
+  max-inline-size: min(
+    var(--radix-popover-content-available-width, calc(100vw - 24px)),
+    calc(100vw - 24px)
+  );
+  max-block-size: min(
+    var(--radix-popover-content-available-height, calc(100dvh - 24px)),
+    calc(100dvh - 24px)
+  );
+  /* One internal scroller includes the heading on short viewports; an
+     unshrinkable heading must not protrude beyond the constrained panel. */
+  overflow-y: auto;
+  overscroll-behavior: contain;
+  border: 1px solid var(--color-rule);
+  border-radius: var(--radius-md);
+  background: var(--color-paper-raised);
+  color: var(--color-ink);
+  box-shadow: var(--shadow-float);
+  transform-origin: var(--radix-popover-content-transform-origin);
+}
+
+.panel[data-header-menu='campus'] {
+  inline-size: min(32rem, calc(100vw - 24px));
+}
+
+.heading {
+  display: flex;
+  flex-shrink: 0;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 0.75rem;
+  border-bottom: 1px solid var(--color-hairline);
+  padding: 0.75rem 1rem;
+}
+
+.body {
+  flex-shrink: 0;
+  min-block-size: 0;
+  min-inline-size: 0;
+  padding: 1rem;
+}
+
+/* Scoped to these panels, never a global Dialog/control override. */
+.panel :where(a[href], button, select, input:not([type='hidden']), summary) {
+  min-block-size: 44px;
+  min-inline-size: 44px;
+}
+
+.panel :where(a[href]) {
+  display: inline-flex;
+  align-items: center;
+}
+
+.panel :where(p, a, h2) {
+  overflow-wrap: anywhere;
+}
+
+@media (prefers-reduced-motion: no-preference) {
+  .trigger,
+  .close {
+    transition: color 140ms ease-out, background-color 140ms ease-out;
+  }
+
+  .panel[data-state='open'] {
+    animation: header-menu-arrive 160ms var(--ease-out-soft);
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .panel,
+  .trigger,
+  .close,
+  .panel *,
+  .panel *::before,
+  .panel *::after {
+    animation: none !important;
+    transition: none !important;
+  }
+}
+
+@keyframes header-menu-arrive {
+  from { opacity: 0; transform: translateY(4px); }
+  to { opacity: 1; transform: translateY(0); }
+}

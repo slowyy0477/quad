@@ -73,8 +73,8 @@ export default async function StudyLogPage() {
   const todaysEntry = log.entries.find((entry) => entry.log_date === today)
 
   return (
-    <div className="mx-auto w-full max-w-2xl px-4 py-8 sm:py-12">
-      <header className="border-b border-rule pb-4">
+    <div className="page-enter mx-auto w-full max-w-2xl px-4 py-8 sm:py-12">
+      <header className="border-b border-hairline pb-5">
         <div className="flex flex-wrap items-baseline justify-between gap-3">
           <h1 className="text-3xl">Study log</h1>
           <Link href="/goals" className="text-sm text-accent-700 underline-offset-4 hover:underline">
@@ -82,8 +82,8 @@ export default async function StudyLogPage() {
           </Link>
         </div>
         <p className="mt-2 max-w-prose text-sm text-ink-muted">
-          One entry a day. The streak is the run of consecutive days you wrote one — two
-          entries on the same day still count once.
+          What you studied, what went well, and what to try next. A small record
+          you can come back to.
         </p>
       </header>
 
@@ -105,22 +105,21 @@ export default async function StudyLogPage() {
           </p>
           <p className="mt-1 text-sm text-ink-muted">
             {log.streak > 0
-              ? 'Counted by the database from your entries, every time this page loads.'
+              ? 'Consecutive days with an entry. Each day counts once.'
               : 'No run is live at the moment. One entry today starts a new one.'}
           </p>
           <StreakStrip className="mt-4" days={strip} />
         </section>
       ) : (
         <EmptyState className="mt-6" title="No entries yet">
-          The first entry is the whole beginning. Log today, and a streak exists from
-          tomorrow — not before, because there is nothing yet to count.
+          Write a little about today. Your study history and streak will appear here.
         </EmptyState>
       )}
 
       <section className="mt-7" aria-labelledby="entry-heading">
         <SectionHeading
           title={todaysEntry ? 'Today’s entry' : 'Log today'}
-          description={`The day is the database's current date (UTC): ${today}. Entries are one per day.`}
+          description={`Today in UTC: ${today}. One entry per day; saving again updates it.`}
         />
         <div className="mt-4">
           <DailyLogForm today={today} existing={todaysEntry} />
@@ -140,10 +139,7 @@ export default async function StudyLogPage() {
       ) : null}
 
       <p className="mt-10 border-t border-hairline pt-4 text-2xs text-ink-faint">
-        The streak counts days in the database&rsquo;s time zone, which is UTC — so it rolls
-        over at midnight UTC rather than at your local midnight. The page and the database
-        use the same boundary; a streak that reset at a different midnight than the one your
-        rows are filed under would be a bug.
+        Your entries are private. Days roll over at midnight UTC (5:00 am in Karachi).
       </p>
     </div>
   )

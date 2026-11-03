@@ -16,7 +16,7 @@ import { optionalText, requiredText } from '@/lib/form-schemas'
  */
 
 /** The things a reader can report. The list is the CHECK constraint on reports.kind. */
-export const REPORT_KINDS = ['post', 'comment', 'project', 'idea', 'message', 'profile'] as const
+export const REPORT_KINDS = ['post', 'comment', 'project', 'idea', 'message', 'profile', 'event', 'opportunity'] as const
 
 export type ReportKind = (typeof REPORT_KINDS)[number]
 
@@ -35,6 +35,8 @@ export const REPORT_TARGET_COLUMN: Record<ReportKind, string> = {
   idea: 'idea_id',
   message: 'message_id',
   profile: 'user_id',
+  event: 'event_id',
+  opportunity: 'opportunity_id',
 }
 
 /**

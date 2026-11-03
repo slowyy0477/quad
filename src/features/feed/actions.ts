@@ -5,6 +5,7 @@ import { z } from 'zod'
 import { isSupabaseConfigured } from '@/lib/env'
 import { id, mutate, now, readStore, type LocalProfile } from '@/lib/local/db'
 import { isLocalMode } from '@/lib/mode'
+import { localFormWrite, localInteractionWrite } from '@/lib/local/write-result'
 import { createClient, getUser } from '@/lib/supabase/server'
 import { localCanViewPost } from '@/features/feed/queries'
 import type {
@@ -167,12 +168,12 @@ export async function createPostAction(
       : 'text'
 
   if (isLocalMode()) {
-    return createLocalPost({
+    return localFormWrite(() => createLocalPost({
       body: parsed.data.body,
       visibility: parsed.data.visibility,
       projectId: parsed.data.projectId,
       goalId: parsed.data.goalId,
-    })
+    }), formData)
   }
 
   const supabase = await createClient()
@@ -223,11 +224,11 @@ export async function createCommentAction(
 
   // No author_id: `comments_before_write` forces it to auth.uid() on insert.
   if (isLocalMode()) {
-    return createLocalComment({
+    return localFormWrite(() => createLocalComment({
       postId: parsed.data.postId,
       parentId: parsed.data.parentId,
       body: parsed.data.body,
-    })
+    }), formData)
   }
 
   const supabase = await createClient()
@@ -292,14 +293,14 @@ export async function setPostLikeAction(input: {
   postId: string
   active: boolean
 }): Promise<InteractionResult> {
-  if (!isSupabaseConfigured()) {
+  if (!isLocalMode() && !isSupabaseConfigured()) {
     return { ok: false, message: 'Liking is unavailable: this deployment has no database.' }
   }
 
   const parsed = interactionSchema.safeParse(input)
   if (!parsed.success) return { ok: false, message: 'That post could not be identified.' }
 
-  if (isLocalMode()) return setLocalLike(parsed.data.postId, parsed.data.active)
+  if (isLocalMode()) return localInteractionWrite(() => setLocalLike(parsed.data.postId, parsed.data.active))
 
   const user = await getUser()
   // A signed-out visitor has no row to write. The action says so instead of
@@ -355,14 +356,14 @@ export async function setPostSaveAction(input: {
   postId: string
   active: boolean
 }): Promise<InteractionResult> {
-  if (!isSupabaseConfigured()) {
+  if (!isLocalMode() && !isSupabaseConfigured()) {
     return { ok: false, message: 'Saving is unavailable: this deployment has no database.' }
   }
 
   const parsed = interactionSchema.safeParse(input)
   if (!parsed.success) return { ok: false, message: 'That post could not be identified.' }
 
-  if (isLocalMode()) return setLocalSave(parsed.data.postId, parsed.data.active)
+  if (isLocalMode()) return localInteractionWrite(() => setLocalSave(parsed.data.postId, parsed.data.active))
 
   const user = await getUser()
   if (!user) return { ok: false, message: 'Sign in to save posts.' }
@@ -435,7 +436,7 @@ async function localPostFor(
   const author = post ? db.profiles.find((profile) => profile.id === post.author_id) : undefined
 
   if (!me) return { failure: { ok: false, message: messages.signedOut } }
-  if (!post || !localCanViewPost(post, me, author)) {
+  if (!post || !localCanViewPost(post, me, author, db)) {
     return { failure: { ok: false, message: messages.refused } }
   }
 
@@ -576,7 +577,7 @@ async function createLocalComment(input: {
 
   const post = db.posts.find((candidate) => candidate.id === input.postId)
   const author = post ? db.profiles.find((profile) => profile.id === post.author_id) : undefined
-  if (!post || !localCanViewPost(post, me, author)) {
+  if (!post || !localCanViewPost(post, me, author, db)) {
     return {
       status: 'error',
       message: 'You are not allowed to comment on that post.',

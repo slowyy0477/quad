@@ -5,6 +5,7 @@ import { createClient, getUser } from '@/lib/supabase/server'
 import { isLocalMode } from '@/lib/mode'
 import { readStore, type LocalEvent, type LocalProfile, type Tables } from '@/lib/local/db'
 import { eventHasPassed } from '@/features/events/when'
+import { canReadContent, canReadProfile } from '@/lib/local/access'
 
 /**
  * Event reads.
@@ -185,7 +186,7 @@ function localSlugs(rows: LocalEvent[]): Map<string, string> {
   )
 
   for (const row of ordered) {
-    const slug = uniqueAgainst(used, row.title)
+    const slug = row.slug ?? uniqueAgainst(used, row.title)
     used.add(slug)
     out.set(row.id, slug)
   }
@@ -215,15 +216,7 @@ export function localEventSlug(db: Tables, eventId: string): string {
  * at the creator's university, which is the value the trigger denormalised.
  */
 export function canViewEvent(db: Tables, event: LocalEvent, viewer: LocalProfile | null): boolean {
-  if (viewer && event.created_by === viewer.id) return true
-  if (event.deleted_at !== null) return false
-  if (event.visibility === 'public') return true
-  if (event.visibility !== 'university') return false
-
-  const creator = db.profiles.find((profile) => profile.id === event.created_by)
-  return Boolean(
-    viewer?.university_id && creator?.university_id && viewer.university_id === creator.university_id,
-  )
+  return canReadContent(db, event, event.created_by, viewer, 'event')
 }
 
 async function localContext(): Promise<{ db: Tables; viewer: LocalProfile | null }> {
@@ -317,7 +310,7 @@ function localMode(row: LocalEvent): string {
   // No `attendance_mode` column: the only evidence in the row is whether a venue
   // was written down. Stated here so every reader of the shape sees the inference
   // in one place rather than in each caller.
-  return row.location ? 'onsite' : 'online'
+  return row.attendance_mode ?? (row.location ? 'onsite' : 'online')
 }
 
 function localListRow(db: Tables, row: LocalEvent, slug: string): EventListRow {
@@ -327,17 +320,17 @@ function localListRow(db: Tables, row: LocalEvent, slug: string): EventListRow {
     slug,
     title: row.title,
     // No `type` column, and nothing in the row that implies one.
-    type: 'other',
+    type: row.type ?? 'other',
     starts_at: row.starts_at,
     ends_at: row.ends_at,
     time_zone: row.timezone,
     // No `is_all_day` column: an all-day event cannot be stored here, and
     // claiming it for every event would be a bigger lie than a stated time.
-    is_all_day: false,
+    is_all_day: row.is_all_day ?? false,
     attendance_mode: localMode(row),
     location: row.location,
     // No `join_url` column: an online event's link is not kept locally.
-    join_url: null,
+    join_url: row.join_url ?? null,
     visibility: row.visibility,
     capacity: row.capacity,
     // Derived from the attendee rows, never the stored counter: the store has no
@@ -349,9 +342,9 @@ function localListRow(db: Tables, row: LocalEvent, slug: string): EventListRow {
   }
 }
 
-function localHost(db: Tables, profileId: string): EventDetail['host'] {
+function localHost(db: Tables, profileId: string, viewer: LocalProfile | null): EventDetail['host'] {
   const profile = db.profiles.find((entry) => entry.id === profileId)
-  if (!profile) return null
+  if (!profile || !canReadProfile(db, profile, viewer)) return null
   return {
     id: profile.id,
     username: profile.username,
@@ -362,16 +355,16 @@ function localHost(db: Tables, profileId: string): EventDetail['host'] {
   }
 }
 
-function localDetailRow(db: Tables, row: LocalEvent, slug: string): EventDetail {
+function localDetailRow(db: Tables, row: LocalEvent, slug: string, viewer: LocalProfile | null): EventDetail {
   return {
     ...localListRow(db, row, slug),
     description: row.description,
     // No `location_url` column.
-    location_url: null,
+    location_url: row.location_url ?? null,
     created_by: row.created_by,
     // No `project_id` column: no local event belongs to a project.
     project: null,
-    host: localHost(db, row.created_by),
+    host: localHost(db, row.created_by, viewer),
   }
 }
 
@@ -415,7 +408,7 @@ export async function listEvents({
       )
       // `type` has no local column, so every row reports `other`; a filter for a
       // kind the store cannot record matches nothing rather than everything.
-      .filter(() => !type || type === 'other')
+      .filter((row) => !type || (row.type ?? 'other') === type)
       .filter((row) => (mode ? localMode(row) === mode : true))
       .sort((a, b) => startOrder(a, b, upcoming))
       .filter((row) => afterStartCursor(row, start, upcoming))
@@ -504,7 +497,7 @@ export async function getEventBySlug(slug: string): Promise<EventDetail | null> 
     const row = db.events.find((entry) => entry.deleted_at === null && derived.get(entry.id) === slug)
     if (!row || !canViewEvent(db, row, viewer)) return null
 
-    return localDetailRow(db, row, derived.get(row.id) ?? row.id)
+    return localDetailRow(db, row, derived.get(row.id) ?? row.id, viewer)
   }
 
   const supabase = await createClient()

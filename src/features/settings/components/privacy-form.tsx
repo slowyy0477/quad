@@ -64,16 +64,16 @@ export function PrivacyForm({ profile }: { profile: PrivacySettings }) {
       </fieldset>
 
       <fieldset className="space-y-2">
-        <legend className="text-sm font-medium text-ink">Who can message you</legend>
+        <legend className="text-sm font-medium text-ink">Who can send you direct messages</legend>
         <RadioGroup name="allow_messages_from" defaultValue={profile.allow_messages_from}>
-          <RadioOption id="messages-everyone" value="everyone" label="Anyone on Quad" />
+          <RadioOption id="messages-everyone" value="everyone" label="Anyone on Bulla" />
           <RadioOption id="messages-university" value="university" label="People at my university" />
           <RadioOption id="messages-connections" value="connections" label="Only people I have accepted" />
           <RadioOption
             id="messages-nobody"
             value="nobody"
             label="Nobody"
-            description="Existing conversations stay readable; no new ones can be started."
+            description="No new direct conversations or incoming direct messages, including in existing conversations. Your readable history stays."
           />
         </RadioGroup>
       </fieldset>

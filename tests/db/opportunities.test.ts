@@ -651,7 +651,7 @@ describe('RSVPs', () => {
            values ($1, $2, 'going')`,
           [hidden, outsider],
         ),
-      /Event not found/i,
+      /That event is unavailable/i,
     )
   })
 

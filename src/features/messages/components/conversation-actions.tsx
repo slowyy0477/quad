@@ -2,7 +2,7 @@
 
 import { useRouter } from 'next/navigation'
 import { useState, useTransition } from 'react'
-import { BellOff, BellRing, CheckCheck, MoreHorizontal } from 'lucide-react'
+import { BellOff, BellRing, CheckCheck, LogOut, MoreHorizontal } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import {
   DropdownMenu,
@@ -14,6 +14,7 @@ import {
 import {
   markConversationReadAction,
   setConversationMutedAction,
+  leaveConversationAction,
 } from '@/features/messages/actions'
 
 /**
@@ -40,10 +41,14 @@ export function ConversationActions({
   conversationId,
   isMuted,
   unreadCount,
+  left = false,
+  leaveBlockedReason,
 }: {
   conversationId: string
   isMuted: boolean
   unreadCount: number
+  left?: boolean
+  leaveBlockedReason?: string
 }) {
   const router = useRouter()
   const [error, setError] = useState<string | null>(null)
@@ -83,6 +88,15 @@ export function ConversationActions({
     })
   }
 
+  function leave() {
+    setError(null)
+    startTransition(async () => {
+      const result = await leaveConversationAction(conversationId)
+      if (result.ok) router.refresh()
+      else setError(result.message)
+    })
+  }
+
   return (
     <div className="shrink-0">
       <DropdownMenu>
@@ -100,13 +114,13 @@ export function ConversationActions({
 
         <DropdownMenuContent>
           {unreadCount > 0 ? (
-            <DropdownMenuItem onSelect={markRead}>
+            <DropdownMenuItem onSelect={markRead} disabled={pending}>
               <CheckCheck className="size-4" aria-hidden="true" />
               Mark as read
             </DropdownMenuItem>
           ) : null}
 
-          <DropdownMenuItem onSelect={toggleMute}>
+          <DropdownMenuItem onSelect={toggleMute} disabled={pending}>
             {muted ? (
               <>
                 <BellRing className="size-4" aria-hidden="true" />
@@ -121,9 +135,15 @@ export function ConversationActions({
           </DropdownMenuItem>
 
           <DropdownMenuSeparator />
+          {!left ? (
+            <DropdownMenuItem onSelect={leave} disabled={pending || Boolean(leaveBlockedReason)}>
+              <LogOut className="size-4" aria-hidden="true" />
+              Leave conversation
+            </DropdownMenuItem>
+          ) : null}
           <p className="px-2.5 pb-1.5 text-2xs text-ink-faint">
-            Muting stops being told about new messages here. The unread count still moves, because
-            it counts messages you have not read.
+            {leaveBlockedReason ?? (left ? 'Only messages from your membership remain readable.' :
+              'Muting stops notifications, not unread counts. Leaving stops access to future messages.')}
           </p>
         </DropdownMenuContent>
       </DropdownMenu>
